@@ -1,0 +1,12 @@
+id: clinical-trials
+title: ClinicalTrials.gov CLI
+domain: Clinical trials & health
+target: https://clinicaltrials.gov/api/v2
+lane: service
+goal: make trial search agent-native and converge to Grade A
+kind: demo
+contributor: wjlgatech
+exit_criteria:
+  target_grade: A
+  max_iterations: 10
+result_ref: clinical-trials.json

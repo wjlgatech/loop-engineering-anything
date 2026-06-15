@@ -1,0 +1,12 @@
+id: supply-chain
+title: OpenSky logistics CLI
+domain: Supply chain & logistics
+target: https://opensky-network.org/api
+lane: service
+goal: make live air-traffic/logistics tracking agent-native
+kind: demo
+contributor: wjlgatech
+exit_criteria:
+  target_grade: A
+  max_iterations: 10
+result_ref: supply-chain.json

@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "loop-engineering-anything demo manifest",
+  "type": "object",
+  "required": ["id", "title", "domain", "target", "lane", "goal", "kind"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "kebab-case slug, unique across the registry"
+    },
+    "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "domain": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "target": { "type": "string", "minLength": 1, "maxLength": 400 },
+    "lane": { "type": "string", "enum": ["service", "codebase"] },
+    "goal": { "type": "string", "minLength": 1, "maxLength": 400 },
+    "kind": { "type": "string", "enum": ["demo", "recipe"] },
+    "contributor": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9-]{1,39}$",
+      "description": "GitHub handle; HTML-special characters disallowed by pattern"
+    },
+    "required_env": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+      "description": "names of env vars a credentialed target needs (never values)"
+    },
+    "exit_criteria": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "target_grade": { "type": "string", "enum": ["A", "B", "C", "D", "F"] },
+        "max_iterations": { "type": "integer", "minimum": 1, "maximum": 100 }
+      }
+    },
+    "result_ref": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*\\.json$",
+      "description": "slug-only fixture filename under demos/results/ (no path, no ..)"
+    }
+  }
+}

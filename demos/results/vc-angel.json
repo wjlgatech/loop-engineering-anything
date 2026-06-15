@@ -1,0 +1,13 @@
+{
+  "demo_id": "vc-angel",
+  "source": "illustrative",
+  "grade_trajectory": [
+    "C",
+    "B",
+    "A"
+  ],
+  "final_grade": "A",
+  "convergence_status": "converged",
+  "report_ref": "vc-angel.report.md",
+  "engine_version": "0.1.0"
+}

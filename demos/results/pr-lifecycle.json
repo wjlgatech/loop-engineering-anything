@@ -1,0 +1,13 @@
+{
+  "demo_id": "pr-lifecycle",
+  "source": "illustrative",
+  "grade_trajectory": [
+    "C",
+    "B",
+    "A"
+  ],
+  "final_grade": "A",
+  "convergence_status": "converged",
+  "report_ref": "pr-lifecycle.report.md",
+  "engine_version": "0.1.0"
+}

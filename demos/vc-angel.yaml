@@ -1,0 +1,12 @@
+id: vc-angel
+title: SEC company-facts CLI
+domain: VC & angel investing
+target: https://data.sec.gov/api/xbrl
+lane: service
+goal: make company financial-facts lookups agent-native
+kind: demo
+contributor: wjlgatech
+exit_criteria:
+  target_grade: A
+  max_iterations: 10
+result_ref: vc-angel.json

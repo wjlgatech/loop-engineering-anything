@@ -1,0 +1,9 @@
+id: smart-grid-dispatch
+title: Predictive grid dispatch loop
+domain: Smart-grid energy
+target: https://api.open-meteo.com/v1
+lane: service
+goal: simulate 24h grid load and reroute micro-grid discharge until predicted stability
+  with zero maintenance risk
+kind: recipe
+contributor: wjlgatech

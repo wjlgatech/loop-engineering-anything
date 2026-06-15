@@ -1,0 +1,13 @@
+{
+  "demo_id": "smart-grid",
+  "source": "illustrative",
+  "grade_trajectory": [
+    "C",
+    "B",
+    "A"
+  ],
+  "final_grade": "A",
+  "convergence_status": "converged",
+  "report_ref": "smart-grid.report.md",
+  "engine_version": "0.1.0"
+}

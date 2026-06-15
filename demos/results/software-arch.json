@@ -1,0 +1,13 @@
+{
+  "demo_id": "software-arch",
+  "source": "illustrative",
+  "grade_trajectory": [
+    "D",
+    "C",
+    "B"
+  ],
+  "final_grade": "B",
+  "convergence_status": "stopped",
+  "report_ref": "software-arch.report.md",
+  "engine_version": "0.1.0"
+}

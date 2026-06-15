@@ -15,5 +15,8 @@ runs/
 # Agent worktrees
 .claude/worktrees/
 
+# Generated showcase catalog
+/showcase.html
+
 # OS
 .DS_Store

@@ -37,6 +37,9 @@ implementation plan.
 | `src/loopeng/adapters/` | contracts, `safety.py` (subprocess/jail), factory + judge shells (U4/U5) |
 | `src/loopeng/loop/` | controller, convergence, brief, compound, `GitCheckpoint` (U6) |
 | `src/loopeng/autonomous/` | research report + autonomous runner shell (U8) |
+| `src/loopeng/demos/` | demo manifest/registry + result fixtures (validated; SSRF/traversal/secret guards) |
+| `src/loopeng/showcase/` | self-contained HTML catalog generator (context-aware escaping) |
+| `demos/` · `docs/recipes/` | community demo manifests + fixtures; aspirational loop recipes |
 | `skills/loop-anything/` | the `/loop-anything` agent skill |
 
 ## Conventions

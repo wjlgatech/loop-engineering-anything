@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "loop-engineering-anything demo result fixture",
+  "type": "object",
+  "required": ["demo_id", "source", "grade_trajectory", "final_grade", "convergence_status"],
+  "additionalProperties": false,
+  "properties": {
+    "demo_id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "source": {
+      "type": "string",
+      "enum": ["illustrative", "live_verified"],
+      "description": "illustrative = hand-authored, never run; live_verified = snapshot of a real run"
+    },
+    "grade_trajectory": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["A", "B", "C", "D", "F"] },
+      "minItems": 1
+    },
+    "final_grade": { "type": "string", "enum": ["A", "B", "C", "D", "F"] },
+    "convergence_status": {
+      "type": "string",
+      "enum": ["converged", "stopped", "blocked_safety"]
+    },
+    "report_ref": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*\\.report\\.md$"
+    },
+    "recorded_at": { "type": "string" },
+    "engine_version": { "type": "string" }
+  }
+}

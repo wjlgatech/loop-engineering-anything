@@ -1,0 +1,9 @@
+id: clinical-trial-protocol
+title: Trial-protocol refinement loop
+domain: Clinical trials & health
+target: https://clinicaltrials.gov/api/v2
+lane: service
+goal: monitor telemetry for statistical drift and recalibrate recruitment criteria
+  until trial safety is maximized
+kind: recipe
+contributor: wjlgatech

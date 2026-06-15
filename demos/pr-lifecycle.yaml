@@ -1,0 +1,14 @@
+id: pr-lifecycle
+title: Autonomous PR-lifecycle CLI
+domain: Interactive spec / PR lifecycle
+target: https://api.github.com
+lane: service
+goal: make the GitHub PR/CI surface agent-native and raise it to Grade A
+kind: demo
+contributor: wjlgatech
+exit_criteria:
+  target_grade: A
+  max_iterations: 10
+result_ref: pr-lifecycle.json
+required_env:
+- GITHUB_TOKEN
