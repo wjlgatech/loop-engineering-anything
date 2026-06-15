@@ -34,9 +34,9 @@ implementation plan.
 | `src/loopeng/preflight.py` | dependency detection (per-mechanism) |
 | `src/loopeng/router.py` | target → lane classification (U3) |
 | `src/loopeng/memory/` | SQLite run history + trend/plateau/recurring queries (U2) |
-| `src/loopeng/adapters/` | contracts + (incoming) real tool bindings (U4/U5) |
-| `src/loopeng/loop/` | controller state machine, convergence, brief, compound (U6) |
-| `src/loopeng/autonomous/` | research report; runner is a deferred unit (U8) |
+| `src/loopeng/adapters/` | contracts, `safety.py` (subprocess/jail), factory + judge shells (U4/U5) |
+| `src/loopeng/loop/` | controller, convergence, brief, compound, `GitCheckpoint` (U6) |
+| `src/loopeng/autonomous/` | research report + autonomous runner shell (U8) |
 | `skills/loop-anything/` | the `/loop-anything` agent skill |
 
 ## Conventions
