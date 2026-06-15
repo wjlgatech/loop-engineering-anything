@@ -61,6 +61,39 @@ def _trajectory(result) -> str:
     return " &rarr; ".join(_t(g) for g in result.grade_trajectory)
 
 
+def _proof_line(result) -> str:
+    """Compact before/after summary for a verified card, from the proof pack.
+
+    Renders e.g. "C &rarr; A · top: D3 +18 · 4 iters · 38s". All values are
+    numbers/letters derived from the parsed proof pack, but they are escaped
+    defensively anyway."""
+    proof = getattr(result, "proof", None)
+    if not proof:
+        return ""
+    bits = []
+    before, after = proof.get("before_grade"), proof.get("after_grade")
+    if before and after:
+        bits.append(f"{_t(before)} &rarr; {_t(after)}")
+    # Highlight the dimension with the largest positive delta.
+    dim_diff = proof.get("dim_diff") or {}
+    best = None
+    for name, d in dim_diff.items():
+        delta = d.get("delta")
+        if isinstance(delta, (int, float)) and (best is None or delta > best[1]):
+            best = (name, delta)
+    if best and best[1] > 0:
+        bits.append(f"top: {_t(best[0])} +{_t(str(round(best[1], 1)))}")
+    if isinstance(proof.get("iterations"), int):
+        bits.append(f"{_t(str(proof['iterations']))} iters")
+    if isinstance(proof.get("elapsed_seconds"), (int, float)):
+        bits.append(f"{_t(str(round(proof['elapsed_seconds'])))}s")
+    if isinstance(proof.get("token_cost"), int):
+        bits.append(f"{_t(str(proof['token_cost']))} tok")
+    if not bits:
+        return ""
+    return f'<p class="proof" aria-label="before/after proof">{" &middot; ".join(bits)}</p>'
+
+
 def _demo_card(manifest, result, base_url: str = "") -> str:
     search_blob = " ".join(
         x for x in (manifest.id, manifest.domain, manifest.target, manifest.contributor) if x
@@ -91,6 +124,7 @@ def _demo_card(manifest, result, base_url: str = "") -> str:
         body = (
             f'<p class="traj" aria-label="grade trajectory {_a(" to ".join(result.grade_trajectory))}">'
             f'{_trajectory(result)}</p>'
+            f'{_proof_line(result) if result.verified else ""}'
             f'<span class="badge grade {grade_cls}">{_t(result.final_grade)}</span>'
             f'<span class="badge conv {_a(result.convergence_status)}">{_t(result.convergence_status)}</span>'
             f'{prov}{report}'
@@ -138,6 +172,7 @@ _CSS = """
 .card h3{margin:.1em 0;font-size:1.05rem}.card .domain{color:var(--acc);font-size:.8rem;margin:.2em 0}
 .card .target,.card .goal{color:var(--mut);font-size:.85rem;word-break:break-word}
 .traj{font-size:1.3rem;font-weight:600;letter-spacing:1px;margin:.4em 0}
+.proof{font-size:.8rem;color:#9aa4b2;margin:.2em 0 .5em;font-variant-numeric:tabular-nums}
 .badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.72rem;margin:2px 4px 2px 0}
 .grade{font-weight:700}.g-a{background:#1a7f37;color:#fff}.g-b{background:#2f6f4f;color:#fff}.g-c{background:#9e6a03;color:#fff}.g-d{background:#bb5a00;color:#fff}.g-f{background:#cf222e;color:#fff}.g-q{background:#30363d;color:var(--mut)}
 .conv{background:#21262d;color:var(--mut)}.conv.blocked_safety{background:#cf222e;color:#fff}

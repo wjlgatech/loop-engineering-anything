@@ -119,3 +119,88 @@ def test_demo_record_writes_fixture_and_report(demos_dir, tmp_path, monkeypatch)
     assert fixture["grade_trajectory"] == ["C", "A"]
     assert fixture["convergence_status"] == "converged"
     assert (demos_dir / "results" / "clinical-trials.report.md").exists()
+
+
+# ----- U4: demo proof (reproducible proof pipeline) ----------------------
+
+_SHA = "a" * 40
+_PROOF_ARGS = ["--catalog", "cli-anything", "--name", "cli-anything-wiremock",
+               "--sha", _SHA, "--install-kind", "pip_git_subdir"]
+
+
+def test_demo_proof_dry_run_writes_nothing(demos_dir):
+    _write(demos_dir)
+    result = CliRunner().invoke(main, ["demo", "proof", "clinical-trials", "--dry-run", *_PROOF_ARGS])
+    assert result.exit_code == 0, result.output
+    assert "dry-run" in result.output.lower()
+    assert _SHA[:12] in result.output
+    assert not (demos_dir / "results" / "clinical-trials.json").exists()
+
+
+def _seed_run(store, grades, status="converged", dims_last=None):
+    run_id = store.create_run("t", "service", "g", "2026-06-15T00:00:00+00:00")
+    for n, g in enumerate(grades, start=1):
+        dims = dims_last if (n == len(grades) and dims_last) else {"D1": 10}
+        store.record_iteration(run_id, n, g, dims, safety_ok=(status != "blocked_safety"))
+    store.finish_run(run_id, status, grades[-1])
+    store.record_finished(run_id, "2026-06-15T00:00:30+00:00")
+    return run_id
+
+
+def test_demo_proof_records_live_verified_with_proof(demos_dir, tmp_path, monkeypatch):
+    from loopeng import adopt as adopt_mod
+
+    _write(demos_dir)
+    store = MemoryStore(tmp_path / "proof.db")
+    monkeypatch.setattr(MemoryStore, "default", classmethod(lambda cls: store))
+    monkeypatch.setattr("loopeng.preflight.missing_for_refine", lambda statuses=None: [])
+    monkeypatch.setattr(
+        adopt_mod, "adopt",
+        lambda spec, ws: adopt_mod.AdoptResult(True, tool_path=ws, resolved_sha=_SHA),
+    )
+    run_id = _seed_run(store, ["C", "A"], dims_last={"D1": 28})
+    monkeypatch.setattr("loopeng.cli._drive_proof_loop", lambda tool_path, m, ws: run_id)
+
+    result = CliRunner().invoke(main, ["demo", "proof", "clinical-trials", *_PROOF_ARGS])
+    assert result.exit_code == 0, result.output
+    fixture = json.loads((demos_dir / "results" / "clinical-trials.json").read_text())
+    assert fixture["source"] == "live_verified"
+    assert fixture["proof"]["before_grade"] == "C"
+    assert fixture["proof"]["after_grade"] == "A"
+    assert fixture["proof"]["baseline_source_sha"] == _SHA
+    assert "C &rarr; A" in result.output or "C -> A" in result.output or "->" in result.output
+
+
+def test_demo_proof_blocked_safety_is_honest(demos_dir, tmp_path, monkeypatch):
+    from loopeng import adopt as adopt_mod
+
+    _write(demos_dir)
+    store = MemoryStore(tmp_path / "proof.db")
+    monkeypatch.setattr(MemoryStore, "default", classmethod(lambda cls: store))
+    monkeypatch.setattr("loopeng.preflight.missing_for_refine", lambda statuses=None: [])
+    monkeypatch.setattr(
+        adopt_mod, "adopt",
+        lambda spec, ws: adopt_mod.AdoptResult(True, tool_path=ws, resolved_sha=_SHA),
+    )
+    run_id = _seed_run(store, ["C", "C"], status="blocked_safety")
+    monkeypatch.setattr("loopeng.cli._drive_proof_loop", lambda tool_path, m, ws: run_id)
+
+    result = CliRunner().invoke(main, ["demo", "proof", "clinical-trials", *_PROOF_ARGS])
+    assert result.exit_code == 0, result.output
+    fixture = json.loads((demos_dir / "results" / "clinical-trials.json").read_text())
+    assert fixture["convergence_status"] == "blocked_safety"
+    assert "not a passing proof" in result.output.lower()
+
+
+def test_demo_proof_adoption_failure_errors(demos_dir, monkeypatch):
+    from loopeng import adopt as adopt_mod
+
+    _write(demos_dir)
+    monkeypatch.setattr("loopeng.preflight.missing_for_refine", lambda statuses=None: [])
+    monkeypatch.setattr(
+        adopt_mod, "adopt",
+        lambda spec, ws: adopt_mod.AdoptResult(False, error="pip install failed"),
+    )
+    result = CliRunner().invoke(main, ["demo", "proof", "clinical-trials", *_PROOF_ARGS])
+    assert result.exit_code != 0
+    assert "adoption failed" in result.output.lower()

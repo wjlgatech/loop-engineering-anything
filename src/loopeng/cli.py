@@ -217,21 +217,17 @@ def demo_validate_cmd() -> None:
     click.echo(f"OK: {len(reg.manifests)} manifests valid.")
 
 
-@demo_grp.command("record")
-@click.argument("demo_id")
-@click.option("--from", "run_id", type=int, required=True, help="Run-history id to snapshot.")
-def demo_record_cmd(demo_id: str, run_id: int) -> None:
-    """Snapshot a real run into a live_verified fixture + persisted report."""
+def _record_run(reg, store, demo_id: str, run_id: int, *, proof: dict | None = None) -> dict:
+    """Build, validate, and write a live_verified fixture + report for a run.
+
+    The single write path to live_verified status (KTD2). ``proof`` is the
+    optional proof pack (``demo proof`` supplies it; bare ``demo record`` does
+    not) -- when present it is embedded so the showcase can headline before/after.
+    """
     from . import __version__
     from .autonomous.report import render_report
-    from .demos.registry import Registry
     from .demos.result import from_dict as result_from_dict
-    from .memory.store import MemoryStore
 
-    reg = Registry.load()
-    if demo_id not in reg.manifests:
-        raise click.ClickException(f"no demo with id {demo_id!r}.")
-    store = MemoryStore.default()
     run = store.get_run(run_id)
     if run is None:
         raise click.ClickException(f"no run #{run_id} in the memory store.")
@@ -245,12 +241,33 @@ def demo_record_cmd(demo_id: str, run_id: int) -> None:
         "report_ref": f"{demo_id}.report.md",
         "engine_version": __version__,
     }
+    if proof is not None:
+        payload["proof"] = proof
     result_from_dict(payload)  # validate before writing
     results_dir = reg.demos_dir / "results"
     results_dir.mkdir(exist_ok=True)
     (results_dir / f"{demo_id}.json").write_text(json.dumps(payload, indent=2))
     (results_dir / f"{demo_id}.report.md").write_text(render_report(store, run_id))
-    click.echo(f"Recorded {demo_id} from run #{run_id} ({payload['final_grade']}, {run.status}).")
+    return payload
+
+
+@demo_grp.command("record")
+@click.argument("demo_id")
+@click.option("--from", "run_id", type=int, required=True, help="Run-history id to snapshot.")
+def demo_record_cmd(demo_id: str, run_id: int) -> None:
+    """Snapshot a real run into a live_verified fixture + persisted report."""
+    from .demos.registry import Registry
+    from .memory.store import MemoryStore
+
+    reg = Registry.load()
+    if demo_id not in reg.manifests:
+        raise click.ClickException(f"no demo with id {demo_id!r}.")
+    store = MemoryStore.default()
+    payload = _record_run(reg, store, demo_id, run_id)
+    click.echo(
+        f"Recorded {demo_id} from run #{run_id} "
+        f"({payload['final_grade']}, {payload['convergence_status']})."
+    )
 
 
 def _run_generator(manifest, workspace: str):
@@ -313,6 +330,132 @@ def demo_run_cmd(demo_id: str, workspace: str | None) -> None:
         click.echo(
             f"Generated into {workspace}/. To grade + record a live_verified result, add a "
             f"CLI-Judge adapter at demos/adapters/{demo_id}.py, then re-run."
+        )
+
+
+@demo_grp.command("proof")
+@click.argument("demo_id")
+@click.option("--catalog", required=True, help="Catalog key: cli-anything | printing-press.")
+@click.option("--name", "entry_name", required=True, help="Catalog entry/package name to adopt.")
+@click.option("--sha", required=True, help="Full 40-char commit SHA to pin the baseline (KTD7).")
+@click.option("--install-kind", required=True, help="pip_git_subdir | pp_binary.")
+@click.option("--workspace", default=None, help="Where to adopt the tool (default .loopeng/proof/<id>).")
+@click.option("--required-env", multiple=True, help="Env var names the adopted tool needs.")
+@click.option("--dry-run", is_flag=True, help="Print the adopt + loop plan; write nothing.")
+def demo_proof_cmd(
+    demo_id: str,
+    catalog: str,
+    entry_name: str,
+    sha: str,
+    install_kind: str,
+    workspace: str | None,
+    required_env: tuple[str, ...],
+    dry_run: bool,
+) -> None:
+    """Adopt a catalog CLI as a baseline, run the refine loop, and record a
+    live_verified proof pack (before/after). The reproducible proof pipeline (U4).
+
+    Honest by construction: a card flips to live_verified ONLY via the shared
+    record path against a real run (KTD2), and a safety-blocked run is recorded
+    as blocked_safety, never as a passing proof (R6).
+    """
+    import os
+
+    from .adopt import AdoptSpec, adopt
+    from .config import Lane
+    from .demos.registry import Registry
+    from .preflight import missing_for_refine
+
+    reg = Registry.load()
+    m = reg.manifests.get(demo_id)
+    if m is None:
+        raise click.ClickException(f"no demo with id {demo_id!r}.")
+    if not m.runnable:
+        raise click.ClickException(f"{demo_id} is a recipe, not a runnable demo.")
+
+    workspace = workspace or os.path.join(".loopeng", "proof", demo_id)
+    spec = AdoptSpec(
+        catalog=catalog,
+        name=entry_name,
+        sha=sha,
+        install_kind=install_kind,
+        required_env=tuple(required_env),
+    )
+
+    if dry_run:
+        click.echo(
+            f"[dry-run] proof plan for {demo_id}:\n"
+            f"  adopt: {catalog}:{entry_name}@{sha[:12]} ({install_kind}) -> {workspace}/\n"
+            f"  loop:  refine-only on the {m.lane.value} lane, goal={m.goal!r}\n"
+            f"  record: live_verified + proof pack via `demo record` (only on a real run)."
+        )
+        return
+
+    missing = missing_for_refine()
+    if missing:
+        raise click.ClickException(f"missing tools for a refine run: {', '.join(x.label for x in missing)}")
+
+    click.echo(f"Adopting {catalog}:{entry_name}@{sha[:12]} into {workspace}/ ...")
+    adopted = adopt(spec, workspace)
+    if not adopted.ok:
+        raise click.ClickException(f"adoption failed: {adopted.error or adopted.logs[:300]}")
+
+    run_id = _drive_proof_loop(adopted.tool_path, m, workspace)
+    _finish_proof(reg, demo_id, run_id, adopted.resolved_sha)
+
+
+def _drive_proof_loop(tool_path: str, manifest, workspace: str) -> int:
+    """Run the refine-only loop on an adopted tool; returns the run id."""
+    from .adapters.compound_engineering import ClaudeCodeCompounder, ClaudeCodeRefiner
+    from .adapters.judge import CLIJudge
+    from .autonomous.runner import run_refine_loop
+    from .demos.registry import Registry
+    from .memory.store import MemoryStore
+
+    reg = Registry.load()
+    adapter = reg.demos_dir / "adapters" / f"{manifest.id}.py"
+    if not adapter.exists():
+        raise click.ClickException(
+            f"no CLI-Judge adapter at demos/adapters/{manifest.id}.py -- add one (U5) before proving."
+        )
+    store = MemoryStore.default()
+    result = run_refine_loop(
+        tool_path,
+        manifest.goal,
+        judge=CLIJudge(adapter_path=str(adapter)),
+        refiner=ClaudeCodeRefiner(),
+        compounder=ClaudeCodeCompounder(tool_path),
+        store=store,
+        workspace_root=workspace,
+        lane=manifest.lane,
+        target_label=manifest.target,
+    )
+    return result.run_id
+
+
+def _finish_proof(reg, demo_id: str, run_id: int, resolved_sha: str | None) -> None:
+    """Build the proof pack and record a live_verified fixture (honest status)."""
+    from .memory.store import MemoryStore
+    from .proof import ProofPack
+
+    store = MemoryStore.default()
+    proof = ProofPack.from_run(store, run_id)
+    if resolved_sha:
+        proof["baseline_source_sha"] = resolved_sha
+    payload = _record_run(reg, store, demo_id, run_id, proof=proof)
+
+    status = payload["convergence_status"]
+    if status == "blocked_safety":
+        click.echo(f"Recorded {demo_id}: BLOCKED_SAFETY -- honest result, not a passing proof (R6).")
+    elif ProofPack.is_improvement(proof):
+        click.echo(
+            f"Recorded {demo_id}: {proof['before_grade']} -> {proof['after_grade']} "
+            f"over {proof['iterations']} iters (live_verified)."
+        )
+    else:
+        click.echo(
+            f"Recorded {demo_id}: no grade gain ({proof['before_grade']} -> {proof['after_grade']}, "
+            f"{status}) -- honest result, recorded as-is."
         )
 
 

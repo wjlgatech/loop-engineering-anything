@@ -165,10 +165,17 @@ def run_refine_loop(
         _ensure_git_repo(tool_path)
         checkpoint = GitCheckpoint(tool_path)
 
+    # Wrap the injected compounder so every accepted-fix learning is recorded to
+    # the store (the proof pack's regression_tests field reads from there). The
+    # real /ce-compound binding rides along as the inner compounder.
+    from ..proof import StoreBackedCompounder
+
+    store_compounder = StoreBackedCompounder(store, run_id, inner=compounder)
+
     controller = LoopController(
         judge=judge,
         refiner=refiner,
-        compounder=compounder,
+        compounder=store_compounder,
         checkpoint=checkpoint,
         store=store,
         budget=budget,

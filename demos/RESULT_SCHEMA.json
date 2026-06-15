@@ -35,6 +35,7 @@
       "properties": {
         "before_grade": { "type": "string", "enum": ["A", "B", "C", "D", "F"] },
         "after_grade": { "type": "string", "enum": ["A", "B", "C", "D", "F"] },
+        "convergence_status": { "type": "string", "enum": ["converged", "stopped", "blocked_safety"] },
         "dim_diff": {
           "type": "object",
           "description": "Per-dimension {before, after, delta} computed from parsed verdicts (never code inspection).",
