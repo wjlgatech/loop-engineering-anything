@@ -121,6 +121,14 @@ def test_empty_registry_renders_hero_not_blank(tmp_path):
     assert "Tools that grade themselves better" in html
 
 
+def test_base_url_makes_doc_links_absolute(tmp_path):
+    reg = _registry(tmp_path, [_manifest(result_ref="clinical-trials.json")], [_result()])
+    base = "https://github.com/wjlgatech/loop-engineering-anything/blob/main/"
+    html = render_catalog(reg, base_url=base)
+    assert f"{base}demos/results/clinical-trials.report.md" in html
+    assert f"{base}CONTRIBUTING-demos.md" in html
+
+
 def test_output_has_no_external_assets(tmp_path):
     reg = _registry(tmp_path, [_manifest()])
     html = render_catalog(reg)

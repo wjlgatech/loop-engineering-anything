@@ -37,6 +37,17 @@ All notable changes to this project are documented here, following
   (env-only, never logged), workspace boundary, git checkpoints — wiring
   preflight → route → factory → controller, injectable for testing.
 
+### Added — loop-anything-hub + live-run prep
+- **loop-anything-hub:** a GitHub Pages workflow (`pages.yml`) that builds the
+  showcase catalog and publishes it on every push to `main` —
+  https://wjlgatech.github.io/loop-engineering-anything/
+- `loop-anything showcase --base-url <url>` so hosted report/recipe/contributing
+  links resolve to GitHub blob URLs (relative when local).
+- `loop-anything demo run` now **really attempts** the generator via `claude -p`
+  (`/printing-press` or `/cli-anything`) instead of a hardcoded stub: it surfaces
+  the real upstream error today (quota) and will produce a tool once quota/Go are
+  available, then point to the grade + record step.
+
 ### Changed — demo honesty pass
 - Relabeled two demos so the domain matches the real target: `smart-grid` →
   *Weather & forecasting* (Open-Meteo is weather, not grid control), `supply-chain`

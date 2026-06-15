@@ -76,13 +76,31 @@ def test_demo_run_recipe_refuses(demos_dir):
     assert "recipe" in result.output.lower()
 
 
-def test_demo_run_demo_kind_is_gated_stub(demos_dir, monkeypatch):
+def test_demo_run_surfaces_generator_failure(demos_dir, tmp_path, monkeypatch):
+    from loopeng.adapters.safety import ProcResult
+
     _write(demos_dir)
-    # Pretend the lane's tools are present so we reach the not-yet-wired gate.
     monkeypatch.setattr("loopeng.preflight.missing_for_lane", lambda lane: [])
-    result = CliRunner().invoke(main, ["demo", "run", "clinical-trials"])
+    # Simulate the real generator failing (e.g. the claude -p usage-limit error).
+    monkeypatch.setattr(
+        "loopeng.cli._run_generator",
+        lambda m, ws: ProcResult(1, "", "API Error: 400 usage limits"),
+    )
+    result = CliRunner().invoke(main, ["demo", "run", "clinical-trials", "--workspace", str(tmp_path / "ws")])
     assert result.exit_code != 0
-    assert "not yet wired" in result.output.lower()
+    assert "generation failed" in result.output.lower()
+    assert "usage limits" in result.output.lower()
+
+
+def test_demo_run_success_without_adapter_reports_next_step(demos_dir, tmp_path, monkeypatch):
+    from loopeng.adapters.safety import ProcResult
+
+    _write(demos_dir)
+    monkeypatch.setattr("loopeng.preflight.missing_for_lane", lambda lane: [])
+    monkeypatch.setattr("loopeng.cli._run_generator", lambda m, ws: ProcResult(0, "generated", ""))
+    result = CliRunner().invoke(main, ["demo", "run", "clinical-trials", "--workspace", str(tmp_path / "ws")])
+    assert result.exit_code == 0
+    assert "cli-judge adapter" in result.output.lower()
 
 
 def test_demo_record_writes_fixture_and_report(demos_dir, tmp_path, monkeypatch):

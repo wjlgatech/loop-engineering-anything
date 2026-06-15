@@ -51,11 +51,17 @@ def safe_url(url) -> str | None:
     return None
 
 
+def _doc_href(base_url: str, path: str) -> str | None:
+    """Build a link to a repo doc: relative when base_url is empty, else absolute
+    (e.g. a GitHub blob URL) so links resolve when the catalog is hosted."""
+    return safe_url(f"{base_url}{path}")
+
+
 def _trajectory(result) -> str:
     return " &rarr; ".join(_t(g) for g in result.grade_trajectory)
 
 
-def _demo_card(manifest, result) -> str:
+def _demo_card(manifest, result, base_url: str = "") -> str:
     search_blob = " ".join(
         x for x in (manifest.id, manifest.domain, manifest.target, manifest.contributor) if x
     )
@@ -79,7 +85,7 @@ def _demo_card(manifest, result) -> str:
             else '<span class="badge prov illustrative">illustrative &mdash; not a verified run</span>'
         )
         report = ""
-        href = safe_url(f"demos/results/{result.report_ref}") if result.report_ref else None
+        href = _doc_href(base_url, f"demos/results/{result.report_ref}") if result.report_ref else None
         if href:
             report = f'<a class="report" href="{_a(href)}">report &rarr;</a>'
         body = (
@@ -93,9 +99,9 @@ def _demo_card(manifest, result) -> str:
     return head + body + foot
 
 
-def _recipe_card(manifest) -> str:
+def _recipe_card(manifest, base_url: str = "") -> str:
     search_blob = f"{manifest.id} {manifest.domain} {manifest.target}".lower()
-    href = safe_url(f"docs/recipes/{manifest.id}.md")
+    href = _doc_href(base_url, f"docs/recipes/{manifest.id}.md")
     link = f'<a class="report" href="{_a(href)}">recipe &rarr;</a>' if href else ""
     return (
         f'<article class="card recipe" data-domain="{_a(manifest.domain)}" data-search="{_a(search_blob)}">'
@@ -106,10 +112,11 @@ def _recipe_card(manifest) -> str:
     )
 
 
-def _leaderboard(reg: Registry) -> str:
+def _leaderboard(reg: Registry, base_url: str = "") -> str:
     counts = Counter(m.contributor for m in reg.manifests.values() if m.contributor)
     if not counts:
-        return '<p class="empty">Be the first &mdash; see <a href="CONTRIBUTING-demos.md">CONTRIBUTING-demos.md</a></p>'
+        contrib = _a(_doc_href(base_url, "CONTRIBUTING-demos.md") or "CONTRIBUTING-demos.md")
+        return f'<p class="empty">Be the first &mdash; see <a href="{contrib}">CONTRIBUTING-demos.md</a></p>'
     ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:10]
     items = "".join(f'<li>@{_t(name)} <span class="count">{n}</span></li>' for name, n in ranked)
     return f"<ol class=\"leaderboard\">{items}</ol>"
@@ -162,25 +169,26 @@ q.addEventListener('input',apply);
 """
 
 
-def render_catalog(reg: Registry) -> str:
+def render_catalog(reg: Registry, base_url: str = "") -> str:
     demos = reg.demos()
     recipes = reg.recipes()
     domains = sorted({m.domain for m in demos})
+    contrib = _a(_doc_href(base_url, "CONTRIBUTING-demos.md") or "CONTRIBUTING-demos.md")
 
     chips = '<button class="chip" data-domain="" aria-pressed="true">All</button>' + "".join(
         f'<button class="chip" data-domain="{_a(d)}" aria-pressed="false">{_t(d)}</button>' for d in domains
     )
     if demos:
-        cards = "".join(_demo_card(m, reg.result_for(m)) for m in demos)
+        cards = "".join(_demo_card(m, reg.result_for(m), base_url) for m in demos)
         grid = f'<div class="grid" id="grid" aria-live="polite">{cards}</div>'
         noresults = '<p class="empty" id="noresults" style="display:none">No demos match &mdash; clear the filter.</p>'
     else:
         grid = '<div class="grid" id="grid" aria-live="polite"></div>'
-        noresults = '<p class="empty" id="noresults">No demos yet &mdash; see <a href="CONTRIBUTING-demos.md">CONTRIBUTING-demos.md</a>.</p>'
+        noresults = f'<p class="empty" id="noresults">No demos yet &mdash; see <a href="{contrib}">CONTRIBUTING-demos.md</a>.</p>'
 
     recipes_section = ""
     if recipes:
-        recipe_cards = "".join(_recipe_card(m) for m in recipes)
+        recipe_cards = "".join(_recipe_card(m, base_url) for m in recipes)
         recipes_section = (
             '<section class="recipes"><h2>Loop recipes (not runnable yet)</h2>'
             f'<div class="grid">{recipe_cards}</div></section>'
@@ -196,7 +204,7 @@ def render_catalog(reg: Registry) -> str:
 <h1>Tools that grade themselves better</h1>
 <p>Each demo is a real target our loop made agent-native, then refactored toward Grade A &mdash; generate &rarr; judge &rarr; refactor, with the grade trajectory shown.</p>
 <a class="cta" href="#grid">Browse demos</a>
-<a class="cta" href="CONTRIBUTING-demos.md">Add your own</a>
+<a class="cta" href="{contrib}">Add your own</a>
 </header>
 <div class="controls" role="search">
 {chips}
@@ -206,7 +214,7 @@ def render_catalog(reg: Registry) -> str:
 {grid}
 {recipes_section}
 <h2>Contributors</h2>
-{_leaderboard(reg)}
+{_leaderboard(reg, base_url)}
 </div>
 <script>{_JS}</script>
 </body></html>
