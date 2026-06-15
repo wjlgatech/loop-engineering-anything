@@ -272,6 +272,26 @@ live run.
 
 ---
 
+## 🖼️ Demos & community showcase
+
+A community catalog of loops — modeled on [printingpress.dev](https://printingpress.dev)
+and [clianything.cc](https://clianything.cc), but each card headlines the **loop
+outcome** (grade trajectory + convergence + report), which a plain CLI gallery can't.
+
+```bash
+loop-anything demo list                 # registered demos + recipes
+loop-anything demo validate             # the CI gate (manifests + fixtures)
+loop-anything showcase --out showcase.html   # generate the self-contained gallery
+```
+
+Ten starter demos seed the catalog from the *Infinite Improvement Loop* domains
+(PR lifecycle, legal, clinical trials, biotech, quant, VC, software architecture,
+education, smart grid, supply chain), each mapped to a concrete agent-native
+target. Domains beyond the engine's reach ship as **[loop recipes](docs/recipes/)**,
+not fake demos. Starter results are `illustrative` (badged as not-a-verified-run)
+until a live run is recorded. Add your own in one PR — see
+[`CONTRIBUTING-demos.md`](CONTRIBUTING-demos.md).
+
 ## 🤝 Contributing
 
 PRs welcome. The repo enforces a simple bar: **CI must be green** (pytest on Python 3.11–3.13) and

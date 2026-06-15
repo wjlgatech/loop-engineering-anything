@@ -37,6 +37,24 @@ All notable changes to this project are documented here, following
   (env-only, never logged), workspace boundary, git checkpoints — wiring
   preflight → route → factory → controller, injectable for testing.
 
+### Added — community demos + showcase
+- Demo manifest format + registry (`demos/`, `src/loopeng/demos/`): YAML manifests
+  validated by JSON Schema with semantic guards (https-only + non-private host for
+  service targets, repo-relative no-`..` for codebase, credential-string rejection);
+  result fixtures carry explicit `source` provenance (`illustrative`/`live_verified`).
+- `loop-anything demo` CLI (list/show/validate/record/run) — `validate` is the CI
+  gate; `record` snapshots a real run into a verified fixture + persisted report;
+  `run` is an honest gated stub until per-target adapters land.
+- `loop-anything showcase` — self-contained HTML catalog generator: context-aware
+  encoding + URL allow-list, card-state table headlining grade trajectory +
+  provenance badge, recipes lane, contributor leaderboard, empty/hero/a11y states.
+- 10 starter demos from the *Infinite Improvement Loop* domains (concrete targets,
+  illustrative fixtures) + 5 `kind: recipe` manifests and `docs/recipes/` docs for
+  domains beyond the engine.
+- Community contribution path: `CONTRIBUTING-demos.md`, a demo PR template, and a
+  `demos.yml` CI workflow running `demo validate` on `demos/**` changes.
+- Declared `pyyaml` + `jsonschema` dependencies (manifest format).
+
 ### Added (continued)
 - History Compression Engine (U7): periodic System-2 consolidation pass with a
   grade-neutral-or-better-and-safe guard (rolls back otherwise); wired into the
