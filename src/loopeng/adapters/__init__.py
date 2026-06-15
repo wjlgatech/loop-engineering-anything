@@ -9,6 +9,9 @@ from .base import (
     Refiner,
     Verdict,
 )
+from .cli_anything import CLIAnythingFactory
+from .judge import CLIJudge, parse_report
+from .printing_press import PrintingPressFactory
 
 __all__ = [
     "Verdict",
@@ -18,4 +21,8 @@ __all__ = [
     "Compounder",
     "Factory",
     "Checkpoint",
+    "PrintingPressFactory",
+    "CLIAnythingFactory",
+    "CLIJudge",
+    "parse_report",
 ]

@@ -53,12 +53,18 @@ loop-anything report <run_id> [--json]
 
 ## Status
 
-Foundations are implemented and tested: project scaffold + dependency preflight,
-SQLite memory layer, target router, and the loop-controller core (state machine,
+Implemented and tested (57 tests): project scaffold + dependency preflight,
+SQLite memory layer, target router, the loop-controller core (state machine,
 convergence policy, safety hard-gate, regression rollback) validated against
-recorded judge verdicts. The factory/judge adapters that bind to the real
-external tools, the History Compression Engine, and the autonomous "going to the
-beach" runner are planned units — see `docs/plans/`.
+recorded judge verdicts, plus **adapter shells** for the factories (U4), judge
+(U5), git checkpoint, and the autonomous runner (U8) — real subprocess
+execution, `report.json` parsing, and end-to-end wiring, tested with mocked
+tools.
+
+Still pending: binding those shells to live tool installs, a real
+`/ce-work`/`/ce-compound` refiner, the History Compression Engine (U7), and the
+e2e reference loop against a real public API. Two feasibility gates precede the
+live binding — see `AGENTS.md` and `docs/plans/`.
 
 ## Tests
 

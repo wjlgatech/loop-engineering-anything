@@ -24,6 +24,18 @@ All notable changes to this project are documented here, following
   (target grade, plateau, iteration/token budget), safety hard-gate, and
   regression rollback — driven through injectable `Judge`/`Refiner` protocols and
   validated against recorded verdicts (de-risks loop dynamics before any live run).
+- Factory adapter shells (U4): `PrintingPressFactory` and `CLIAnythingFactory`
+  with `shell=False` subprocess execution, shell-metacharacter rejection,
+  timeout/exit-code normalization, and a single `_build_command` seam for the
+  documented surface.
+- Judge adapter shell (U5): `CLIJudge` + `parse_report` with strict
+  safety-gate derivation (`safety_ok` False on gate failure or C-cap; fails
+  closed on a missing/malformed report). The exact safety field is centralized
+  in `derive_safety_ok` for pinning against a real `report.json`.
+- `GitCheckpoint` (in `loop/`, reused by U6 and U8 per the U6→U8 dependency fix)
+  and the autonomous runner shell (U8): preflight gate, credential gate
+  (env-only, never logged), workspace boundary, git checkpoints — wiring
+  preflight → route → factory → controller, injectable for testing.
 
 ### Investigated / Rejected
 - **`command -v` for all four tools** — rejected: CLI-Anything and
@@ -34,10 +46,11 @@ All notable changes to this project are documented here, following
   and large maintenance surface; adapters get the same capability thinner.
 
 ### Deferred (gated on external tools + open feasibility questions)
-- Factory adapters binding to the real CLI-Printing-Press / CLI-Anything (U4)
-  and the CLI-Judge adapter (U5) — need the tools installed.
-- History Compression Engine (U7) and the autonomous runner + e2e reference loop
-  (U8).
+- Binding the U4/U5/U8 shells to the live tools — `_build_command` surfaces and
+  the `report.json` safety field must be pinned against installed versions.
+- A live `Refiner`/`Compounder` driving real `/ce-work` and `/ce-compound`.
+- History Compression Engine (U7) and the e2e reference loop against a real
+  public API.
 - **P0 gates to resolve before binding the live loop:** whether `/ce-work` and
   `/ce-compound` can be driven headlessly from a long-running controller, and
   whether CLI-Judge grades are stable enough to be a control signal.
