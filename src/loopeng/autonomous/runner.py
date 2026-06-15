@@ -124,7 +124,7 @@ def run_refine_loop(
     *,
     judge: Judge,
     refiner: Refiner,
-    compounder: Compounder,
+    compounder: Compounder | None,
     store: MemoryStore,
     workspace_root: str,
     lane: Lane = Lane.SERVICE,

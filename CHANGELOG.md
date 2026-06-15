@@ -50,6 +50,16 @@ All notable changes to this project are documented here, following
     fixture provenance, human-review + full-SHA rules); `docs/solutions/`
     decision records (refine-only baseline, provenance honesty, adopter
     isolation, P0 gate status); `docs/e2e-runbook.md` proof run steps.
+  - **Provider-agnostic LLM refiner** (`src/loopeng/adapters/llm_refiner.py`):
+    a claude-free, quota-free `Refiner` that drives any OpenAI-compatible chat
+    endpoint with a free-tier **fallback chain** (NVIDIA NIM → Groq → Gemini →
+    local Ollama, per the `free-llm` design) using stdlib `urllib` (no new
+    dependency). Edits are applied as jailed full-file rewrites
+    (`within_workspace`); model output is never executed. `demo proof` gains
+    `--refiner claude|llm`; preflight's refine gate drops the compound-engineering
+    requirement for `llm`; the gated proof e2e accepts `LOOPENG_PROOF_REFINER=llm`
+    with a free provider key instead of the `claude -p` quota. This removes the
+    quota as a hard blocker on running a real before/after proof.
 - Project scaffold: `pyproject.toml`, `loop-anything` CLI entrypoint, package
   layout under `src/loopeng/` (U1).
 - `AGENTS.md` agent guide and GitHub Actions CI (pytest on Python 3.11–3.13 for

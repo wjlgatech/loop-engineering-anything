@@ -88,8 +88,11 @@ loop-anything demo proof arxiv --catalog printing-press --name arxiv \
 - Until a real run lands, leave the card in **draft** (no fixture) — do not ship a
   fabricated `illustrative` trajectory for a proof target.
 
-Live runs need the `claude -p` refine quota and the target's toolchain/daemon;
-absent them the gated e2e (`tests/e2e/test_proof_loop.py`) skips, never fails.
+The refine engine is selectable: `--refiner claude` (`/ce-work`, needs the
+`claude -p` quota) or `--refiner llm` (a free-tier fallback chain — NIM → Groq →
+Gemini → Ollama — **no claude, no quota**; set at least one provider key). Either
+way the target's toolchain/daemon must be present; absent the prerequisites the
+gated e2e (`tests/e2e/test_proof_loop.py`) skips, never fails.
 
 ## 3. Validate + preview
 

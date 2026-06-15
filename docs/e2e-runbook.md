@@ -74,16 +74,28 @@ the loop refine-only (no generate step). It is the `demo proof` path.
 loop-anything demo proof arxiv --catalog printing-press --name arxiv \
     --sha <full-40-char-commit-sha> --install-kind pp_binary --dry-run
 
-# 2. real run — needs the claude -p refine quota + the target binary/toolchain:
+# 2a. real run via /ce-work (needs the claude -p quota + the target binary):
 loop-anything demo proof arxiv --catalog printing-press --name arxiv \
     --sha <full-40-char-commit-sha> --install-kind pp_binary
+
+# 2b. real run WITHOUT claude — the free-tier LLM fallback chain (no quota):
+#     drives NIM -> Groq -> Gemini -> Ollama; set at least one provider key.
+GROQ_API_KEY=gsk_... loop-anything demo proof arxiv --refiner llm \
+    --catalog printing-press --name arxiv \
+    --sha <full-40-char-commit-sha> --install-kind pp_binary
 ```
+
+The `--refiner llm` path removes the `claude -p` quota as a blocker. Tune it with
+`LOOPENG_REFINER_CHAIN` (e.g. `groq,gemini,ollama`) and
+`LOOPENG_REFINER_MODEL_<KEY>`. Probe a provider before trusting it (free model
+ids churn — see the `free-llm` skill).
 
 Or drive the gated e2e directly (skips unless all prerequisites are present):
 
 ```bash
 export LOOPENG_PROOF_DEMO="arxiv"           # a demo id with demos/adapters/<id>.py
 export LOOPENG_PROOF_BINARY="/path/to/arxiv"  # the adopted tool to grade + refine
+export LOOPENG_PROOF_REFINER="llm"          # "claude" (default) | "llm" (quota-free)
 pytest tests/e2e/test_proof_loop.py -v
 ```
 

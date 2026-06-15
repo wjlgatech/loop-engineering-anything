@@ -7,7 +7,9 @@ target is configured. In CI and on machines without the tools (or while the
 does NOT imply a real before/after proof was produced. See docs/e2e-runbook.md.
 
 Prerequisites (all required, else skipped):
-  - `cli-judge` and `claude` on PATH
+  - `cli-judge` on PATH
+  - the refiner: `claude` on PATH (LOOPENG_PROOF_REFINER=claude, default) OR a
+    free-tier LLM provider key set (LOOPENG_PROOF_REFINER=llm — no claude quota)
   - LOOPENG_PROOF_DEMO     a demo id with an adapter at demos/adapters/<id>.py
   - LOOPENG_PROOF_BINARY   the adopted tool binary/command to grade + refine
 """
@@ -22,6 +24,7 @@ import pytest
 
 DEMO = os.environ.get("LOOPENG_PROOF_DEMO")
 BINARY = os.environ.get("LOOPENG_PROOF_BINARY")
+REFINER = os.environ.get("LOOPENG_PROOF_REFINER", "claude")
 _REPO = Path(__file__).resolve().parents[2]
 
 _missing = []
@@ -31,8 +34,12 @@ if not BINARY:
     _missing.append("LOOPENG_PROOF_BINARY")
 if not shutil.which("cli-judge"):
     _missing.append("cli-judge on PATH")
-if not shutil.which("claude"):
-    _missing.append("claude on PATH (refine quota)")
+if REFINER == "claude" and not shutil.which("claude"):
+    _missing.append("claude on PATH (or set LOOPENG_PROOF_REFINER=llm)")
+if REFINER == "llm" and not any(
+    os.environ.get(k) for k in ("NVIDIA_API_KEY", "GROQ_API_KEY", "GEMINI_API_KEY")
+):
+    _missing.append("a free LLM provider key (NVIDIA_API_KEY/GROQ_API_KEY/GEMINI_API_KEY)")
 if DEMO and not (_REPO / "demos" / "adapters" / f"{DEMO}.py").exists():
     _missing.append(f"demos/adapters/{DEMO}.py")
 
@@ -42,7 +49,6 @@ pytestmark = pytest.mark.skipif(
 
 
 def test_refine_only_proof_produces_a_proof_pack(tmp_path):
-    from loopeng.adapters.compound_engineering import ClaudeCodeCompounder, ClaudeCodeRefiner
     from loopeng.adapters.judge import CLIJudge
     from loopeng.autonomous.runner import run_refine_loop
     from loopeng.config import Budget
@@ -58,13 +64,22 @@ def test_refine_only_proof_produces_a_proof_pack(tmp_path):
     tool_path.mkdir()
     adapter = str(_REPO / "demos" / "adapters" / f"{DEMO}.py")
 
+    if REFINER == "llm":
+        from loopeng.adapters.llm_refiner import FallbackLLMRefiner
+        refiner_impl = FallbackLLMRefiner()
+        compounder_impl = None
+    else:
+        from loopeng.adapters.compound_engineering import ClaudeCodeCompounder, ClaudeCodeRefiner
+        refiner_impl = ClaudeCodeRefiner()
+        compounder_impl = ClaudeCodeCompounder(str(tool_path))
+
     store = MemoryStore(tmp_path / "proof.db")
     result = run_refine_loop(
         str(tool_path),
         "raise this catalog CLI toward Grade A",
         judge=CLIJudge(adapter, strict_unknown=True),
-        refiner=ClaudeCodeRefiner(),
-        compounder=ClaudeCodeCompounder(str(tool_path)),
+        refiner=refiner_impl,
+        compounder=compounder_impl,
         store=store,
         workspace_root=str(workspace),
         budget=Budget(max_iterations=3),

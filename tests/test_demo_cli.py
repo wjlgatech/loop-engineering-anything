@@ -137,6 +137,15 @@ def test_demo_proof_dry_run_writes_nothing(demos_dir):
     assert not (demos_dir / "results" / "clinical-trials.json").exists()
 
 
+def test_demo_proof_dry_run_llm_refiner(demos_dir):
+    _write(demos_dir)
+    result = CliRunner().invoke(
+        main, ["demo", "proof", "clinical-trials", "--dry-run", "--refiner", "llm", *_PROOF_ARGS]
+    )
+    assert result.exit_code == 0, result.output
+    assert "refiner: llm" in result.output.lower()
+
+
 def _seed_run(store, grades, status="converged", dims_last=None):
     run_id = store.create_run("t", "service", "g", "2026-06-15T00:00:00+00:00")
     for n, g in enumerate(grades, start=1):
@@ -153,13 +162,13 @@ def test_demo_proof_records_live_verified_with_proof(demos_dir, tmp_path, monkey
     _write(demos_dir)
     store = MemoryStore(tmp_path / "proof.db")
     monkeypatch.setattr(MemoryStore, "default", classmethod(lambda cls: store))
-    monkeypatch.setattr("loopeng.preflight.missing_for_refine", lambda statuses=None: [])
+    monkeypatch.setattr("loopeng.preflight.missing_for_refine", lambda statuses=None, *, refiner="claude": [])
     monkeypatch.setattr(
         adopt_mod, "adopt",
         lambda spec, ws: adopt_mod.AdoptResult(True, tool_path=ws, resolved_sha=_SHA),
     )
     run_id = _seed_run(store, ["C", "A"], dims_last={"D1": 28})
-    monkeypatch.setattr("loopeng.cli._drive_proof_loop", lambda tool_path, m, ws: run_id)
+    monkeypatch.setattr("loopeng.cli._drive_proof_loop", lambda tool_path, m, ws, refiner="claude": run_id)
 
     result = CliRunner().invoke(main, ["demo", "proof", "clinical-trials", *_PROOF_ARGS])
     assert result.exit_code == 0, result.output
@@ -177,13 +186,13 @@ def test_demo_proof_blocked_safety_is_honest(demos_dir, tmp_path, monkeypatch):
     _write(demos_dir)
     store = MemoryStore(tmp_path / "proof.db")
     monkeypatch.setattr(MemoryStore, "default", classmethod(lambda cls: store))
-    monkeypatch.setattr("loopeng.preflight.missing_for_refine", lambda statuses=None: [])
+    monkeypatch.setattr("loopeng.preflight.missing_for_refine", lambda statuses=None, *, refiner="claude": [])
     monkeypatch.setattr(
         adopt_mod, "adopt",
         lambda spec, ws: adopt_mod.AdoptResult(True, tool_path=ws, resolved_sha=_SHA),
     )
     run_id = _seed_run(store, ["C", "C"], status="blocked_safety")
-    monkeypatch.setattr("loopeng.cli._drive_proof_loop", lambda tool_path, m, ws: run_id)
+    monkeypatch.setattr("loopeng.cli._drive_proof_loop", lambda tool_path, m, ws, refiner="claude": run_id)
 
     result = CliRunner().invoke(main, ["demo", "proof", "clinical-trials", *_PROOF_ARGS])
     assert result.exit_code == 0, result.output
@@ -196,7 +205,7 @@ def test_demo_proof_adoption_failure_errors(demos_dir, monkeypatch):
     from loopeng import adopt as adopt_mod
 
     _write(demos_dir)
-    monkeypatch.setattr("loopeng.preflight.missing_for_refine", lambda statuses=None: [])
+    monkeypatch.setattr("loopeng.preflight.missing_for_refine", lambda statuses=None, *, refiner="claude": [])
     monkeypatch.setattr(
         adopt_mod, "adopt",
         lambda spec, ws: adopt_mod.AdoptResult(False, error="pip install failed"),

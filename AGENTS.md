@@ -41,8 +41,18 @@ implementation plan.
 runs the refine-only loop (`run_refine_loop` → unchanged `LoopController.run`,
 whose initial judge is the "before"), builds a `ProofPack`, and records a
 `live_verified` card with a before/after proof. This proves the **refine loop**,
-not the generate frontier (which stays deferred). Live runs need the `claude -p`
-quota and a per-target CLI-Judge adapter at `demos/adapters/<id>.py`.
+not the generate frontier (which stays deferred). A per-target CLI-Judge adapter
+at `demos/adapters/<id>.py` is required.
+
+**The refiner is pluggable** — the controller depends only on the `Refiner`
+protocol, so the refine engine is selectable:
+- `--refiner claude` (default): `/ce-work` via `claude -p` — the documented brain;
+  needs the compound-engineering plugin + the `claude -p` quota.
+- `--refiner llm`: `FallbackLLMRefiner` — any OpenAI-compatible endpoint with a
+  free-tier fallback chain (NIM → Groq → Gemini → Ollama, per the `free-llm`
+  design). **No claude, no quota.** Edits are jailed full-file rewrites; model
+  output is never executed. Use this to run a real proof while the `claude -p`
+  quota is closed.
 
 ## Layout
 
@@ -52,7 +62,7 @@ quota and a per-target CLI-Judge adapter at `demos/adapters/<id>.py`.
 | `src/loopeng/preflight.py` | dependency detection (per-mechanism); `missing_for_refine` (no factory) |
 | `src/loopeng/router.py` | target → lane classification (U3) |
 | `src/loopeng/memory/` | SQLite run history + trend/plateau/recurring queries (U2); `runs.finished` wall-clock |
-| `src/loopeng/adapters/` | contracts, `safety.py` (subprocess/jail/env-prune), factory + judge shells (U4/U5) |
+| `src/loopeng/adapters/` | contracts, `safety.py` (subprocess/jail/env-prune), factory + judge shells (U4/U5), `compound_engineering.py` (`/ce-work` refiner), `llm_refiner.py` (claude-free fallback-chain refiner) |
 | `src/loopeng/adopt.py` | catalog tool adopter — venv-isolated, env-pruned, full-SHA-pinned (proof pipeline U1, KTD7) |
 | `src/loopeng/proof.py` | `ProofPack` builder + `StoreBackedCompounder` (proof pipeline U3) |
 | `src/loopeng/loop/` | controller, convergence, brief, compound, `GitCheckpoint` (U6) |

@@ -341,6 +341,9 @@ def demo_run_cmd(demo_id: str, workspace: str | None) -> None:
 @click.option("--install-kind", required=True, help="pip_git_subdir | pp_binary.")
 @click.option("--workspace", default=None, help="Where to adopt the tool (default .loopeng/proof/<id>).")
 @click.option("--required-env", multiple=True, help="Env var names the adopted tool needs.")
+@click.option("--refiner", type=click.Choice(["claude", "llm"]), default="claude",
+              help="Refine engine: 'claude' (/ce-work via claude -p) or 'llm' "
+                   "(free-tier fallback chain — no claude quota).")
 @click.option("--dry-run", is_flag=True, help="Print the adopt + loop plan; write nothing.")
 def demo_proof_cmd(
     demo_id: str,
@@ -350,6 +353,7 @@ def demo_proof_cmd(
     install_kind: str,
     workspace: str | None,
     required_env: tuple[str, ...],
+    refiner: str,
     dry_run: bool,
 ) -> None:
     """Adopt a catalog CLI as a baseline, run the refine loop, and record a
@@ -385,13 +389,14 @@ def demo_proof_cmd(
     if dry_run:
         click.echo(
             f"[dry-run] proof plan for {demo_id}:\n"
-            f"  adopt: {catalog}:{entry_name}@{sha[:12]} ({install_kind}) -> {workspace}/\n"
-            f"  loop:  refine-only on the {m.lane.value} lane, goal={m.goal!r}\n"
+            f"  adopt:  {catalog}:{entry_name}@{sha[:12]} ({install_kind}) -> {workspace}/\n"
+            f"  loop:   refine-only on the {m.lane.value} lane, goal={m.goal!r}\n"
+            f"  refiner: {refiner}\n"
             f"  record: live_verified + proof pack via `demo record` (only on a real run)."
         )
         return
 
-    missing = missing_for_refine()
+    missing = missing_for_refine(refiner=refiner)
     if missing:
         raise click.ClickException(f"missing tools for a refine run: {', '.join(x.label for x in missing)}")
 
@@ -400,13 +405,17 @@ def demo_proof_cmd(
     if not adopted.ok:
         raise click.ClickException(f"adoption failed: {adopted.error or adopted.logs[:300]}")
 
-    run_id = _drive_proof_loop(adopted.tool_path, m, workspace)
+    run_id = _drive_proof_loop(adopted.tool_path, m, workspace, refiner)
     _finish_proof(reg, demo_id, run_id, adopted.resolved_sha)
 
 
-def _drive_proof_loop(tool_path: str, manifest, workspace: str) -> int:
-    """Run the refine-only loop on an adopted tool; returns the run id."""
-    from .adapters.compound_engineering import ClaudeCodeCompounder, ClaudeCodeRefiner
+def _drive_proof_loop(tool_path: str, manifest, workspace: str, refiner: str = "claude") -> int:
+    """Run the refine-only loop on an adopted tool; returns the run id.
+
+    ``refiner='claude'`` drives `/ce-work` via `claude -p` (the documented brain).
+    ``refiner='llm'`` drives the provider-agnostic fallback-chain LLM refiner --
+    no claude, no quota -- and skips the `/ce-compound` inner step (learnings are
+    still recorded to the store for the proof pack)."""
     from .adapters.judge import CLIJudge
     from .autonomous.runner import run_refine_loop
     from .demos.registry import Registry
@@ -418,13 +427,23 @@ def _drive_proof_loop(tool_path: str, manifest, workspace: str) -> int:
         raise click.ClickException(
             f"no CLI-Judge adapter at demos/adapters/{manifest.id}.py -- add one (U5) before proving."
         )
+
+    if refiner == "llm":
+        from .adapters.llm_refiner import FallbackLLMRefiner
+        refiner_impl = FallbackLLMRefiner()
+        compounder_impl = None  # store-only learnings; no claude /ce-compound
+    else:
+        from .adapters.compound_engineering import ClaudeCodeCompounder, ClaudeCodeRefiner
+        refiner_impl = ClaudeCodeRefiner()
+        compounder_impl = ClaudeCodeCompounder(tool_path)
+
     store = MemoryStore.default()
     result = run_refine_loop(
         tool_path,
         manifest.goal,
         judge=CLIJudge(adapter_path=str(adapter)),
-        refiner=ClaudeCodeRefiner(),
-        compounder=ClaudeCodeCompounder(tool_path),
+        refiner=refiner_impl,
+        compounder=compounder_impl,
         store=store,
         workspace_root=workspace,
         lane=manifest.lane,

@@ -103,19 +103,25 @@ def missing_for_lane(lane: Lane, statuses: list[ToolStatus] | None = None) -> li
     return [s for s in statuses if s.key in required and not s.available]
 
 
-def required_keys_for_refine() -> set[str]:
+def required_keys_for_refine(refiner: str = "claude") -> set[str]:
     """Keys required for a *refine-only* run (proof pipeline, U2).
 
-    Refine-only adopts an already-generated tool, so no factory is needed --
-    only the always-required tools (the judge + the refinement engine). This is
-    lane-independent: ``missing_for_lane`` always pulls in a lane factory, which
-    a refine run never invokes.
+    Refine-only adopts an already-generated tool, so no factory is needed.
+    The judge (``cli-judge``) is always required. The refinement engine depends
+    on the chosen refiner: ``claude`` needs the compound-engineering plugin
+    (``/ce-work``); ``llm`` drives an OpenAI-compatible endpoint directly and so
+    requires no preflight-detected tool (its fallback chain self-handles
+    provider availability). Lane-independent: ``missing_for_lane`` always pulls
+    in a lane factory, which a refine run never invokes.
     """
-    return {dep.key for dep in DEPENDENCIES if not dep.lanes}
+    keys = {dep.key for dep in DEPENDENCIES if not dep.lanes}
+    if refiner == "llm":
+        keys.discard("compound-engineering")
+    return keys
 
 
-def missing_for_refine(statuses: list[ToolStatus] | None = None) -> list[ToolStatus]:
+def missing_for_refine(statuses: list[ToolStatus] | None = None, *, refiner: str = "claude") -> list[ToolStatus]:
     """Return the unavailable tools that block a refine-only run (no factory)."""
     statuses = statuses if statuses is not None else preflight()
-    required = required_keys_for_refine()
+    required = required_keys_for_refine(refiner)
     return [s for s in statuses if s.key in required and not s.available]
