@@ -1,9 +1,9 @@
 id: supply-chain
-title: OpenSky logistics CLI
-domain: Supply chain & logistics
+title: OpenSky air-traffic CLI
+domain: Aviation tracking
 target: https://opensky-network.org/api
 lane: service
-goal: make live air-traffic/logistics tracking agent-native
+goal: make live aircraft/flight-tracking queries agent-native (an air-logistics signal) and converge to Grade A
 kind: demo
 contributor: wjlgatech
 exit_criteria:

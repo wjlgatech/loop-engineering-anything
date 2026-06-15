@@ -1,9 +1,9 @@
 id: smart-grid
 title: Open-Meteo forecast CLI
-domain: Smart-grid energy
+domain: Weather & forecasting
 target: https://api.open-meteo.com/v1
 lane: service
-goal: make weather/renewable forecast queries agent-native and converge to Grade A
+goal: make weather + renewable-supply forecast queries agent-native (a forecasting input to the smart-grid domain) and converge to Grade A
 kind: demo
 contributor: wjlgatech
 exit_criteria:

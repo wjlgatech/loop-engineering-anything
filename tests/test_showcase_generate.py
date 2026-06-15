@@ -89,6 +89,16 @@ def test_contributor_html_is_escaped_in_leaderboard(tmp_path):
     assert "@octocat" in html
 
 
+def test_blocked_safety_badge_renders(tmp_path):
+    reg = _registry(
+        tmp_path,
+        [_manifest(result_ref="clinical-trials.json")],
+        [_result(source="illustrative", grade_trajectory=["C"], final_grade="C", convergence_status="blocked_safety")],
+    )
+    html = render_catalog(reg)
+    assert "conv blocked_safety" in html
+
+
 def test_draft_card_when_no_result(tmp_path):
     reg = _registry(tmp_path, [_manifest()])  # no result_ref
     html = render_catalog(reg)

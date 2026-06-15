@@ -5,7 +5,10 @@ from __future__ import annotations
 from loopeng.demos.registry import Registry
 from loopeng.showcase.generate import render_catalog
 
-ARTICLE_DOMAINS = {
+# Shipped domains. Two intentionally diverge from the article's grand labels to
+# match their real targets honestly: Open-Meteo is weather (not a grid), OpenSky
+# is aviation (not freight). Honest labels beat impressive ones.
+SHIPPED_DOMAINS = {
     "Interactive spec / PR lifecycle",
     "Legal & compliance",
     "Clinical trials & health",
@@ -14,8 +17,8 @@ ARTICLE_DOMAINS = {
     "VC & angel investing",
     "Complex software architecture",
     "Education & curriculum",
-    "Smart-grid energy",
-    "Supply chain & logistics",
+    "Weather & forecasting",
+    "Aviation tracking",
 }
 
 
@@ -40,13 +43,24 @@ def test_every_starter_fixture_is_illustrative():
         assert result.source == "illustrative", f"{m.id} must ship as illustrative"
 
 
-def test_domains_in_article_set_and_credentials_declared():
+def test_domains_match_shipped_set_and_credentials_declared():
     reg = _reg()
     for m in reg.demos():
-        assert m.domain in ARTICLE_DOMAINS, f"{m.id} domain {m.domain!r} not in article set"
+        assert m.domain in SHIPPED_DOMAINS, f"{m.id} domain {m.domain!r} not in shipped set"
     # pr-lifecycle (GitHub) is the credentialed target and must declare its env var.
     pr = reg.manifests["pr-lifecycle"]
     assert "GITHUB_TOKEN" in pr.required_env
+
+
+def test_codebase_demo_targets_exist_on_disk():
+    # software-arch / edu-curriculum point at real vendored repos, not placeholders.
+    from pathlib import Path
+
+    reg = _reg()
+    repo_root = Path(reg.demos_dir).parent
+    for demo_id in ("software-arch", "edu-curriculum"):
+        target = reg.manifests[demo_id].target
+        assert (repo_root / target).is_dir(), f"{demo_id} target {target!r} does not exist"
 
 
 def test_showcase_renders_all_with_recipe_lane():
@@ -57,8 +71,3 @@ def test_showcase_renders_all_with_recipe_lane():
         assert f"docs/recipes/{m.id}.md" in html
 
 
-def test_blocked_safety_demo_present_for_badge_coverage():
-    # supply-chain ships a blocked_safety result so the safety badge is exercised.
-    reg = _reg()
-    result = reg.result_for(reg.manifests["supply-chain"])
-    assert result.convergence_status == "blocked_safety"
