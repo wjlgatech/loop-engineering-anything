@@ -38,6 +38,18 @@ All notable changes to this project are documented here, following
     is recorded as `blocked_safety`, never as a passing proof (R6). `--dry-run`
     prints the plan without writing. The showcase now headlines the before/after
     proof line on verified cards.
+  - **Proof targets** (U5): `arxiv` (first-light), `hackernews`, `wikipedia`
+    manifests (public-API, no-credential, service lane) + self-contained
+    per-target CLI-Judge adapters under `demos/adapters/`. CLI-Judge ships its
+    own generic D1–D5 fixtures, so the adapter is the only target-specific piece.
+    Cards ship in **draft** (no fabricated trajectory) until a real proof runs.
+  - **Gated proof e2e** (`tests/e2e/test_proof_loop.py`, U6): drives the
+    refine-only proof against a real adopted tool; skips (never fails) when the
+    `claude -p` quota, the grader, or the target are absent.
+  - **Docs** (U8): `CONTRIBUTING-demos.md` proof-target section (adopt flags,
+    fixture provenance, human-review + full-SHA rules); `docs/solutions/`
+    decision records (refine-only baseline, provenance honesty, adopter
+    isolation, P0 gate status); `docs/e2e-runbook.md` proof run steps.
 - Project scaffold: `pyproject.toml`, `loop-anything` CLI entrypoint, package
   layout under `src/loopeng/` (U1).
 - `AGENTS.md` agent guide and GitHub Actions CI (pytest on Python 3.11–3.13 for

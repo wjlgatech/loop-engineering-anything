@@ -50,6 +50,47 @@ Put it at `demos/results/<id>.json`:
 - `source: live_verified` — **only** produced by snapshotting a real run:
   `loop-anything demo record my-demo --from <run_id>`. Don't hand-write this.
 
+## 2b. Contributing a *proof* target (refine-only pipeline)
+
+A **proof target** goes further than a demo card: it adopts a real, already-built
+CLI from [clianything.cc](https://clianything.cc/) /
+[printingpress.dev](https://printingpress.dev/) as a **baseline**, runs the loop
+(judge → `/ce-work` → re-judge → `/ce-compound`), and records a `live_verified`
+before/after **proof pack**. It proves the refine loop — not the generate
+frontier.
+
+Two extra artifacts beyond the manifest:
+
+1. **A CLI-Judge adapter** at `demos/adapters/<id>.py`. Copy `demos/adapters/arxiv.py`
+   — it is self-contained (CLI-Judge loads it standalone and requires a
+   module-level `ADAPTER`), resolves the tool binary from `LOOPENG_PROOF_BINARY`,
+   routes replay traffic via base-url env names, and captures a non-zero exit
+   instead of raising. CLI-Judge ships its own generic D1–D5 fixtures, so you do
+   **not** author per-target payloads — the adapter is the only target-specific
+   code.
+2. **A pinned, reviewed baseline.** Run the proof with a **full 40-char commit
+   SHA** (tags/branches are rejected — KTD7) and review the upstream source at
+   that SHA before adopting; the host allowlist gates *where* code comes from,
+   not *what* it does.
+
+```bash
+# dry-run first (writes nothing):
+loop-anything demo proof arxiv --catalog printing-press --name arxiv \
+    --sha <full-40-char-commit-sha> --install-kind pp_binary --dry-run
+```
+
+**Honesty rules (non-negotiable):**
+- A card flips to `live_verified` ONLY via `demo proof` / `demo record` against a
+  real run. Never hand-edit a fixture to `live_verified`.
+- A `blocked_safety` run is recorded as `blocked_safety`, never a passing proof.
+- A no-gain run is recorded honestly as-is — a green before/after is not the goal;
+  an honest one is.
+- Until a real run lands, leave the card in **draft** (no fixture) — do not ship a
+  fabricated `illustrative` trajectory for a proof target.
+
+Live runs need the `claude -p` refine quota and the target's toolchain/daemon;
+absent them the gated e2e (`tests/e2e/test_proof_loop.py`) skips, never fails.
+
 ## 3. Validate + preview
 
 ```bash
