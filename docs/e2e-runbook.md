@@ -4,20 +4,33 @@ The end-to-end loop is the only path that drives the **live** external tools, so
 it is not part of the default `pytest` run (it needs installs, credentials, and
 ~30–40 min of generation time). Run it deliberately.
 
-## 1. Install the tools
+## 1. Install the tools (verified commands)
 
 ```bash
-# service lane
+# referee — CLI-Judge (Python; the package lives in the harness/ subdir)
+git clone https://github.com/wjlgatech/cli-judge
+pip install -e cli-judge/harness          # installs the `cli-judge` console script
+cli-judge selftest                        # sanity: runs the echo adapter, prints a real grade
+
+# codebase lane — CLI-Anything
+#   NOTE: generation is a Claude Code SKILL, not a build binary:
+#     claude -p "/cli-anything <path-or-repo>"      (driven by ClaudeCodeRefiner-style invocation)
+pip install cli-anything-hub              # installs `cli-hub` (browse/install generated CLIs only)
+claude plugin marketplace add HKUDS/CLI-Anything && claude plugin install cli-anything
+
+# service lane — CLI-Printing-Press (REQUIRES a Go toolchain)
+#   install Go first (e.g. `brew install go`), then:
 curl -fsSL https://raw.githubusercontent.com/mvanhorn/cli-printing-press/main/scripts/install.sh | bash
-# codebase lane
-pipx install cli-anything            # or per the CLI-Anything README
-# referee
-pipx install cli-judge               # or per the CLI-Judge README
 ```
 
-`loop-anything preflight` should now show all four available (compound-engineering
-is detected as a Claude Code plugin; set `LOOPENG_ASSUME_COMPOUND_ENGINEERING=1`
-if auto-detection can't confirm it).
+`loop-anything preflight` should then show the lane's tools available
+(compound-engineering is detected as a Claude Code plugin; set
+`LOOPENG_ASSUME_COMPOUND_ENGINEERING=1` if auto-detection can't confirm it).
+
+> **Verified report.json schema** (pin point for the judge adapter): the safety
+> signal is the boolean `safety_blocker`; dimensions are `D1..D5` with
+> `points`/`max_points`; failing fixtures are `tasks[]` entries that lost points.
+> Pass the judge an absolute `cli-judge` path if it is not on the subprocess PATH.
 
 ## 2. Resolve the two P0 gates first
 
