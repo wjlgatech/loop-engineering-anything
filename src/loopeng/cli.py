@@ -138,6 +138,19 @@ def report_cmd(run_id: int, as_json: bool) -> None:
     click.echo(render_report(store, run_id, as_json=as_json))
 
 
+@main.command("showcase")
+@click.option("--out", default="showcase.html", show_default=True, help="Output HTML path.")
+def showcase_cmd(out: str) -> None:
+    """Generate the self-contained HTML demo catalog."""
+    from .demos.registry import Registry
+    from .showcase.generate import render_catalog
+
+    reg = Registry.load()
+    with open(out, "w") as fh:
+        fh.write(render_catalog(reg))
+    click.echo(f"Showcase written to {out} ({len(reg.demos())} demos, {len(reg.recipes())} recipes).")
+
+
 @main.group("demo")
 def demo_grp() -> None:
     """Manage community demos (list / show / validate / record / run)."""
