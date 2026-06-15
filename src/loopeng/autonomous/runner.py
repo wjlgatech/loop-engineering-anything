@@ -23,12 +23,12 @@ from datetime import datetime, timezone
 from ..adapters.base import Checkpoint, Compounder, Factory, Judge, Refiner
 from ..adapters.cli_anything import CLIAnythingFactory
 from ..adapters.printing_press import PrintingPressFactory
-from ..adapters.safety import run_tool, validate_target
+from ..adapters.safety import run_tool, validate_target, within_workspace
 from ..config import Budget, Config, Lane
 from ..loop.checkpoint import GitCheckpoint
 from ..loop.controller import LoopController, LoopOutcome, LoopState
 from ..memory.store import MemoryStore
-from ..preflight import missing_for_lane
+from ..preflight import missing_for_lane, missing_for_refine
 from ..router import route
 
 
@@ -115,4 +115,67 @@ def run_loop(
         budget=budget,
     )
     outcome = controller.run(run_id, gen.tool_path, goal)
+    return RunResult(run_id, outcome)
+
+
+def run_refine_loop(
+    tool_path: str,
+    goal: str,
+    *,
+    judge: Judge,
+    refiner: Refiner,
+    compounder: Compounder,
+    store: MemoryStore,
+    workspace_root: str,
+    lane: Lane = Lane.SERVICE,
+    config: Config | None = None,
+    budget: Budget | None = None,
+    checkpoint: Checkpoint | None = None,
+    check_missing=missing_for_refine,
+    target_label: str | None = None,
+) -> RunResult:
+    """Drive the loop on an **already-present** tool (proof pipeline, U2).
+
+    The "refine-only" entrypoint: there is no generate step. ``tool_path`` is an
+    adopted catalog CLI (or an in-repo target) that already lives under
+    ``workspace_root``. The controller's *initial* judge of that tool is the
+    recorded "before" baseline (KTD1 -- controller is unchanged). Preflight gates
+    on the judge + refinement engine only (no factory). Wall-clock is measured
+    around the loop and stamped via ``store.record_finished`` for the proof pack.
+    """
+    config = config or Config()
+    budget = budget or config.budget
+
+    # Filesystem jail: the tool must already live inside the workspace (S-4).
+    if not within_workspace(tool_path, workspace_root):
+        raise ValueError(f"tool_path is outside the workspace root: {tool_path!r}")
+
+    blocked = check_missing()
+    if blocked:
+        names = ", ".join(b.label for b in blocked)
+        raise RuntimeError(f"preflight: cannot run a refine loop -- missing: {names}")
+
+    _check_credentials(config)
+
+    label = target_label or tool_path
+    started = datetime.now(timezone.utc).isoformat()
+    run_id = store.create_run(label, lane.value, goal, started)
+
+    if checkpoint is None:
+        _ensure_git_repo(tool_path)
+        checkpoint = GitCheckpoint(tool_path)
+
+    controller = LoopController(
+        judge=judge,
+        refiner=refiner,
+        compounder=compounder,
+        checkpoint=checkpoint,
+        store=store,
+        budget=budget,
+    )
+    outcome = controller.run(run_id, tool_path, goal)
+    # Stamp wall-clock end for the proof pack (elapsed = finished - started).
+    # finish_run already set status; record_finished adds the timestamp the
+    # controller doesn't own.
+    store.record_finished(run_id, datetime.now(timezone.utc).isoformat())
     return RunResult(run_id, outcome)

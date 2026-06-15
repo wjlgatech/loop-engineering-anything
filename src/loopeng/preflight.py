@@ -101,3 +101,21 @@ def missing_for_lane(lane: Lane, statuses: list[ToolStatus] | None = None) -> li
     statuses = statuses if statuses is not None else preflight()
     required = required_keys(lane)
     return [s for s in statuses if s.key in required and not s.available]
+
+
+def required_keys_for_refine() -> set[str]:
+    """Keys required for a *refine-only* run (proof pipeline, U2).
+
+    Refine-only adopts an already-generated tool, so no factory is needed --
+    only the always-required tools (the judge + the refinement engine). This is
+    lane-independent: ``missing_for_lane`` always pulls in a lane factory, which
+    a refine run never invokes.
+    """
+    return {dep.key for dep in DEPENDENCIES if not dep.lanes}
+
+
+def missing_for_refine(statuses: list[ToolStatus] | None = None) -> list[ToolStatus]:
+    """Return the unavailable tools that block a refine-only run (no factory)."""
+    statuses = statuses if statuses is not None else preflight()
+    required = required_keys_for_refine()
+    return [s for s in statuses if s.key in required and not s.available]

@@ -34,6 +34,7 @@ class Run:
     status: str
     final_grade: str | None
     started: str
+    finished: str | None = None
 
 
 @dataclass
@@ -57,7 +58,18 @@ class MemoryStore:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(_SCHEMA.read_text())
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Additive, idempotent migrations for DBs created before a column existed.
+
+        ``CREATE TABLE IF NOT EXISTS`` won't add columns to a pre-existing table,
+        so add any missing nullable columns here (proof-pack ``runs.finished``).
+        """
+        cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(runs)").fetchall()}
+        if "finished" not in cols:
+            self._conn.execute("ALTER TABLE runs ADD COLUMN finished TEXT")
 
     @classmethod
     def default(cls) -> "MemoryStore":
@@ -81,6 +93,13 @@ class MemoryStore:
             "UPDATE runs SET status = ?, final_grade = ? WHERE id = ?",
             (status, final_grade, run_id),
         )
+        self._conn.commit()
+
+    def record_finished(self, run_id: int, finished: str) -> None:
+        """Stamp the run's wall-clock end (ISO-8601). Set by the runner after
+        ``controller.run`` returns, since ``finish_run`` fires inside the
+        controller and the runner owns the elapsed measurement (proof-pack)."""
+        self._conn.execute("UPDATE runs SET finished = ? WHERE id = ?", (finished, run_id))
         self._conn.commit()
 
     def get_run(self, run_id: int) -> Run | None:
@@ -191,6 +210,7 @@ class MemoryStore:
             status=row["status"],
             final_grade=row["final_grade"],
             started=row["started"],
+            finished=row["finished"],
         )
 
     @staticmethod

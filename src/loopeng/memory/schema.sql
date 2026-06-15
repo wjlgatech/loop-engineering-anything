@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS runs (
     goal        TEXT,
     status      TEXT NOT NULL DEFAULT 'running',  -- running|converged|blocked_safety|stopped
     final_grade TEXT,
-    started     TEXT NOT NULL                      -- ISO-8601, supplied by caller
+    started     TEXT NOT NULL,                     -- ISO-8601, supplied by caller
+    finished    TEXT                               -- ISO-8601 wall-clock end (proof-pack elapsed); nullable
 );
 
 CREATE TABLE IF NOT EXISTS iterations (
