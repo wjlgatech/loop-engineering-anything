@@ -37,6 +37,20 @@ All notable changes to this project are documented here, following
   (env-only, never logged), workspace boundary, git checkpoints — wiring
   preflight → route → factory → controller, injectable for testing.
 
+### Changed — demo honesty pass
+- Relabeled two demos so the domain matches the real target: `smart-grid` →
+  *Weather & forecasting* (Open-Meteo is weather, not grid control), `supply-chain`
+  → *Aviation tracking* (OpenSky is flights, not freight). The grand grid/logistics
+  loops remain as recipes.
+- Made the two codebase-lane targets real: vendored `services/example-microservice`
+  and `services/example-curriculum` (were placeholder paths).
+- Removed a fabricated `blocked_safety` status from `supply-chain` (it was decorative,
+  to show the badge); badge coverage now lives in a synthetic generator test.
+- Added `demos/README.md` stating plainly that all demos are `illustrative` and **why
+  none are `live_verified`**: both generators are Claude Code skills driven by
+  `claude -p`, which is quota-blocked until 2026-07-01 — so a verified card can't be
+  produced today and won't be faked.
+
 ### Added — community demos + showcase
 - Demo manifest format + registry (`demos/`, `src/loopeng/demos/`): YAML manifests
   validated by JSON Schema with semantic guards (https-only + non-private host for

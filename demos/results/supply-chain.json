@@ -2,10 +2,12 @@
   "demo_id": "supply-chain",
   "source": "illustrative",
   "grade_trajectory": [
-    "C"
+    "C",
+    "B",
+    "A"
   ],
-  "final_grade": "C",
-  "convergence_status": "blocked_safety",
+  "final_grade": "A",
+  "convergence_status": "converged",
   "report_ref": "supply-chain.report.md",
   "engine_version": "0.1.0"
 }
