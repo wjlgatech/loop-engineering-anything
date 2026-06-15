@@ -90,7 +90,12 @@ class Budget:
     max_iterations: int = 10
     plateau_patience: int = 3  # stop after N iterations with no grade gain
     token_budget: int | None = None  # advisory until a measurement source exists
-    compression_interval: int = 5  # run History Compression every N iterations (U7)
+    compression_interval: int = 5  # run History Compression every N accepted fixes (U7)
+    # Noise band for grade stability (P0 #2). A same-letter iteration only counts
+    # as an improvement when the continuous score rises by more than this margin,
+    # so sub-noise jitter from a non-deterministic judge is not mistaken for gain.
+    # Set from a `probe_grade_variance` measurement; 0.0 = letter-grade only.
+    min_score_gain: float = 0.0
 
 
 @dataclass

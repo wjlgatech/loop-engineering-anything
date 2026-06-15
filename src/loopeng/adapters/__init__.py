@@ -10,7 +10,8 @@ from .base import (
     Verdict,
 )
 from .cli_anything import CLIAnythingFactory
-from .judge import CLIJudge, parse_report
+from .compound_engineering import ClaudeCodeCompounder, ClaudeCodeRefiner
+from .judge import CLIJudge, VarianceReport, parse_report, probe_grade_variance
 from .printing_press import PrintingPressFactory
 
 __all__ = [
@@ -25,4 +26,8 @@ __all__ = [
     "CLIAnythingFactory",
     "CLIJudge",
     "parse_report",
+    "probe_grade_variance",
+    "VarianceReport",
+    "ClaudeCodeRefiner",
+    "ClaudeCodeCompounder",
 ]

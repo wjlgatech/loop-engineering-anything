@@ -37,6 +37,20 @@ All notable changes to this project are documented here, following
   (env-only, never logged), workspace boundary, git checkpoints — wiring
   preflight → route → factory → controller, injectable for testing.
 
+### Added (continued)
+- History Compression Engine (U7): periodic System-2 consolidation pass with a
+  grade-neutral-or-better-and-safe guard (rolls back otherwise); wired into the
+  controller on an accepted-fix cadence via an injectable `compressor`.
+- Headless refinement bindings (P0 #1): `ClaudeCodeRefiner` / `ClaudeCodeCompounder`
+  drive `/ce-work` and `/ce-compound` non-interactively via `claude -p` — a
+  concrete answer to "can the loop run unattended?" (quality on real targets stays
+  empirical).
+- Grade-stability probe (P0 #2): `probe_grade_variance` + `loop-anything
+  judge-variance` measure judge jitter; `Budget.min_score_gain` + a noise-aware
+  `is_improvement` make the loop ignore sub-noise gains.
+- Gated end-to-end reference-loop test (`tests/e2e/`) and `docs/e2e-runbook.md` —
+  skipped unless the live tools + credentials are configured.
+
 ### Changed
 - README redesigned for impact: centered hero, badge row (live CI/tests/license),
   mermaid loop + architecture diagrams, pain→fix table, capability columns,

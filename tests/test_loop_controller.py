@@ -149,6 +149,48 @@ def test_max_iterations_stops(store):
     assert "max iterations" in outcome.reason
 
 
+class RecordingCompressor:
+    def __init__(self, after_verdict):
+        self.after = after_verdict
+        self.runs = 0
+
+    def run(self, run_id, tool_path):
+        from loopeng.compression import CompressionResult
+
+        self.runs += 1
+        return CompressionResult(True, self.after, self.after, "stub")
+
+
+def test_compressor_fires_on_cadence(store):
+    # Improvements C->B->A->A... ; compression every 1 accepted fix.
+    judge = ScriptedJudge([v("C"), v("B"), v("A")])
+    refiner = FakeRefiner()
+    compounder = RecordingCompounder()
+    checkpoint = FakeCheckpoint()
+    compressor = RecordingCompressor(after_verdict=v("B"))
+    ctrl = LoopController(
+        judge=judge,
+        refiner=refiner,
+        compounder=compounder,
+        checkpoint=checkpoint,
+        store=store,
+        budget=Budget(target_grade="A", compression_interval=1),
+        compressor=compressor,
+    )
+    run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+    ctrl.run(run_id, "tool/")
+    # At least one accepted fix -> compressor ran at least once.
+    assert compressor.runs >= 1
+
+
+def test_no_compressor_means_no_compression(store):
+    judge = ScriptedJudge([v("C"), v("A")])
+    ctrl, *_ = _controller(store, judge, Budget(target_grade="A"))
+    run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+    outcome = ctrl.run(run_id, "tool/")
+    assert outcome.final_state is LoopState.CONVERGED  # unchanged behavior
+
+
 def test_regression_rolls_back_and_does_not_compound_transient(store):
     # B then a worse C (regression -> rollback, no compound), then A (accepted).
     judge = ScriptedJudge([v("B"), v("C"), v("A")])

@@ -57,3 +57,19 @@ def evaluate(
         return Decision(STOPPED, f"plateau: no gain over {budget.plateau_patience} iterations")
 
     return Decision(CONTINUE, "below target with budget remaining")
+
+
+def is_improvement(old: Verdict, new: Verdict, budget: Budget) -> bool:
+    """Whether ``new`` is a real improvement over ``old`` (P0 #2, noise-aware).
+
+    A strictly better letter grade always counts. A same-letter result counts
+    only when the continuous score rises by more than ``budget.min_score_gain``
+    -- the noise band that keeps a jittery judge from registering phantom gains.
+    A worse letter grade is never an improvement.
+    """
+    old_r, new_r = grade_rank(old.grade), grade_rank(new.grade)
+    if new_r > old_r:
+        return True
+    if new_r < old_r:
+        return False
+    return (new.score - old.score) > budget.min_score_gain

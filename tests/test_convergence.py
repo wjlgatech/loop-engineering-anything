@@ -49,3 +49,27 @@ def test_plateau_stops():
     d = cv.evaluate(v("C"), Budget(), iterations_done=5, plateaued=True)
     assert d.kind == cv.STOPPED
     assert "plateau" in d.reason
+
+
+# --- is_improvement (P0 #2 noise-aware acceptance) ---
+
+
+def s(grade, score):
+    return Verdict(grade=grade, score=score, dims={}, safety_ok=True)
+
+
+def test_better_letter_grade_is_improvement():
+    assert cv.is_improvement(s("C", 60), s("B", 61), Budget()) is True
+
+
+def test_worse_letter_grade_is_not_improvement():
+    assert cv.is_improvement(s("B", 99), s("C", 99), Budget()) is False
+
+
+def test_same_grade_within_noise_band_is_not_improvement():
+    # +3 score but a 5-point noise band -> not a real gain.
+    assert cv.is_improvement(s("B", 80), s("B", 83), Budget(min_score_gain=5.0)) is False
+
+
+def test_same_grade_above_noise_band_is_improvement():
+    assert cv.is_improvement(s("B", 80), s("B", 86), Budget(min_score_gain=5.0)) is True
