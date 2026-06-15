@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Loop memory stores
+*.db
+*.sqlite
+*.sqlite3
+runs/
+
+# Agent worktrees
+.claude/worktrees/
+
+# OS
+.DS_Store
