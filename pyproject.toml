@@ -12,6 +12,8 @@ license = { text = "MIT" }
 authors = [{ name = "wjlgatech" }]
 dependencies = [
     "click>=8.1",
+    "pyyaml>=6",
+    "jsonschema>=4",
 ]
 
 [project.optional-dependencies]
