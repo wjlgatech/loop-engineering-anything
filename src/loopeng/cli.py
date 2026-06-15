@@ -140,14 +140,19 @@ def report_cmd(run_id: int, as_json: bool) -> None:
 
 @main.command("showcase")
 @click.option("--out", default="showcase.html", show_default=True, help="Output HTML path.")
-def showcase_cmd(out: str) -> None:
+@click.option(
+    "--base-url",
+    default="",
+    help="Prefix for doc links (e.g. a GitHub blob URL) so report/recipe links resolve when hosted.",
+)
+def showcase_cmd(out: str, base_url: str) -> None:
     """Generate the self-contained HTML demo catalog."""
     from .demos.registry import Registry
     from .showcase.generate import render_catalog
 
     reg = Registry.load()
     with open(out, "w") as fh:
-        fh.write(render_catalog(reg))
+        fh.write(render_catalog(reg, base_url=base_url))
     click.echo(f"Showcase written to {out} ({len(reg.demos())} demos, {len(reg.recipes())} recipes).")
 
 
@@ -248,10 +253,34 @@ def demo_record_cmd(demo_id: str, run_id: int) -> None:
     click.echo(f"Recorded {demo_id} from run #{run_id} ({payload['final_grade']}, {run.status}).")
 
 
+def _run_generator(manifest, workspace: str):
+    """Attempt the real generate step via the generator's Claude Code skill.
+
+    Both generators are Claude Code skills driven by `claude -p`:
+      service lane  -> /printing-press <target>
+      codebase lane -> /cli-anything <target>
+    This really runs today; while headless quota is exhausted it returns the
+    upstream usage-limit error, and it Just Works once quota/a key is available.
+    """
+    from .config import Lane
+    from .adapters.safety import run_tool
+
+    skill = "/printing-press" if manifest.lane is Lane.SERVICE else "/cli-anything"
+    prompt = f"{skill} {manifest.target}\nGoal: {manifest.goal}"
+    return run_tool(
+        ["claude", "-p", prompt, "--permission-mode", "bypassPermissions"],
+        cwd=workspace,
+        timeout=60 * 60,
+    )
+
+
 @demo_grp.command("run")
 @click.argument("demo_id")
-def demo_run_cmd(demo_id: str) -> None:
-    """Run a demo's loop live (gated until per-target adapters land)."""
+@click.option("--workspace", default=None, help="Where to generate the tool (default .loopeng/<id>).")
+def demo_run_cmd(demo_id: str, workspace: str | None) -> None:
+    """Generate + (when an adapter exists) judge + record a demo, live."""
+    import os
+
     from .demos.registry import Registry
     from .preflight import missing_for_lane
 
@@ -264,12 +293,27 @@ def demo_run_cmd(demo_id: str) -> None:
     missing = missing_for_lane(m.lane)
     if missing:
         raise click.ClickException(f"missing tools: {', '.join(x.label for x in missing)}")
-    # Honest stub: run_loop needs Judge/Refiner/Compounder bindings that depend on
-    # the still-deferred per-target adapters (same gate as `loop-anything run`).
-    raise click.ClickException(
-        "Live demo runs are not yet wired: per-target factory/judge adapters are deferred. "
-        "Record results from an existing run with `loop-anything demo record <id> --from <run_id>`."
-    )
+
+    workspace = workspace or os.path.join(".loopeng", demo_id)
+    os.makedirs(workspace, exist_ok=True)
+    click.echo(f"Generating {demo_id} ({m.lane.value} lane) into {workspace}/ ...")
+    res = _run_generator(m, workspace)
+    if not res.ok:
+        detail = (res.stderr or res.stdout or "generator failed").strip()[:500]
+        raise click.ClickException(f"generation failed for {m.target}:\n{detail}")
+
+    adapter = reg.demos_dir / "adapters" / f"{demo_id}.py"
+    if adapter.exists():
+        click.echo(
+            f"Generated into {workspace}/. Grade it: "
+            f"`cli-judge run --adapter {adapter} --suite full`, then "
+            f"`loop-anything demo record {demo_id} --from <run_id>` to publish a live_verified card."
+        )
+    else:
+        click.echo(
+            f"Generated into {workspace}/. To grade + record a live_verified result, add a "
+            f"CLI-Judge adapter at demos/adapters/{demo_id}.py, then re-run."
+        )
 
 
 if __name__ == "__main__":  # pragma: no cover

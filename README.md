@@ -12,6 +12,7 @@ reality, and refactors until the grade stops climbing — then tells you what it
 <br/>
 
 [![CI](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml/badge.svg)](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml)
+[![loop-anything-hub](https://img.shields.io/badge/loop--anything--hub-live-brightgreen)](https://wjlgatech.github.io/loop-engineering-anything/)
 [![Tests](https://img.shields.io/badge/tests-74%20passing-brightgreen)](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
 [![Units](https://img.shields.io/badge/plan-6%2F8%20units-blue)](docs/plans/)
@@ -272,11 +273,13 @@ live run.
 
 ---
 
-## 🖼️ Demos & community showcase
+## 🖼️ Demos & community showcase — [loop-anything-hub](https://wjlgatech.github.io/loop-engineering-anything/)
 
-A community catalog of loops — modeled on [printingpress.dev](https://printingpress.dev)
-and [clianything.cc](https://clianything.cc), but each card headlines the **loop
-outcome** (grade trajectory + convergence + report), which a plain CLI gallery can't.
+The **[loop-anything-hub](https://wjlgatech.github.io/loop-engineering-anything/)** is a
+live GitHub Pages catalog of loops, auto-published from `demos/` on every push to
+`main`. Modeled on [printingpress.dev](https://printingpress.dev) and
+[clianything.cc](https://clianything.cc), but each card headlines the **loop outcome**
+(grade trajectory + convergence + report), which a plain CLI gallery can't.
 
 ```bash
 loop-anything demo list                 # registered demos + recipes
