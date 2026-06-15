@@ -25,18 +25,38 @@ implementation plan.
 - **Safety is unbypassable (KTD5/R3).** A safety-failing verdict is a terminal
   `BLOCKED_SAFETY` state that rolls back and never ships. Do not add a path that
   exits `BLOCKED_SAFETY` into a ship/accept.
+- **Adoption isolates the install, not just the files (KTD7).** The catalog
+  adopter runs third-party `pip`/`npx` code at install time. It MUST install into
+  an isolated dir, pass a credential-pruned `env=` (no ambient `ANTHROPIC_API_KEY`
+  etc. reaching the subprocess), and pin by a full 40-char commit SHA from an
+  allowlisted host. Never widen the allowlist or accept a tag/branch ref.
+- **Verified status is record-only (KTD2).** A card flips to `live_verified`
+  ONLY via `demo record` / `demo proof` against a real run. Never hand-edit a
+  fixture to `live_verified`, and never record a `blocked_safety` run as a
+  passing proof.
+
+## Proof pipeline (refine-only)
+
+`loop-anything demo proof <id>` adopts a published catalog CLI as a *baseline*,
+runs the refine-only loop (`run_refine_loop` → unchanged `LoopController.run`,
+whose initial judge is the "before"), builds a `ProofPack`, and records a
+`live_verified` card with a before/after proof. This proves the **refine loop**,
+not the generate frontier (which stays deferred). Live runs need the `claude -p`
+quota and a per-target CLI-Judge adapter at `demos/adapters/<id>.py`.
 
 ## Layout
 
 | Path | Purpose |
 |---|---|
 | `src/loopeng/config.py` | budgets, convergence knobs, dependency table |
-| `src/loopeng/preflight.py` | dependency detection (per-mechanism) |
+| `src/loopeng/preflight.py` | dependency detection (per-mechanism); `missing_for_refine` (no factory) |
 | `src/loopeng/router.py` | target → lane classification (U3) |
-| `src/loopeng/memory/` | SQLite run history + trend/plateau/recurring queries (U2) |
-| `src/loopeng/adapters/` | contracts, `safety.py` (subprocess/jail), factory + judge shells (U4/U5) |
+| `src/loopeng/memory/` | SQLite run history + trend/plateau/recurring queries (U2); `runs.finished` wall-clock |
+| `src/loopeng/adapters/` | contracts, `safety.py` (subprocess/jail/env-prune), factory + judge shells (U4/U5) |
+| `src/loopeng/adopt.py` | catalog tool adopter — venv-isolated, env-pruned, full-SHA-pinned (proof pipeline U1, KTD7) |
+| `src/loopeng/proof.py` | `ProofPack` builder + `StoreBackedCompounder` (proof pipeline U3) |
 | `src/loopeng/loop/` | controller, convergence, brief, compound, `GitCheckpoint` (U6) |
-| `src/loopeng/autonomous/` | research report + autonomous runner shell (U8) |
+| `src/loopeng/autonomous/` | research report + autonomous runner; `run_refine_loop` (refine-only, proof pipeline U2) |
 | `src/loopeng/demos/` | demo manifest/registry + result fixtures (validated; SSRF/traversal/secret guards) |
 | `src/loopeng/showcase/` | self-contained HTML catalog generator (context-aware escaping) |
 | `demos/` · `docs/recipes/` | community demo manifests + fixtures; aspirational loop recipes |

@@ -160,9 +160,11 @@ flowchart TD
 ```
 loop-engineering-anything/
 ├── src/loopeng/
-│   ├── cli.py                 # loop-anything entrypoint  (run / preflight / status / report)
+│   ├── cli.py                 # loop-anything entrypoint  (run / preflight / status / report / demo proof)
 │   ├── config.py              # budgets, convergence knobs, dependency table
-│   ├── preflight.py           # per-mechanism dependency detection
+│   ├── preflight.py           # per-mechanism dependency detection (+ refine-only gate)
+│   ├── adopt.py               # catalog tool adopter — venv-isolated, env-pruned, full-SHA pin
+│   ├── proof.py               # ProofPack builder + store-backed compounder
 │   ├── router.py              # target → lane classification
 │   ├── adapters/
 │   │   ├── base.py            # Verdict / GenerateResult + Judge/Refiner/Compounder/Checkpoint protocols
@@ -285,7 +287,19 @@ live GitHub Pages catalog of loops, auto-published from `demos/` on every push t
 loop-anything demo list                 # registered demos + recipes
 loop-anything demo validate             # the CI gate (manifests + fixtures)
 loop-anything showcase --out showcase.html   # generate the self-contained gallery
+
+# Turn a real catalog CLI into a verified before/after proof (refine-only):
+loop-anything demo proof <id> --catalog cli-anything --name <entry> \
+    --sha <full-40-char-commit-sha> --install-kind pip_git_subdir --dry-run
 ```
+
+> **Proofs validate the refine loop, not the generate frontier.** `demo proof`
+> adopts an *already-generated* catalog CLI as the baseline ("before"), runs the
+> loop (judge → `/ce-work` → re-judge → `/ce-compound`), and records a
+> `live_verified` card whose proof pack carries the before/after grade, the
+> per-dimension diff, iterations, and the regression tests it compounded. A
+> live run needs the `claude -p` quota and a per-target CLI-Judge adapter at
+> `demos/adapters/<id>.py`.
 
 Ten starter demos seed the catalog from the *Infinite Improvement Loop* domains
 (PR lifecycle, legal, clinical trials, biotech, quant, VC, software architecture,

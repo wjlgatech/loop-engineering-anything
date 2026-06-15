@@ -6,6 +6,38 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Catalog-to-proof pipeline, Phase A** (plan
+  `docs/plans/2026-06-15-003-feat-catalog-proof-pipeline-plan.md`): turns real
+  clianything.cc / printingpress.dev CLIs into verified before/after loop proofs
+  by adopting them as refine-only baselines — proving the loop's own value, not
+  the generators it wraps.
+  - **Catalog adopter** (`src/loopeng/adopt.py`, U1): installs an already-generated
+    catalog CLI into a workspace as a baseline. Security-first (KTD7): installs
+    into an isolated `--target`/venv dir, spawns the install with a
+    credential-pruned environment so third-party install-time code can't read
+    ambient secrets, pins by a **full 40-char commit SHA** (tags/branches
+    rejected), and only adopts from an allowlisted catalog host. `run_tool` gained
+    an `env=` parameter to support the pruned environment.
+  - **Refine-only loop entrypoint** (`run_refine_loop` in
+    `src/loopeng/autonomous/runner.py`, U2): drives the loop over an
+    already-present tool with no generate step — the controller's initial judge
+    is the recorded "before" baseline (controller unchanged, KTD1). Adds
+    `preflight.missing_for_refine` (gates on judge + refinement engine only, no
+    factory) and stamps wall-clock end via the new `runs.finished` column.
+  - **Proof pack** (`src/loopeng/proof.py`, U3): `ProofPack.from_run` assembles
+    before/after grades, per-dimension score diff, iterations, elapsed, token
+    cost (best-effort; omitted, never faked), and compounded regression tests.
+    `StoreBackedCompounder` records each accepted-fix learning to the store so
+    the proof's regression-test field is real. Result schema extended additively
+    with an optional `proof` block (existing illustrative fixtures still
+    validate). Secret-scan pattern set broadened (bearer/JWT, GCP, HuggingFace,
+    Stripe). `claude -p --output-format json` token usage is now parsed.
+  - **`loop-anything demo proof <id>`** (`src/loopeng/cli.py`, U4): orchestrates
+    adopt → refine loop → proof pack → record. Flips a card to `live_verified`
+    only through the shared `demo record` write path (KTD2); a safety-blocked run
+    is recorded as `blocked_safety`, never as a passing proof (R6). `--dry-run`
+    prints the plan without writing. The showcase now headlines the before/after
+    proof line on verified cards.
 - Project scaffold: `pyproject.toml`, `loop-anything` CLI entrypoint, package
   layout under `src/loopeng/` (U1).
 - `AGENTS.md` agent guide and GitHub Actions CI (pytest on Python 3.11–3.13 for
