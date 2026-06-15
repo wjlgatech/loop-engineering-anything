@@ -8,6 +8,8 @@ All notable changes to this project are documented here, following
 ### Added
 - Project scaffold: `pyproject.toml`, `loop-anything` CLI entrypoint, package
   layout under `src/loopeng/` (U1).
+- `AGENTS.md` agent guide and GitHub Actions CI (pytest on Python 3.11–3.13 for
+  every push/PR to `main`).
 - Dependency preflight (U1) detecting all four external tools, with per-tool
   detection by mechanism (PATH binary vs. Claude Code skill) so skill-distributed
   tools are not false-negatived; `LOOPENG_ASSUME_*` env override for
