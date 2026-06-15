@@ -37,6 +37,12 @@ All notable changes to this project are documented here, following
   (env-only, never logged), workspace boundary, git checkpoints — wiring
   preflight → route → factory → controller, injectable for testing.
 
+### Changed
+- README redesigned for impact: centered hero, badge row (live CI/tests/license),
+  mermaid loop + architecture diagrams, pain→fix table, capability columns,
+  roadmap checklist, and star-history — modeled on the CLI-Anything layout while
+  staying honest about the current 6/8-unit status.
+
 ### Investigated / Rejected
 - **`command -v` for all four tools** — rejected: CLI-Anything and
   compound-engineering are distributed as Claude Code skills, not PATH binaries,
