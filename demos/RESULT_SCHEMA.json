@@ -26,6 +26,35 @@
       "pattern": "^[a-z0-9]+(-[a-z0-9]+)*\\.report\\.md$"
     },
     "recorded_at": { "type": "string" },
-    "engine_version": { "type": "string" }
+    "engine_version": { "type": "string" },
+
+    "proof": {
+      "type": "object",
+      "description": "Proof pack (live_verified only): the rigorous before/after evidence. All fields optional and additive so existing illustrative fixtures still validate.",
+      "additionalProperties": false,
+      "properties": {
+        "before_grade": { "type": "string", "enum": ["A", "B", "C", "D", "F"] },
+        "after_grade": { "type": "string", "enum": ["A", "B", "C", "D", "F"] },
+        "dim_diff": {
+          "type": "object",
+          "description": "Per-dimension {before, after, delta} computed from parsed verdicts (never code inspection).",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "before": { "type": "number" },
+              "after": { "type": "number" },
+              "delta": { "type": "number" }
+            }
+          }
+        },
+        "iterations": { "type": "integer", "minimum": 1 },
+        "elapsed_seconds": { "type": "number" },
+        "token_cost": { "type": ["integer", "null"] },
+        "regression_tests": { "type": "array", "items": { "type": "string" } },
+        "before_report_ref": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*\\.before\\.json$" },
+        "after_report_ref": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*\\.after\\.json$" },
+        "baseline_source_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    }
   }
 }
