@@ -1,0 +1,12 @@
+id: software-arch
+title: Microservice ops CLI
+domain: Complex software architecture
+target: services/example-microservice
+lane: codebase
+goal: make a local microservice agent-native
+kind: demo
+contributor: wjlgatech
+exit_criteria:
+  target_grade: A
+  max_iterations: 10
+result_ref: software-arch.json

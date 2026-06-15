@@ -1,0 +1,13 @@
+{
+  "demo_id": "biotech-discovery",
+  "source": "illustrative",
+  "grade_trajectory": [
+    "C",
+    "B",
+    "B"
+  ],
+  "final_grade": "B",
+  "convergence_status": "stopped",
+  "report_ref": "biotech-discovery.report.md",
+  "engine_version": "0.1.0"
+}

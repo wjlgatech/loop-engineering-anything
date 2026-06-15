@@ -1,0 +1,12 @@
+id: edu-curriculum
+title: Curriculum tool CLI
+domain: Education & curriculum
+target: services/example-curriculum
+lane: codebase
+goal: make a local learning tool agent-native and converge to Grade A
+kind: demo
+contributor: wjlgatech
+exit_criteria:
+  target_grade: A
+  max_iterations: 10
+result_ref: edu-curriculum.json

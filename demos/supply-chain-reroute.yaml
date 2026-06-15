@@ -1,0 +1,9 @@
+id: supply-chain-reroute
+title: Autonomous logistics reroute loop
+domain: Supply chain & logistics
+target: https://opensky-network.org/api
+lane: service
+goal: monitor bottlenecks and iterate rerouting until the most cost-effective plan
+  that prevents depletion
+kind: recipe
+contributor: wjlgatech

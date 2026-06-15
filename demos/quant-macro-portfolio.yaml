@@ -1,0 +1,9 @@
+id: quant-macro-portfolio
+title: Overnight portfolio optimization loop
+domain: Quant asset management
+target: https://api.frankfurter.app
+lane: service
+goal: backtest thousands of micro-strategies overnight until a risk-mitigated allocation
+  survives a stress scenario
+kind: recipe
+contributor: wjlgatech

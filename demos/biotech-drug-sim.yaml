@@ -1,0 +1,9 @@
+id: biotech-drug-sim
+title: Molecule design simulation loop
+domain: Biotech & drug discovery
+target: https://pubchem.ncbi.nlm.nih.gov/rest/pug
+lane: service
+goal: generate + simulate molecule variants overnight until binding affinity and toxicity
+  thresholds are met
+kind: recipe
+contributor: wjlgatech

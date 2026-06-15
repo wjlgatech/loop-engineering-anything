@@ -1,0 +1,12 @@
+id: biotech-discovery
+title: PubChem discovery CLI
+domain: Biotech & drug discovery
+target: https://pubchem.ncbi.nlm.nih.gov/rest/pug
+lane: service
+goal: make compound lookups agent-native
+kind: demo
+contributor: wjlgatech
+exit_criteria:
+  target_grade: A
+  max_iterations: 10
+result_ref: biotech-discovery.json

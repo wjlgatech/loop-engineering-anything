@@ -1,0 +1,14 @@
+{
+  "demo_id": "clinical-trials",
+  "source": "illustrative",
+  "grade_trajectory": [
+    "D",
+    "C",
+    "B",
+    "A"
+  ],
+  "final_grade": "A",
+  "convergence_status": "converged",
+  "report_ref": "clinical-trials.report.md",
+  "engine_version": "0.1.0"
+}
