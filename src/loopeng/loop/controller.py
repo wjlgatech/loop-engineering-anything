@@ -23,7 +23,7 @@ from enum import Enum
 
 from ..adapters.base import Checkpoint, Compounder, Judge, Refiner, Verdict
 from ..config import Budget
-from ..memory.store import MemoryStore, grade_rank
+from ..memory.store import MemoryStore
 from . import convergence as cv
 from .refactor_brief import build_refactor_brief
 
@@ -65,6 +65,7 @@ class LoopController:
         checkpoint: Checkpoint,
         store: MemoryStore,
         budget: Budget | None = None,
+        compressor=None,
     ):
         self.judge = judge
         self.refiner = refiner
@@ -72,6 +73,8 @@ class LoopController:
         self.checkpoint = checkpoint
         self.store = store
         self.budget = budget or Budget()
+        # Optional History Compression Engine (U7); None = no compression pass.
+        self.compressor = compressor
 
     def run(self, run_id: int, tool_path: str, goal: str = "") -> LoopOutcome:
         # Initial grade.
@@ -79,6 +82,7 @@ class LoopController:
         n = 1
         self._record(run_id, n, verdict, diff_ref=None)
         tokens_spent = 0
+        accepted = 0  # count of kept improvements, for compression cadence
 
         while True:
             plateaued = self.store.is_plateaued(run_id, self.budget.plateau_patience)
@@ -111,7 +115,7 @@ class LoopController:
                     n,
                 )
 
-            if grade_rank(new_verdict.grade) > grade_rank(verdict.grade):
+            if cv.is_improvement(verdict, new_verdict, self.budget):
                 # Improvement accepted and kept -> compound (never on rollback).
                 self.compounder.compound(
                     f"iteration {n}: grade {verdict.grade} -> {new_verdict.grade} "
@@ -119,6 +123,13 @@ class LoopController:
                     regression_test_ref=diff_ref,
                 )
                 verdict = new_verdict
+                accepted += 1
+                # Periodic System-2 compression pass (U7), on accepted-fix cadence.
+                if self.compressor is not None and accepted % self.budget.compression_interval == 0:
+                    result = self.compressor.run(run_id, tool_path)
+                    verdict = result.after
+                    n += 1
+                    self._record(run_id, n, verdict, diff_ref="compression")
             else:
                 # Regression or no gain -> roll back; keep the prior verdict.
                 self.checkpoint.restore(token)

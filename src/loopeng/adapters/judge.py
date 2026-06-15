@@ -15,9 +15,10 @@ present at all (recommended for autonomous runs).
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
-from .base import Verdict
+from .base import Judge, Verdict
 from .safety import ProcResult, run_tool
 
 
@@ -90,3 +91,36 @@ class CLIJudge:
             return Verdict(grade="F", score=0.0, dims={}, safety_ok=False,
                            failing_fixtures=["report.json was malformed"])
         return parse_report(data, strict_unknown=self.strict_unknown)
+
+
+@dataclass(frozen=True)
+class VarianceReport:
+    """Result of re-judging an unchanged tool K times (P0 #2 spike).
+
+    If ``grade_stable`` is False, single-run grade deltas are unsafe as a control
+    signal -- set ``Budget.min_score_gain`` to at least ``recommended_min_score_gain``
+    so the loop only accepts gains that clear the observed jitter.
+    """
+
+    grades: list
+    scores: list
+    grade_stable: bool
+    score_spread: float
+    recommended_min_score_gain: float
+
+
+def probe_grade_variance(judge: Judge, tool_path: str, k: int = 5) -> VarianceReport:
+    """Re-judge an unchanged tool ``k`` times and report grade/score variance."""
+    if k < 2:
+        raise ValueError("k must be >= 2 to measure variance")
+    verdicts = [judge.judge(tool_path) for _ in range(k)]
+    grades = [v.grade for v in verdicts]
+    scores = [v.score for v in verdicts]
+    spread = (max(scores) - min(scores)) if scores else 0.0
+    return VarianceReport(
+        grades=grades,
+        scores=scores,
+        grade_stable=len(set(grades)) == 1,
+        score_spread=spread,
+        recommended_min_score_gain=spread,
+    )

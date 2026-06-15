@@ -58,14 +58,19 @@ loop-anything preflight
 Per change that alters behavior: add a `CHANGELOG.md` entry under `[Unreleased]`
 and sync the docs the change touches (README, this file, the plan's tables).
 
-## Open feasibility gates (resolve before binding the live loop)
+## Feasibility gates (mechanism resolved; empirical validation pending)
 
-1. Can `/ce-work` and `/ce-compound` be driven **headlessly** from a long-running
-   controller? Blocks the real `Refiner`/`Compounder` bindings.
-2. Are **CLI-Judge grades stable** enough across identical re-judges to be a
-   control signal? Needs a variance spike before trusting autonomous convergence.
+1. **Headless refinement** — `/ce-work` and `/ce-compound` are driven via
+   `claude -p` in `adapters/compound_engineering.py` (`ClaudeCodeRefiner` /
+   `ClaudeCodeCompounder`). Mechanism settled; output *quality* on a real target
+   is still to be measured on a live run.
+2. **Grade stability** — measure judge jitter with `loop-anything judge-variance`
+   (`probe_grade_variance`); set `Budget.min_score_gain` to the reported band so
+   `convergence.is_improvement` ignores sub-noise gains.
 
-Until resolved, adapter bindings are shells against documented contracts; the
-controller core is validated against recorded verdicts.
+Remaining live work: pin the factory/judge command surfaces + the `report.json`
+safety field to installed tool versions, then run the gated e2e loop
+(`docs/e2e-runbook.md`). The controller core stays untouched — bindings drop in
+behind the `Judge`/`Refiner`/`Compounder` protocols.
 
 project_tracker: github

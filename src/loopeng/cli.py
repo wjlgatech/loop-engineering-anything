@@ -92,6 +92,26 @@ def run_cmd(target: str, goal: str, lane: str | None) -> None:
     )
 
 
+@main.command("judge-variance")
+@click.argument("tool_path")
+@click.option("--adapter", required=True, help="CLI-Judge tool adapter path.")
+@click.option("-k", "samples", default=5, show_default=True, help="Number of re-judges.")
+def judge_variance_cmd(tool_path: str, adapter: str, samples: int) -> None:
+    """Re-judge an unchanged TOOL_PATH K times to measure grade stability (P0 #2)."""
+    from .adapters.judge import CLIJudge, probe_grade_variance
+
+    report = probe_grade_variance(CLIJudge(adapter), tool_path, k=samples)
+    click.echo(f"grades: {report.grades}")
+    click.echo(f"scores: {report.scores}")
+    click.echo(f"grade stable: {report.grade_stable}")
+    click.echo(f"score spread: {report.score_spread}")
+    if not report.grade_stable:
+        click.echo(
+            f"\nGrades are NOT stable. Set Budget.min_score_gain >= "
+            f"{report.recommended_min_score_gain} so the loop ignores sub-noise jitter."
+        )
+
+
 @main.command("status")
 def status_cmd() -> None:
     """Show recorded runs from the memory store."""

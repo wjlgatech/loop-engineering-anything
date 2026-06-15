@@ -12,7 +12,7 @@ reality, and refactors until the grade stops climbing — then tells you what it
 <br/>
 
 [![CI](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml/badge.svg)](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-57%20passing-brightgreen)](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-74%20passing-brightgreen)](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
 [![Units](https://img.shields.io/badge/plan-6%2F8%20units-blue)](docs/plans/)
 [![License](https://img.shields.io/badge/license-MIT-green)](#-license)
@@ -173,7 +173,7 @@ loop-engineering-anything/
 │   ├── loop/                  # controller state machine, convergence, brief, compound, GitCheckpoint
 │   └── autonomous/            # research report + autonomous runner
 ├── skills/loop-anything/      # the /loop-anything agent skill
-├── tests/                     # 57 tests — loop dynamics validated against recorded verdicts
+├── tests/                     # 74 tests — loop dynamics validated against recorded verdicts
 └── docs/plans/                # the implementation plan
 ```
 
@@ -188,7 +188,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
 loop-anything preflight        # check the four dependencies
-pytest -q                      # 57 passing
+pytest -q                      # 74 passing
 ```
 
 **Preflight tells you exactly what's wired:**
@@ -234,14 +234,17 @@ live run.
 - [x] **U4** — Factory adapter shells (Printing-Press / CLI-Anything)
 - [x] **U5** — Judge adapter shell (strict `report.json` safety derivation)
 - [x] **U8** — Autonomous runner shell (preflight + credential + workspace guards)
-- [ ] **Live binding** — pin command surfaces + `report.json` safety field to installed tools
-- [ ] **U7** — History Compression Engine (System-2 consolidation pass)
-- [ ] **e2e** — reference loop against a real public API
+- [x] **U7** — History Compression Engine (grade-neutral-or-better System-2 pass)
+- [x] **P0 #1 mechanism** — headless `/ce-work` + `/ce-compound` via `claude -p`
+- [x] **P0 #2 mechanism** — grade-variance probe + noise-aware acceptance band
+- [ ] **Live binding** — pin command surfaces + `report.json` safety field against installed tools
+- [ ] **e2e** — run the reference loop against a real public API (gated test + runbook ready)
 
-> **Two feasibility gates precede the live loop** (see [`AGENTS.md`](AGENTS.md)): whether
-> `/ce-work` + `/ce-compound` can be driven **headlessly**, and whether **CLI-Judge grades are
-> stable** enough to be a control signal. The protocol seams mean each binding drops in without
-> touching the validated controller.
+> **The two feasibility gates are now resolved in mechanism:** `/ce-work` + `/ce-compound` are
+> driven headlessly via `claude -p`, and judge jitter is measured by `loop-anything judge-variance`
+> and absorbed by a noise band. What remains is **empirical** — installing the tools and running the
+> [gated e2e loop](docs/e2e-runbook.md) against a real target. The protocol seams mean none of this
+> touches the validated controller.
 
 ---
 
