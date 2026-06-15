@@ -64,13 +64,15 @@ and sync the docs the change touches (README, this file, the plan's tables).
    `claude -p` in `adapters/compound_engineering.py` (`ClaudeCodeRefiner` /
    `ClaudeCodeCompounder`). Mechanism settled; output *quality* on a real target
    is still to be measured on a live run.
-2. **Grade stability** — measure judge jitter with `loop-anything judge-variance`
-   (`probe_grade_variance`); set `Budget.min_score_gain` to the reported band so
-   `convergence.is_improvement` ignores sub-noise gains.
+2. **Grade stability** — RESOLVED empirically: the installed CLI-Judge is
+   deterministic (variance probe spread 0.0), so single-run grades are safe.
+   `loop-anything judge-variance` re-checks any target; `Budget.min_score_gain`
+   absorbs jitter if a future judge is noisy.
 
-Remaining live work: pin the factory/judge command surfaces + the `report.json`
-safety field to installed tool versions, then run the gated e2e loop
-(`docs/e2e-runbook.md`). The controller core stays untouched — bindings drop in
-behind the `Judge`/`Refiner`/`Compounder` protocols.
+The judge adapter is pinned to the real `report.json` (`safety_blocker`, `D1..D5`
+dims, `--out`) and verified against an installed `cli-judge`. Remaining live work:
+the factory side — CLI-Anything generation is an agentic `claude -p "/cli-anything
+…"` skill, and CLI-Printing-Press needs a Go toolchain — plus a full agentic
+generate+refine e2e (`docs/e2e-runbook.md`). The controller core stays untouched.
 
 project_tracker: github

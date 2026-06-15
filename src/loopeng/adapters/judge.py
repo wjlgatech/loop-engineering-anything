@@ -15,6 +15,7 @@ present at all (recommended for autonomous runs).
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,11 +27,15 @@ def derive_safety_ok(data: dict, dims: dict, *, strict_unknown: bool = False) ->
     """Strictly derive the safety-gate signal from a parsed report.
 
     Recognized encodings, in priority order:
-      1. explicit boolean flags: ``safety_gate_failed`` / ``safety_capped``
-      2. a ``safety`` dimension object carrying ``passed``
-      3. no safety signal at all -> ``not strict_unknown`` (fail closed when
-         ``strict_unknown`` is set; otherwise assume OK and rely on (1)/(2)).
+      1. ``safety_blocker`` -- the REAL CLI-Judge field (pinned against a live
+         ``report.json``): a true blocker caps the grade and means not-shippable.
+      2. explicit boolean flags: ``safety_gate_failed`` / ``safety_capped``
+      3. a ``safety`` dimension object carrying ``passed``
+      4. no safety signal at all -> ``not strict_unknown`` (fail closed when
+         ``strict_unknown`` is set; otherwise assume OK and rely on (1)-(3)).
     """
+    if "safety_blocker" in data:
+        return not bool(data["safety_blocker"])
     if "safety_gate_failed" in data:
         return not bool(data["safety_gate_failed"])
     if "safety_capped" in data:
@@ -45,13 +50,27 @@ def parse_report(data: dict, *, strict_unknown: bool = False) -> Verdict:
     grade = (data.get("grade") or data.get("final_grade") or "").strip().upper()
     score = float(data.get("score", data.get("total", 0)) or 0)
 
+    # Dimensions: CLI-Judge keys them D1..D5 with points/max_points; earlier
+    # fixtures used name->score. Accept both.
     dims_raw = data.get("dimensions") or data.get("dims") or {}
     dims: dict[str, float] = {}
     for name, val in dims_raw.items():
-        dims[name] = float(val["score"]) if isinstance(val, dict) else float(val)
+        if isinstance(val, dict):
+            dims[name] = float(val.get("score", val.get("points", 0)))
+        else:
+            dims[name] = float(val)
 
     safety_ok = derive_safety_ok(data, dims, strict_unknown=strict_unknown)
-    failing = data.get("failing_fixtures") or data.get("failures") or []
+
+    # Failing fixtures: explicit list if present, else derive from tasks that
+    # lost points (the real CLI-Judge shape).
+    failing = data.get("failing_fixtures") or data.get("failures")
+    if failing is None:
+        failing = [
+            t.get("id")
+            for t in data.get("tasks", [])
+            if t.get("points", 0) < t.get("max_points", 0)
+        ]
     return Verdict(grade=grade, score=score, dims=dims, safety_ok=safety_ok, failing_fixtures=list(failing))
 
 
@@ -73,13 +92,21 @@ class CLIJudge:
         self.timeout = timeout
         self.strict_unknown = strict_unknown
 
-    def _build_command(self) -> list[str]:
-        # DOCUMENTED SURFACE: cli-judge run --adapter <x> --suite full
-        return [self.executable, "run", "--adapter", self.adapter_path, "--suite", self.suite]
+    def _build_command(self, out_dir: str) -> list[str]:
+        # PINNED against a live cli-judge: report.json is written to --out, and
+        # suites are bundled (resolve from any cwd).
+        return [
+            self.executable, "run",
+            "--adapter", self.adapter_path,
+            "--suite", self.suite,
+            "--out", out_dir,
+        ]
 
     def judge(self, tool_path: str) -> Verdict:
-        result: ProcResult = run_tool(self._build_command(), cwd=tool_path, timeout=self.timeout)
-        report = Path(tool_path) / "report.json"
+        out_dir = os.path.join(tool_path, ".cli-judge")
+        os.makedirs(out_dir, exist_ok=True)
+        result: ProcResult = run_tool(self._build_command(out_dir), cwd=None, timeout=self.timeout)
+        report = Path(out_dir) / "report.json"
         if not report.exists():
             # No report -> cannot certify safety. Fail closed (KTD5): an absent
             # verdict must not be read as "safe".

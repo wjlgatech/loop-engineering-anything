@@ -237,14 +237,17 @@ live run.
 - [x] **U7** — History Compression Engine (grade-neutral-or-better System-2 pass)
 - [x] **P0 #1 mechanism** — headless `/ce-work` + `/ce-compound` via `claude -p`
 - [x] **P0 #2 mechanism** — grade-variance probe + noise-aware acceptance band
-- [ ] **Live binding** — pin command surfaces + `report.json` safety field against installed tools
-- [ ] **e2e** — run the reference loop against a real public API (gated test + runbook ready)
+- [x] **Judge live-binding** — `CLIJudge` pinned to the real `report.json` (`safety_blocker`,
+  `D1..D5` dims, `--out`) and **verified against an installed `cli-judge`**
+- [x] **Real loop run** — `LoopController` driven by the live `cli-judge` to a correct terminal state
+- [ ] **Factory live-binding** — CLI-Anything generation is an agentic `claude -p "/cli-anything …"` skill; CLI-Printing-Press needs a Go toolchain
+- [ ] **Full agentic e2e** — real generate (`/cli-anything`) + real refine (`/ce-work`) on a live target
 
-> **The two feasibility gates are now resolved in mechanism:** `/ce-work` + `/ce-compound` are
-> driven headlessly via `claude -p`, and judge jitter is measured by `loop-anything judge-variance`
-> and absorbed by a noise band. What remains is **empirical** — installing the tools and running the
-> [gated e2e loop](docs/e2e-runbook.md) against a real target. The protocol seams mean none of this
-> touches the validated controller.
+> **Both feasibility gates are resolved.** **P0 #2 is empirical:** the live CLI-Judge is
+> **deterministic** (variance probe spread `0.0`), so grades are a safe control signal. **P0 #1**
+> is mechanical: `/ce-work` + `/ce-compound` run headlessly via `claude -p`. The loop has been run
+> end-to-end against the **real referee**; the remaining frontier is the agentic generate/refine
+> steps and the Go-based service lane — see the [runbook](docs/e2e-runbook.md).
 
 ---
 

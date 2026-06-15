@@ -41,11 +41,19 @@ def test_failing_fixtures_collected():
     assert parse_report(data).failing_fixtures == ["pagination_drift"]
 
 
+def _write_report(tool_dir, payload):
+    # The pinned adapter reads report.json from <tool>/.cli-judge (cli-judge --out).
+    out = tool_dir / ".cli-judge"
+    out.mkdir(exist_ok=True)
+    (out / "report.json").write_text(payload)
+
+
 def test_judge_reads_report_json(monkeypatch, tmp_path):
-    (tmp_path / "report.json").write_text(json.dumps({"grade": "B", "score": 80, "dimensions": {}}))
+    _write_report(tmp_path, json.dumps({"grade": "B", "score": 80, "safety_blocker": False, "dimensions": {}}))
     monkeypatch.setattr(judge_mod, "run_tool", lambda *a, **k: ProcResult(0, "Grade: B", ""))
     v = CLIJudge("adapter.py").judge(str(tmp_path))
     assert v.grade == "B"
+    assert v.safety_ok is True
 
 
 def test_judge_missing_report_fails_closed(monkeypatch, tmp_path):
@@ -56,7 +64,16 @@ def test_judge_missing_report_fails_closed(monkeypatch, tmp_path):
 
 
 def test_judge_malformed_report_fails_closed(monkeypatch, tmp_path):
-    (tmp_path / "report.json").write_text("{not json")
+    _write_report(tmp_path, "{not json")
     monkeypatch.setattr(judge_mod, "run_tool", lambda *a, **k: ProcResult(0, "", ""))
     v = CLIJudge("adapter.py").judge(str(tmp_path))
     assert v.safety_ok is False
+
+
+def test_safety_blocker_field_is_authoritative():
+    # The real CLI-Judge safety signal (pinned against a live report.json).
+    blocked = parse_report({"grade": "C", "score": 88, "safety_blocker": True, "dimensions": {}})
+    assert blocked.safety_ok is False
+    ok = parse_report({"grade": "F", "score": 32.6, "safety_blocker": False, "dimensions": {"D1": {"points": 7, "max_points": 30}}})
+    assert ok.safety_ok is True
+    assert ok.dims["D1"] == 7.0

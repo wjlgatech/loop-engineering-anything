@@ -51,6 +51,21 @@ All notable changes to this project are documented here, following
 - Gated end-to-end reference-loop test (`tests/e2e/`) and `docs/e2e-runbook.md` —
   skipped unless the live tools + credentials are configured.
 
+### Verified against the live CLI-Judge
+- Installed CLI-Judge (`pip install -e harness`) and ran it for real. **Pinned the
+  judge adapter to the actual `report.json` schema:** the safety signal is
+  `safety_blocker` (boolean), dimensions are `D1..D5` with `points`/`max_points`,
+  and failing fixtures derive from `tasks[]` that lost points. `CLIJudge` now
+  passes `--out` and reads `<tool>/.cli-judge/report.json`.
+- **P0 #2 resolved empirically:** the variance probe over the live judge returned
+  identical grades across runs (spread 0.0) — CLI-Judge is deterministic, so
+  single-run grades are a safe control signal (`min_score_gain` can stay 0).
+- Ran the real loop: `LoopController` driven by the live `cli-judge` reached a
+  correct terminal state (`STOPPED`/plateau) with a real grade trajectory.
+- CLI-Anything generation is a Claude Code *skill* (`/cli-anything <path>`), not a
+  build binary; `cli-anything-hub` (`cli-hub`) installs the package manager only.
+  CLI-Printing-Press requires a Go toolchain (absent here).
+
 ### Changed
 - README redesigned for impact: centered hero, badge row (live CI/tests/license),
   mermaid loop + architecture diagrams, pain→fix table, capability columns,
