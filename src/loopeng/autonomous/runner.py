@@ -27,6 +27,7 @@ from ..adapters.safety import run_tool, validate_target, within_workspace
 from ..config import Budget, Config, Lane
 from ..loop.checkpoint import GitCheckpoint
 from ..loop.controller import LoopController, LoopOutcome, LoopState
+from ..loop.integrity import assert_loop_integrity, confirm_convergence
 from ..memory.store import MemoryStore
 from ..preflight import missing_for_lane, missing_for_refine
 from ..router import route
@@ -36,6 +37,19 @@ from ..router import route
 class RunResult:
     run_id: int
     outcome: LoopOutcome
+    # Anti-cognitive-surrender (U17, R10): a CONVERGED outcome is only
+    # ``shippable`` once the human-confirm gate is satisfied. ``False`` means
+    # "converged, but 'done' is still a claim until confirmed". For any
+    # non-converged outcome this is ``False`` (nothing to ship).
+    shippable: bool = False
+
+
+def _gate_shippable(outcome: LoopOutcome, config: Config, *, scheduled: bool, confirmed: bool) -> bool:
+    """Apply the human-confirm gate to a finished outcome. Only a CONVERGED
+    result can be shippable; the gate decides whether confirmation is still owed."""
+    if outcome.final_state is not LoopState.CONVERGED:
+        return False
+    return confirm_convergence(config.gate, scheduled=scheduled, confirmed=confirmed)
 
 
 def _default_factories() -> dict[str, Factory]:
@@ -71,12 +85,35 @@ def run_loop(
     factories: dict[str, Factory] | None = None,
     checkpoint: Checkpoint | None = None,
     check_missing=missing_for_lane,
+    scheduled: bool = False,
+    confirmed: bool = False,
+    referee_paths=(),
+    maker_write_paths=(),
+    dev_seeds=None,
+    heldout_seeds=None,
 ) -> RunResult:
-    """Drive one unattended loop. Raises before any work starts if preflight or
-    the credential gate fails; returns a ``RunResult`` otherwise."""
+    """Drive one unattended loop. Raises before any work starts if preflight,
+    the credential gate, or the maker/checker integrity contract (U17) fails;
+    returns a ``RunResult`` otherwise.
+
+    ``scheduled`` marks an unattended/scheduler-driven run: its CONVERGED result
+    defaults to confirm-required regardless of CI (anti-surrender). ``confirmed``
+    is the human's affirmative that satisfies the verification gate."""
     config = config or Config()
     budget = budget or config.budget
     validate_target(target)
+
+    # U17 integrity contract (fail-closed, before any work — mirrors the
+    # credential gate): maker ≠ checker, referee immutable to the maker, and a
+    # disjoint held-out grade when the domain declares seeds (R6/R10/KTD6).
+    assert_loop_integrity(
+        refiner=refiner,
+        judge=judge,
+        referee_paths=referee_paths,
+        maker_write_paths=maker_write_paths,
+        dev_seeds=dev_seeds,
+        heldout_seeds=heldout_seeds,
+    )
 
     decision = route(target, forced_lane=lane)
 
@@ -100,6 +137,7 @@ def run_loop(
         return RunResult(
             run_id,
             LoopOutcome(LoopState.STOPPED, grade="", reason="factory generation failed", iterations=0),
+            shippable=False,
         )
 
     if checkpoint is None:
@@ -115,7 +153,8 @@ def run_loop(
         budget=budget,
     )
     outcome = controller.run(run_id, gen.tool_path, goal)
-    return RunResult(run_id, outcome)
+    shippable = _gate_shippable(outcome, config, scheduled=scheduled, confirmed=confirmed)
+    return RunResult(run_id, outcome, shippable=shippable)
 
 
 def run_refine_loop(
@@ -133,6 +172,12 @@ def run_refine_loop(
     checkpoint: Checkpoint | None = None,
     check_missing=missing_for_refine,
     target_label: str | None = None,
+    scheduled: bool = False,
+    confirmed: bool = False,
+    referee_paths=(),
+    maker_write_paths=(),
+    dev_seeds=None,
+    heldout_seeds=None,
 ) -> RunResult:
     """Drive the loop on an **already-present** tool (proof pipeline, U2).
 
@@ -145,6 +190,17 @@ def run_refine_loop(
     """
     config = config or Config()
     budget = budget or config.budget
+
+    # U17 integrity contract (fail-closed, before any work): maker ≠ checker,
+    # referee immutable to the maker, disjoint held-out grade (R6/R10/KTD6).
+    assert_loop_integrity(
+        refiner=refiner,
+        judge=judge,
+        referee_paths=referee_paths,
+        maker_write_paths=maker_write_paths,
+        dev_seeds=dev_seeds,
+        heldout_seeds=heldout_seeds,
+    )
 
     # Filesystem jail: the tool must already live inside the workspace (S-4).
     if not within_workspace(tool_path, workspace_root):
@@ -185,4 +241,5 @@ def run_refine_loop(
     # finish_run already set status; record_finished adds the timestamp the
     # controller doesn't own.
     store.record_finished(run_id, datetime.now(timezone.utc).isoformat())
-    return RunResult(run_id, outcome)
+    shippable = _gate_shippable(outcome, config, scheduled=scheduled, confirmed=confirmed)
+    return RunResult(run_id, outcome, shippable=shippable)

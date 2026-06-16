@@ -103,9 +103,33 @@ class Budget:
     min_score_gain: float = 0.0
 
 
+@dataclass(frozen=True)
+class VerificationGate:
+    """Anti-cognitive-surrender human-confirm gate (U17, R10).
+
+    A ``CONVERGED`` outcome is a *claim*, not a shipped fact ("'done' is a claim
+    until confirmed"). When this gate is on, a converged result is not marked
+    shippable until a human confirms it — defeating a reward-hacked maker that
+    declares victory.
+
+    **Bypass is access-controlled (security finding).** The gate is ON by
+    default. There is deliberately **no caller-settable bypass flag**: a CLI
+    caller (or a scheduler authoring its own invocation) must not be able to
+    silently auto-ship. The only bypass keys on a *CI-infrastructure* env var
+    (``ci_env_var``, default ``CI``) that the build platform owns, NOT the
+    caller. And ``scheduled`` (unattended) runs default to confirm-required
+    **regardless of the CI flag** — so a scheduler cannot disable the gate by
+    setting ``CI=true`` in its own environment (anti-surrender default, R10).
+    """
+
+    require_human_confirm: bool = True  # gate ON by default
+    ci_env_var: str = "CI"  # the CI-infrastructure var that may bypass (attended only)
+
+
 @dataclass
 class Config:
     budget: Budget = field(default_factory=Budget)
     # Where required-credential env vars are read from (security finding S-1):
     # the runner reads creds from the environment only, never from this file.
     required_env: tuple[str, ...] = ()
+    gate: VerificationGate = field(default_factory=VerificationGate)
