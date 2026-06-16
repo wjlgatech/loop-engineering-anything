@@ -1,15 +1,30 @@
-"""SQLite memory store (U2, R6).
+"""SQLite memory store (U2, R6; concurrency hardened U16, R9).
 
-Single-writer by design: the loop controller is single-threaded (one iteration
-runs, writes, then advances), so no concurrency guard is needed for the MVP.
-WAL is enabled as cheap forward-compatibility for the deferred parallel-looping
-feature; until then the store has exactly one writer.
+Originally single-writer: the loop controller is single-threaded, so the MVP
+needed no concurrency guard. Worktree parallelism (U16) changes that -- several
+loops fan out concurrently and each records its own run/iterations into the same
+store. SQLite serializes writes itself, but concurrent writers on the *default*
+threading guard would raise ``ProgrammingError`` (a connection used off its
+creating thread) or contend into ``database is locked``.
+
+Decision (plan-004 U16): make this one store object safe to share across threads
+by **serializing every write through a single shared connection guarded by a
+re-entrant lock, in WAL mode**. Concretely:
+  - ``check_same_thread=False`` so the shared connection can be used from worker
+    threads (we provide our own mutual exclusion rather than per-thread conns).
+  - WAL journal mode + ``busy_timeout`` so a reader never blocks a writer.
+  - An ``RLock`` (``_wlock``) wraps every statement+commit so writes from
+    parallel runs are applied one-at-a-time and never interleave/corrupt. Reads
+    take the same lock so a row is never read mid-write.
+This keeps a single writer *connection* (the plan's named decision) while letting
+N parallel loops record independently.
 """
 
 from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -67,10 +82,21 @@ class Iteration:
 class MemoryStore:
     def __init__(self, path: str | Path = "loopeng.db"):
         self.path = str(path)
-        self._conn = sqlite3.connect(self.path)
+        # check_same_thread=False: we share one connection across worker threads
+        # (U16 fan-out) and provide our own mutual exclusion via ``_wlock`` below,
+        # so SQLite's per-thread guard would only get in the way. Every write and
+        # read goes through that lock, so the connection is never touched
+        # concurrently.
+        self._conn = sqlite3.connect(self.path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        # Re-entrant: a few public methods call other locked methods (e.g.
+        # is_plateaued -> score_trajectory -> iterations).
+        self._wlock = threading.RLock()
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
+        # A writer holding the lock + WAL means readers don't block; the timeout
+        # is a belt-and-braces guard against any lock contention.
+        self._conn.execute("PRAGMA busy_timeout=5000")
         self._conn.executescript(_SCHEMA.read_text())
         self._migrate()
         self._conn.commit()
@@ -93,38 +119,44 @@ class MemoryStore:
         return cls("loopeng.db")
 
     def close(self) -> None:
-        self._conn.close()
+        with self._wlock:
+            self._conn.close()
 
     # ----- runs -----------------------------------------------------------
 
     def create_run(self, target: str, lane: str, goal: str | None, started: str) -> int:
-        cur = self._conn.execute(
-            "INSERT INTO runs (target, lane, goal, status, started) VALUES (?, ?, ?, 'running', ?)",
-            (target, lane, goal, started),
-        )
-        self._conn.commit()
-        return int(cur.lastrowid)
+        with self._wlock:
+            cur = self._conn.execute(
+                "INSERT INTO runs (target, lane, goal, status, started) VALUES (?, ?, ?, 'running', ?)",
+                (target, lane, goal, started),
+            )
+            self._conn.commit()
+            return int(cur.lastrowid)
 
     def finish_run(self, run_id: int, status: str, final_grade: str | None) -> None:
-        self._conn.execute(
-            "UPDATE runs SET status = ?, final_grade = ? WHERE id = ?",
-            (status, final_grade, run_id),
-        )
-        self._conn.commit()
+        with self._wlock:
+            self._conn.execute(
+                "UPDATE runs SET status = ?, final_grade = ? WHERE id = ?",
+                (status, final_grade, run_id),
+            )
+            self._conn.commit()
 
     def record_finished(self, run_id: int, finished: str) -> None:
         """Stamp the run's wall-clock end (ISO-8601). Set by the runner after
         ``controller.run`` returns, since ``finish_run`` fires inside the
         controller and the runner owns the elapsed measurement (proof-pack)."""
-        self._conn.execute("UPDATE runs SET finished = ? WHERE id = ?", (finished, run_id))
-        self._conn.commit()
+        with self._wlock:
+            self._conn.execute("UPDATE runs SET finished = ? WHERE id = ?", (finished, run_id))
+            self._conn.commit()
 
     def get_run(self, run_id: int) -> Run | None:
-        row = self._conn.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
+        with self._wlock:
+            row = self._conn.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
         return self._row_to_run(row) if row else None
 
     def list_runs(self) -> list[Run]:
-        rows = self._conn.execute("SELECT * FROM runs ORDER BY id DESC").fetchall()
+        with self._wlock:
+            rows = self._conn.execute("SELECT * FROM runs ORDER BY id DESC").fetchall()
         return [self._row_to_run(r) for r in rows]
 
     # ----- iterations -----------------------------------------------------
@@ -141,29 +173,31 @@ class MemoryStore:
         diff_ref: str | None = None,
         score: float | None = None,
     ) -> int:
-        cur = self._conn.execute(
-            """INSERT INTO iterations
-               (run_id, n, grade, score, dims_json, failing_fixtures_json, safety_ok, token_cost, diff_ref)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                run_id,
-                n,
-                grade,
-                score,
-                json.dumps(dims),
-                json.dumps(failing_fixtures or []),
-                1 if safety_ok else 0,
-                token_cost,
-                diff_ref,
-            ),
-        )
-        self._conn.commit()
-        return int(cur.lastrowid)
+        with self._wlock:
+            cur = self._conn.execute(
+                """INSERT INTO iterations
+                   (run_id, n, grade, score, dims_json, failing_fixtures_json, safety_ok, token_cost, diff_ref)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    run_id,
+                    n,
+                    grade,
+                    score,
+                    json.dumps(dims),
+                    json.dumps(failing_fixtures or []),
+                    1 if safety_ok else 0,
+                    token_cost,
+                    diff_ref,
+                ),
+            )
+            self._conn.commit()
+            return int(cur.lastrowid)
 
     def iterations(self, run_id: int) -> list[Iteration]:
-        rows = self._conn.execute(
-            "SELECT * FROM iterations WHERE run_id = ? ORDER BY n", (run_id,)
-        ).fetchall()
+        with self._wlock:
+            rows = self._conn.execute(
+                "SELECT * FROM iterations WHERE run_id = ? ORDER BY n", (run_id,)
+            ).fetchall()
         return [self._row_to_iteration(r) for r in rows]
 
     # ----- learnings ------------------------------------------------------
@@ -171,17 +205,19 @@ class MemoryStore:
     def record_learning(
         self, run_id: int, iteration_id: int | None, summary: str, regression_test_ref: str | None = None
     ) -> int:
-        cur = self._conn.execute(
-            "INSERT INTO learnings (run_id, iteration_id, summary, regression_test_ref) VALUES (?, ?, ?, ?)",
-            (run_id, iteration_id, summary, regression_test_ref),
-        )
-        self._conn.commit()
-        return int(cur.lastrowid)
+        with self._wlock:
+            cur = self._conn.execute(
+                "INSERT INTO learnings (run_id, iteration_id, summary, regression_test_ref) VALUES (?, ?, ?, ?)",
+                (run_id, iteration_id, summary, regression_test_ref),
+            )
+            self._conn.commit()
+            return int(cur.lastrowid)
 
     def learnings(self, run_id: int) -> list[dict]:
-        rows = self._conn.execute(
-            "SELECT * FROM learnings WHERE run_id = ? ORDER BY id", (run_id,)
-        ).fetchall()
+        with self._wlock:
+            rows = self._conn.execute(
+                "SELECT * FROM learnings WHERE run_id = ? ORDER BY id", (run_id,)
+            ).fetchall()
         return [dict(r) for r in rows]
 
     # ----- scheduler state (U14) -----------------------------------------
@@ -197,38 +233,42 @@ class MemoryStore:
     ) -> None:
         """Register or update a scheduled target's cadence, preserving its
         ``last_fired``/``last_run_id`` resume anchor across re-registration."""
-        updated = self._conn.execute(
-            """UPDATE schedule_state
-               SET goal = ?, domain = ?, lane = ?, interval_seconds = ?
-               WHERE target = ?""",
-            (goal, domain, lane, interval_seconds, target),
-        )
-        if updated.rowcount == 0:
-            self._conn.execute(
-                """INSERT INTO schedule_state
-                   (target, goal, domain, lane, interval_seconds, last_fired, last_run_id)
-                   VALUES (?, ?, ?, ?, ?, NULL, NULL)""",
-                (target, goal, domain, lane, interval_seconds),
+        with self._wlock:
+            updated = self._conn.execute(
+                """UPDATE schedule_state
+                   SET goal = ?, domain = ?, lane = ?, interval_seconds = ?
+                   WHERE target = ?""",
+                (goal, domain, lane, interval_seconds, target),
             )
-        self._conn.commit()
+            if updated.rowcount == 0:
+                self._conn.execute(
+                    """INSERT INTO schedule_state
+                       (target, goal, domain, lane, interval_seconds, last_fired, last_run_id)
+                       VALUES (?, ?, ?, ?, ?, NULL, NULL)""",
+                    (target, goal, domain, lane, interval_seconds),
+                )
+            self._conn.commit()
 
     def schedules(self) -> list[ScheduleEntry]:
-        rows = self._conn.execute(
-            "SELECT * FROM schedule_state ORDER BY target"
-        ).fetchall()
+        with self._wlock:
+            rows = self._conn.execute(
+                "SELECT * FROM schedule_state ORDER BY target"
+            ).fetchall()
         return [self._row_to_schedule(r) for r in rows]
 
     def remove_schedule(self, target: str) -> bool:
-        cur = self._conn.execute("DELETE FROM schedule_state WHERE target = ?", (target,))
-        self._conn.commit()
-        return cur.rowcount > 0
+        with self._wlock:
+            cur = self._conn.execute("DELETE FROM schedule_state WHERE target = ?", (target,))
+            self._conn.commit()
+            return cur.rowcount > 0
 
     def mark_scheduled_fired(self, target: str, last_fired: float, last_run_id: int | None) -> None:
-        self._conn.execute(
-            "UPDATE schedule_state SET last_fired = ?, last_run_id = ? WHERE target = ?",
-            (last_fired, last_run_id, target),
-        )
-        self._conn.commit()
+        with self._wlock:
+            self._conn.execute(
+                "UPDATE schedule_state SET last_fired = ?, last_run_id = ? WHERE target = ?",
+                (last_fired, last_run_id, target),
+            )
+            self._conn.commit()
 
     # ----- transcendent queries ------------------------------------------
 
@@ -275,9 +315,10 @@ class MemoryStore:
         fixtures across the full history -- a query a stateless run cannot answer.
         """
         counts: dict[str, set[int]] = {}
-        rows = self._conn.execute(
-            "SELECT run_id, failing_fixtures_json FROM iterations"
-        ).fetchall()
+        with self._wlock:
+            rows = self._conn.execute(
+                "SELECT run_id, failing_fixtures_json FROM iterations"
+            ).fetchall()
         for row in rows:
             for fixture in json.loads(row["failing_fixtures_json"]):
                 counts.setdefault(fixture, set()).add(row["run_id"])

@@ -6,6 +6,38 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Loop-engine domain generalization, Phase C — U17: maker/checker contract +
+  anti-cognitive-surrender gates** (plan `docs/plans/2026-06-15-004-...`): make
+  "maker ≠ checker" an *enforced* precondition and add the verification gate
+  unattended loops demand (R6/R10, KTD6). Why: a maker that referees its own
+  work, or is graded on seeds it trained on, can silently reward-hack — these
+  must fail closed *before* a loop runs.
+  - **`src/loopeng/loop/integrity.py`** (new): `assert_loop_integrity` (the
+    single preflight call) plus `assert_maker_distinct_from_checker` (refiner
+    and judge must be distinct *objects*, by identity), `assert_referee_immutable_to_maker`
+    (rejects a wiring where a referee path lives inside the maker's declared
+    write surface — the contract-level model of KTD6's filesystem boundary),
+    and `assert_heldout_disjoint` (dev seeds vs held-out seeds must not overlap,
+    and the held-out set may not be empty). All raise `IntegrityError`
+    fail-closed with *names, not values* (mirrors the credential gate).
+  - **Human-confirm verification gate** (`config.VerificationGate`, default in
+    `Config.gate`): a `CONVERGED` outcome is a *claim* until confirmed. Gate is
+    **ON by default**. **Bypass is access-controlled (security finding):** there
+    is no caller-settable bypass flag; the only bypass keys on a CI-infrastructure
+    env var (`CI`, attended runs only); **scheduled/unattended runs default to
+    confirm-required regardless of CI** — a scheduler that sets `CI=true` cannot
+    auto-ship a reward-hacked result. `RunResult.shippable` reports the gate's
+    verdict (`gate_requires_confirmation` / `confirm_convergence` in
+    `loop/integrity.py`).
+  - **Runner hook** (`autonomous/runner.py`): `run_loop` / `run_refine_loop`
+    call `assert_loop_integrity` before any work (after `validate_target`,
+    alongside the credential gate) and gate the `CONVERGED` outcome via new
+    `scheduled` / `confirmed` params + optional `referee_paths` /
+    `maker_write_paths` / `dev_seeds` / `heldout_seeds` integrity inputs.
+  - Tests: `tests/test_maker_checker.py` (new) — same-object maker/checker
+    rejected before any run, held-out overlap/empty rejected, referee
+    immutability at the contract level, and the full CI-vs-scheduled gate
+    matrix through the runner. Existing `test_autonomous_runner.py` stays green.
 - **Loop-engine domain generalization, Phase A — U9** (plan
   `docs/plans/2026-06-15-004-feat-loop-engine-domain-generalization-plan.md`):
   widen the loop's contracts so a target can be *any* domain, not just code,
@@ -95,6 +127,63 @@ All notable changes to this project are documented here, following
     `tick`. `tick` reports the targets due now (live execution rides the same
     injected runner as the autonomous loop, gated like `run`).
   - Tests: `tests/test_scheduler.py` (new).
+- **Loop-engine generalization, Phase C — U15 (connector/actuator layer)** (same
+  plan): gives loops a surface to *act* on external systems behind the
+  install/credential isolation boundary — the prerequisite for the org/individual
+  rungs (R8). _Why:_ a self-improving loop must be able to take real-world actions
+  without becoming a path for a generated/refined tool to exfiltrate ambient
+  credentials or reach a shell.
+  - **`Connector` protocol + isolation boundary** (`src/loopeng/connectors/base.py`,
+    new): declared `capabilities` + a structured `act(payload)` surface (payloads
+    are dicts, **never shell-interpolated**). `install_connector` mirrors the
+    catalog adopter's KTD8 discipline — installs into a throwaway `--target`
+    **outside the repo worktree**, **full 40-char SHA pin** (tags/branches
+    rejected), `run_tool` (`shell=False`, args list), and a credential gate that
+    fails fast by **name** only (`check_credentials`, never a value).
+  - **`minimal_env` allowlist** (`src/loopeng/adapters/safety.py`): a *strict
+    allowlist* env builder (only `PATH`/`HOME`/... + explicitly passed names),
+    complementing the existing `run_tool(env=)` param and `adopt.pruned_env`
+    denylist — so a connector child inherits zero ambient secrets by default.
+  - **Reference connector** (`src/loopeng/connectors/reference_connector.py`, new):
+    a structured-payload "file report" actuator demonstrating the surface; tests
+    round-trip the payload in-process (no network, KTD9 skip-not-fail).
+  - Tests: `tests/test_connectors.py` (new, 14 cases).
+- **Loop-engine generalization, Phase C — U16 (worktree parallelism)** (same
+  plan): run multiple loops/targets concurrently in isolated git worktrees
+  without file or git collisions (R9).
+  - **`run_parallel` fan-out** (`src/loopeng/autonomous/parallel.py`, new):
+    single responsibility — concurrency lives here, cadence stays in
+    `heartbeat.py`. Each target runs in its **own git worktree** (`git worktree
+    add` on a per-target branch from `HEAD`) under a worktrees root, so
+    per-iteration `GitCheckpoint` snapshot/`reset --hard` rollbacks are isolated
+    (a safety rollback in one worktree never touches another). Concurrency is
+    **bounded** by `max_parallel` via a `ThreadPoolExecutor` (excess targets
+    queue); a crashed run is captured as a failed `ParallelResult` and does not
+    abort its siblings; every worktree is removed (`worktree remove --force` +
+    `prune`) on completion, success or crash. Duplicate keys and a zero cap are
+    rejected.
+  - **Concurrency-safe `MemoryStore`** (`memory/store.py`): the store was
+    single-writer; parallel writers on separate connections would hit `database
+    is locked`. Decision implemented concretely — **serialize every write
+    through a single shared connection guarded by a re-entrant lock, in WAL
+    mode**: `check_same_thread=False` (so one connection is shared across worker
+    threads), an `RLock` wrapping every statement+commit (and reads, so a row is
+    never read mid-write), plus `busy_timeout`. N parallel loops record
+    independently without corruption.
+  - **Scheduler fan-out hook** (`scheduler/heartbeat.py`): new `tick_parallel`
+    fires every due target through `run_parallel`, rebasing each `ScheduledFire`
+    onto its per-target worktree; successful fires record the run id as the
+    resume anchor, failures are stamped (no anchor) and isolated — same cadence
+    semantics as the sequential `tick`. The sequential `tick` is unchanged.
+  - **Worktree-aware `GitCheckpoint`** (`loop/checkpoint.py`): documented that
+    because every `git` call is `git -C`-scoped, snapshot/restore operate only
+    on the given worktree's branch and working tree — making it safe for
+    parallel runs (no code change needed; the path scoping already provided it).
+  - Tests: `tests/test_parallel_worktrees.py` (new) — real temp git repo + temp
+    DB, hermetic: independent checkpoint/rollback across two worktrees, A's
+    rollback leaving B untouched, the concurrency cap honored, a crashed run
+    recorded + cleaned up while siblings continue, concurrent SQLite writes not
+    corrupting, and the `heartbeat.tick_parallel` integration.
 - **Catalog-to-proof pipeline, Phase A** (plan
   `docs/plans/2026-06-15-003-feat-catalog-proof-pipeline-plan.md`): turns real
   clianything.cc / printingpress.dev CLIs into verified before/after loop proofs
