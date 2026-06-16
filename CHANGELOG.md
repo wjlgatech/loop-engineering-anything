@@ -6,6 +6,28 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Loop-engineering gap-bridges, U1 — cross-run recurring-failure memory in the
+  refactor brief** (plan `docs/plans/2026-06-16-005-feat-loop-engineering-gap-bridges-plan.md`):
+  the loop now starts each run knowing which fixtures defeated prior runs *of the
+  same target*, realizing the post's "memory" pillar at the loop-control level.
+  Why: `recurring_failures()` existed but was called only in tests; briefs were
+  built from the current verdict alone.
+  - **`src/loopeng/memory/store.py`**: `recurring_failures(min_runs=2, *, target=None)`
+    gains a target-scoped variant (join through `runs.target`) so one target's
+    history never leaks into an unrelated target's brief. The unscoped form is
+    unchanged (transcendent reporting).
+  - **`src/loopeng/loop/refactor_brief.py`** + **`adapters/base.py`**:
+    `build_refactor_brief(verdict, goal, recurring_failures=None)` intersects
+    history with the current verdict's failing set — only fixtures that recur
+    *and* fail now are re-prioritized; recurring-but-passing fixtures ride along
+    in a new advisory `RefactorBrief.recurring_failures` field. Live signal is
+    never demoted below stale history.
+  - **`src/loopeng/loop/controller.py`** fetches the target-scoped history once
+    per run and threads it into the brief; **`adapters/compound_engineering.py`**
+    surfaces it in the `/ce-work` prompt as lower-priority watch-for-regression
+    context.
+  - Tests: `tests/test_refactor_brief.py` (new), target-scoping in
+    `tests/test_memory_store.py`, brief-injection in `tests/test_loop_controller.py`.
 - **Loop-engine domain generalization, Phase B — U12: SimJudge referee +
   CMDP safety profile** (plan `docs/plans/2026-06-15-004-...`): the physical-AI-in-sim
   referee that runs a control policy in simulation over a *held-out* seed set

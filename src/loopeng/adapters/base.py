@@ -64,6 +64,10 @@ class RefactorBrief:
     goal: str
     target_dimensions: list  # lowest-scoring dimensions, ranked
     failing_fixtures: list
+    # Fixtures that recur across prior runs of this target but are NOT failing in
+    # the current verdict -- advisory context only, never ahead of live failures
+    # (U1). Fixtures that recur AND fail now are promoted within ``failing_fixtures``.
+    recurring_failures: list = field(default_factory=list)
 
 
 @runtime_checkable

@@ -61,6 +61,23 @@ def test_recurring_failures_join_across_runs(store):
     assert recurring == [("pagination_drift", 2)]
 
 
+def test_recurring_failures_target_scoped_excludes_other_targets(store):
+    # Same target across two runs -> recurs for that target.
+    a1 = store.create_run("target-A", "service", None, "2026-06-15T00:00:00Z")
+    a2 = store.create_run("target-A", "service", None, "2026-06-15T00:00:00Z")
+    b1 = store.create_run("target-B", "service", None, "2026-06-15T00:00:00Z")
+    store.record_iteration(a1, 1, "C", {}, safety_ok=True, failing_fixtures=["fx_a"])
+    store.record_iteration(a2, 1, "C", {}, safety_ok=True, failing_fixtures=["fx_a"])
+    # target-B fails its own fixture twice -- must NOT leak into target-A's scope.
+    store.record_iteration(b1, 1, "C", {}, safety_ok=True, failing_fixtures=["fx_b"])
+    store.record_iteration(b1, 2, "C", {}, safety_ok=True, failing_fixtures=["fx_b"])
+
+    scoped = store.recurring_failures(target="target-A")
+    assert scoped == [("fx_a", 2)]
+    # fx_b recurs only within target-B, never surfaces under target-A.
+    assert all(fx != "fx_b" for fx, _ in scoped)
+
+
 def test_finish_run_and_list(store):
     run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
     store.finish_run(run_id, "converged", "A")

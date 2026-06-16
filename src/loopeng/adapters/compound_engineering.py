@@ -61,11 +61,18 @@ class ClaudeCodeRefiner:
     def _build_prompt(self, brief: RefactorBrief) -> str:
         dims = ", ".join(brief.target_dimensions) or "the lowest-scoring dimensions"
         fixtures = ", ".join(brief.failing_fixtures) or "none reported"
-        return (
+        prompt = (
             f"/ce-work {brief.goal}\n"
             f"Prioritize these dimensions first: {dims}.\n"
             f"Failing fixtures to address: {fixtures}."
         )
+        recurring = ", ".join(getattr(brief, "recurring_failures", []) or [])
+        if recurring:
+            prompt += (
+                f"\nFixtures that recur across prior runs of this target "
+                f"(watch for regressions, lower priority than the failing fixtures above): {recurring}."
+            )
+        return prompt
 
     def refactor(self, tool_path: str, brief: RefactorBrief) -> str | None:
         res = run_tool(

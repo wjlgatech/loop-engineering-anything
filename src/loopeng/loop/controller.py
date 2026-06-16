@@ -84,6 +84,16 @@ class LoopController:
         tokens_spent = 0
         accepted = 0  # count of kept improvements, for compression cadence
 
+        # Cross-run history (U1): fixtures that have failed across prior runs of
+        # THIS target. Scoped to the target so an unrelated target's history never
+        # leaks in. Computed once -- prior-run history does not change mid-run.
+        run = self.store.get_run(run_id)
+        recurring_fixtures = (
+            [fx for fx, _ in self.store.recurring_failures(target=run.target)]
+            if run is not None
+            else []
+        )
+
         while True:
             plateaued = self.store.is_plateaued(
                 run_id,
@@ -102,7 +112,7 @@ class LoopController:
 
             # --- REFACTORING ---
             token = self.checkpoint.snapshot()
-            brief = build_refactor_brief(verdict, goal)
+            brief = build_refactor_brief(verdict, goal, recurring_failures=recurring_fixtures)
             diff_ref = self.refiner.refactor(tool_path, brief)
 
             new_verdict = self.judge.judge(tool_path)

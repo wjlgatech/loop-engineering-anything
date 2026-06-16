@@ -62,6 +62,17 @@ class FakeCheckpoint:
         self.restores += 1
 
 
+class CapturingRefiner:
+    """Records every brief it is handed so tests can assert on brief content."""
+
+    def __init__(self):
+        self.briefs = []
+
+    def refactor(self, tool_path, brief):
+        self.briefs.append(brief)
+        return f"diff-{len(self.briefs)}"
+
+
 @pytest.fixture
 def store(tmp_path):
     s = MemoryStore(tmp_path / "loop.db")
@@ -204,3 +215,30 @@ def test_regression_rolls_back_and_does_not_compound_transient(store):
     # Only the B->A improvement compounds; the transient C never does.
     assert len(compounder.entries) == 1
     assert "-> A" in compounder.entries[0]["summary"]
+
+
+def test_recurring_failures_injected_into_brief(store):
+    # Two prior runs of target "t" both fail "pagination_drift".
+    for _ in range(2):
+        pr = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+        store.record_iteration(pr, 1, "C", {}, safety_ok=True, failing_fixtures=["pagination_drift"])
+    # Current run: verdict fails a live-only fixture plus the recurring one.
+    judge = ScriptedJudge([v("C", fixtures=["live_only", "pagination_drift"]), v("A")])
+    refiner = CapturingRefiner()
+    ctrl = LoopController(
+        judge=judge,
+        refiner=refiner,
+        compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(),
+        store=store,
+        budget=Budget(target_grade="A"),
+    )
+    run_id = store.create_run("t", "service", "improve", "2026-06-15T00:00:00Z")
+
+    ctrl.run(run_id, "tool/")
+
+    assert refiner.briefs, "refiner should have been called at least once"
+    brief = refiner.briefs[0]
+    # recurring AND currently-failing -> promoted to the front; live-only stays.
+    assert brief.failing_fixtures[0] == "pagination_drift"
+    assert "live_only" in brief.failing_fixtures

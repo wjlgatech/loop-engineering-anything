@@ -9,15 +9,33 @@ from __future__ import annotations
 from ..adapters.base import RefactorBrief, Verdict
 
 
-def build_refactor_brief(verdict: Verdict, goal: str = "") -> RefactorBrief:
+def build_refactor_brief(
+    verdict: Verdict,
+    goal: str = "",
+    recurring_failures: list | None = None,
+) -> RefactorBrief:
     # Rank dimensions lowest-score-first; those are where the grade is bleeding.
     ranked = [name for name, _ in sorted(verdict.dims.items(), key=lambda kv: kv[1])]
     objective = goal or (
         f"Raise the grade from {verdict.grade} by fixing the lowest-scoring "
         f"dimensions first."
     )
+
+    live = list(verdict.failing_fixtures)
+    # Cross-run history (U1): only re-prioritize fixtures that are BOTH historically
+    # recurring AND failing now -- live signal is never demoted below stale history.
+    # Recurring fixtures that are passing now ride along as advisory context only.
+    recurring = list(recurring_failures or [])
+    live_set = set(live)
+    recurring_and_live = [fx for fx in recurring if fx in live_set]
+    if recurring_and_live:
+        rest = [fx for fx in live if fx not in set(recurring_and_live)]
+        live = recurring_and_live + rest
+    advisory = [fx for fx in recurring if fx not in live_set]
+
     return RefactorBrief(
         goal=objective,
         target_dimensions=ranked,
-        failing_fixtures=list(verdict.failing_fixtures),
+        failing_fixtures=live,
+        recurring_failures=advisory,
     )

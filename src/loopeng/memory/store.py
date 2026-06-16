@@ -308,17 +308,31 @@ class MemoryStore:
         recent_best = max(values[-patience:])
         return recent_best <= best_before
 
-    def recurring_failures(self, min_runs: int = 2) -> list[tuple[str, int]]:
+    def recurring_failures(
+        self, min_runs: int = 2, *, target: str | None = None
+    ) -> list[tuple[str, int]]:
         """Fixtures that fail across at least ``min_runs`` distinct runs.
 
         Returns (fixture, distinct_run_count) sorted by frequency. Joins failing
-        fixtures across the full history -- a query a stateless run cannot answer.
+        fixtures across history -- a query a stateless run cannot answer.
+
+        ``target`` scopes the join to runs against one target (join through
+        ``runs.target``), so a target's cross-run history never leaks into an
+        unrelated target's brief (U1). The unscoped form (``target=None``) keeps
+        the original transcendent query for reporting across all runs.
         """
         counts: dict[str, set[int]] = {}
         with self._wlock:
-            rows = self._conn.execute(
-                "SELECT run_id, failing_fixtures_json FROM iterations"
-            ).fetchall()
+            if target is None:
+                rows = self._conn.execute(
+                    "SELECT run_id, failing_fixtures_json FROM iterations"
+                ).fetchall()
+            else:
+                rows = self._conn.execute(
+                    "SELECT i.run_id AS run_id, i.failing_fixtures_json AS failing_fixtures_json "
+                    "FROM iterations i JOIN runs r ON i.run_id = r.id WHERE r.target = ?",
+                    (target,),
+                ).fetchall()
         for row in rows:
             for fixture in json.loads(row["failing_fixtures_json"]):
                 counts.setdefault(fixture, set()).add(row["run_id"])
