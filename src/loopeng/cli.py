@@ -478,5 +478,85 @@ def _finish_proof(reg, demo_id: str, run_id: int, resolved_sha: str | None) -> N
         )
 
 
+@main.group("schedule")
+def schedule_grp() -> None:
+    """Register recurring loops and inspect their cadence (U14, R7).
+
+    Durable: registrations live in SQLite and survive a restart ("going to the
+    beach" -> "always running"). Execution rides the same injected runner the
+    autonomous loop uses; `tick` lists what is due now (live execution lands with
+    the generate adapters, exactly as `run`)."""
+
+
+@schedule_grp.command("add")
+@click.argument("target")
+@click.option("--interval", "interval_seconds", type=float, required=True,
+              help="Minimum seconds between runs for this target.")
+@click.option("--goal", default="", help="High-level goal passed to the loop.")
+@click.option("--lane", type=click.Choice([lane.value for lane in Lane]), default=None,
+              help="Force the target lane instead of auto-classifying.")
+@click.option("--domain", default=None, help="Force a registered domain by name.")
+def schedule_add_cmd(target: str, interval_seconds: float, goal: str, lane: str | None, domain: str | None) -> None:
+    """Register TARGET to run on a recurring cadence."""
+    from .memory.store import MemoryStore
+    from .scheduler import Heartbeat
+
+    hb = Heartbeat(MemoryStore.default(), runner=lambda fire: -1)
+    try:
+        hb.schedule(target, interval_seconds=interval_seconds, goal=goal, lane=lane, domain=domain)
+    except ValueError as e:
+        raise click.ClickException(str(e))
+    click.echo(f"Scheduled {target!r} every {interval_seconds:g}s (goal={goal!r}).")
+
+
+@schedule_grp.command("list")
+def schedule_list_cmd() -> None:
+    """Show registered schedules and when each last fired."""
+    from .memory.store import MemoryStore
+
+    entries = MemoryStore.default().schedules()
+    if not entries:
+        click.echo("No schedules registered.")
+        return
+    for e in entries:
+        last = "never" if e.last_fired is None else f"{e.last_fired:.0f}"
+        click.echo(
+            f"{e.target}  every {e.interval_seconds:g}s  last_fired={last}  "
+            f"last_run={e.last_run_id or '-'}  goal={e.goal or '-'}"
+        )
+
+
+@schedule_grp.command("remove")
+@click.argument("target")
+def schedule_remove_cmd(target: str) -> None:
+    """Unregister TARGET from the schedule."""
+    from .memory.store import MemoryStore
+
+    removed = MemoryStore.default().remove_schedule(target)
+    click.echo(f"Removed {target!r}." if removed else f"{target!r} was not scheduled.")
+
+
+@schedule_grp.command("tick")
+def schedule_tick_cmd() -> None:
+    """List the targets due to run right now (one heartbeat, no execution).
+
+    Live execution rides the injected runner used by the autonomous loop; until
+    the generate adapters are wired (same gate as `run`), `tick` reports the due
+    set so an operator/cron can see the cadence without fabricating a run."""
+    import time
+
+    from .memory.store import MemoryStore
+    from .scheduler import Heartbeat
+
+    hb = Heartbeat(MemoryStore.default(), runner=lambda fire: -1)
+    due = hb.due(now=time.time())
+    if not due:
+        click.echo("Nothing due.")
+        return
+    click.echo(f"{len(due)} target(s) due:")
+    for e in due:
+        click.echo(f"  {e.target}  (goal={e.goal or '-'})")
+
+
 if __name__ == "__main__":  # pragma: no cover
     main()

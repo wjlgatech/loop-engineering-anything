@@ -35,5 +35,18 @@ CREATE TABLE IF NOT EXISTS learnings (
     regression_test_ref TEXT
 );
 
+-- Durable scheduler state (U14, R7): a registered target's cadence survives a
+-- process restart ("going to the beach" -> "always running"). last_fired +
+-- last_run_id are the resume anchor so a wake-up continues from the recorded run.
+CREATE TABLE IF NOT EXISTS schedule_state (
+    target           TEXT PRIMARY KEY,
+    goal             TEXT,
+    domain           TEXT,                          -- forced domain name; nullable
+    lane             TEXT,                          -- forced lane; nullable
+    interval_seconds REAL NOT NULL,
+    last_fired       REAL,                          -- epoch seconds; NULL = never fired
+    last_run_id      INTEGER                         -- advisory resume anchor; nullable
+);
+
 CREATE INDEX IF NOT EXISTS idx_iterations_run ON iterations(run_id, n);
 CREATE INDEX IF NOT EXISTS idx_learnings_run ON learnings(run_id);

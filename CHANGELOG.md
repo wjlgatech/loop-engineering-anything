@@ -75,6 +75,26 @@ All notable changes to this project are documented here, following
     and the actionable `--lane` error message are unchanged; all of
     `tests/test_router.py` stays green.
   - Tests: `tests/test_domain_registry.py` (new).
+- **Loop-engine generalization, Phase C — U14 (scheduler/heartbeat)** (same
+  plan): turns the one-off runner into a recurring cadence — Loop Engineering's
+  first primitive (R7).
+  - **`Heartbeat`** (`src/loopeng/scheduler/heartbeat.py`, new): a runner-agnostic
+    cadence engine. `schedule()` registers a target+interval; `tick(now)` fires
+    every due target once via an **injected runner** (`ScheduledFire → run_id`),
+    honors the interval, isolates a failing run from its siblings (stamps the
+    attempt, keeps the prior resume anchor, continues), and resumes from the last
+    recorded run via a stable per-target workspace + `resume_run_id`. Optional,
+    injected, cadence-driven — wired like the History Compression compressor, no
+    new controller state (KTD7).
+  - **Durable schedule state** (`memory/schema.sql`, `memory/store.py`): new
+    `schedule_state` table (created additively) + `upsert_schedule` /
+    `schedules` / `remove_schedule` / `mark_scheduled_fired`, so a registered
+    cadence survives a process restart. `last_run_id` is an advisory resume
+    anchor (not an enforced FK — keeps the engine decoupled from run creation).
+  - **`loop-anything schedule` CLI** (`cli.py`): `add` / `list` / `remove` /
+    `tick`. `tick` reports the targets due now (live execution rides the same
+    injected runner as the autonomous loop, gated like `run`).
+  - Tests: `tests/test_scheduler.py` (new).
 - **Catalog-to-proof pipeline, Phase A** (plan
   `docs/plans/2026-06-15-003-feat-catalog-proof-pipeline-plan.md`): turns real
   clianything.cc / printingpress.dev CLIs into verified before/after loop proofs
