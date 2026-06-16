@@ -67,6 +67,15 @@ All notable changes to this project are documented here, following
   identical to before. Tests: `tests/test_fleet_routing.py` (new), brief field in
   `tests/test_refactor_brief.py`, controller threading in
   `tests/test_loop_controller.py`, end-to-end in `tests/test_fleet_coordinator.py`.
+- **Fleet orchestration layer, Phase A — U4: human-efficiency escalation**
+  (same plan): **`src/loopeng/orchestration/escalation.py`** (new). Only
+  high-judgment forks reach a human — `classify_with_escalation` sends a
+  `BLOCKED_SAFETY`, converged-but-gated, or stuck item to the escalation queue
+  while a clean converged-and-shippable item auto-proceeds; the fleet never
+  auto-merges a blocked/unconfirmed item (`RunResult.shippable` is the sole
+  authority, R10 lifted to the fleet). `rebrief_item` re-runs a single escalated
+  worker with a human note added to its brief context, updating the existing item
+  row in place. Tests: `tests/test_fleet_escalation.py` (new).
 - **Loop-engineering gap-bridges, U6 — name the three deliberate non-gaps**
   (same plan): documents outer-loop sovereignty, single referee of record, and
   the gated human-confirm posture as design choices (each with the failure mode
