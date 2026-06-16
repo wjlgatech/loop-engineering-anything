@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ideation: Loop-Engineering Gap Analysis</title>
+<link rel="preconnect" href="https://fonts.bunny.net">
+<link rel="stylesheet" href="https://fonts.bunny.net/css?family=inter:400,500,600,700|jetbrains-mono:400,500">
+<style>
+  :root{
+    --bg:#0f1115; --surface:#171a21; --surface-2:#1d212b; --line:#2a2f3a;
+    --ink:#e7eaf0; --ink-soft:#aab2c2; --ink-faint:#7c8699;
+    --accent:#56c596; --accent-soft:#15281f; --accent-ink:#7ee0b4;
+    --warn:#e0a35a; --warn-soft:#2a2114; --warn-ink:#f0c187;
+    --info:#6aa6e8; --info-soft:#14202e; --info-ink:#9cc6f5;
+    --bad:#e0796a; --bad-soft:#2a1714; --bad-ink:#f0a497;
+    --radius:10px;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme:light){
+    :root{
+      --bg:#f6f7f9; --surface:#ffffff; --surface-2:#f0f2f5; --line:#e0e3e9;
+      --ink:#1a1d24; --ink-soft:#46505f; --ink-faint:#6b7585;
+      --accent:#1f9d6b; --accent-soft:#e6f6ee; --accent-ink:#137a51;
+      --warn:#b5781f; --warn-soft:#fbf1df; --warn-ink:#8a5b14;
+      --info:#2f6fc4; --info-soft:#e7f0fb; --info-ink:#1f5099;
+      --bad:#c0503c; --bad-soft:#fbe9e5; --bad-ink:#993c2c;
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--sans); font-size:15.5px; line-height:1.62;
+    font-feature-settings:"cv05","ss01"; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:940px; margin-inline:auto; padding:48px 24px 96px}
+  p{max-width:72ch}
+  p,li{color:var(--ink)}
+  a{color:var(--accent-ink); text-decoration:none; border-bottom:1px solid transparent}
+  a:hover{border-bottom-color:var(--accent-ink)}
+  code{font-family:var(--mono); font-size:.86em; background:var(--surface-2);
+    padding:.1em .38em; border-radius:5px; color:var(--ink-soft)}
+  h1{font-size:2.05rem; line-height:1.15; letter-spacing:-.02em; margin:.2em 0 .1em; font-weight:700}
+  h2{font-size:1.4rem; letter-spacing:-.01em; margin:2.6em 0 .6em; font-weight:650;
+    padding-bottom:.3em; border-bottom:1px solid var(--line)}
+  h3{font-size:1.12rem; margin:0 0 .2em; font-weight:600}
+  .eyebrow{font-size:.72rem; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ink-faint); font-weight:600; margin-bottom:.5em}
+  .sub{color:var(--ink-soft); font-size:1.02rem; max-width:74ch}
+  .meta{display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 8px}
+  .chip{font-size:.74rem; font-weight:500; padding:.28em .7em; border-radius:999px;
+    border:1px solid var(--line); background:var(--surface); color:var(--ink-soft)}
+  .chip.k{background:var(--accent-soft); color:var(--accent-ink); border-color:transparent}
+  .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; margin:26px 0 8px}
+  .stat{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px}
+  .stat .n{font-size:1.5rem; font-weight:700; letter-spacing:-.02em}
+  .stat .l{font-size:.76rem; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.07em; margin-top:2px}
+  section{margin-top:8px}
+  .lead{font-size:1.05rem; color:var(--ink-soft)}
+  table{width:100%; border-collapse:collapse; margin:18px 0; font-size:.92rem}
+  th,td{text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{font-size:.74rem; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-faint); font-weight:600}
+  td code{white-space:nowrap}
+  .verdict-ok{color:var(--accent-ink); font-weight:600}
+  .verdict-partial{color:var(--warn-ink); font-weight:600}
+  .verdict-gap{color:var(--bad-ink); font-weight:600}
+  .jump{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px 18px; margin:18px 0}
+  .jump ul{margin:.3em 0 0; padding-left:1.1em; columns:2; column-gap:28px}
+  .jump li{margin:.2em 0; font-size:.9rem; break-inside:avoid}
+  article.idea{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    padding:22px 24px; margin:18px 0; scroll-margin-top:18px}
+  .idea-head{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:6px}
+  .rank{font-family:var(--mono); font-size:.85rem; font-weight:500; color:var(--accent-ink);
+    background:var(--accent-soft); padding:.18em .55em; border-radius:6px}
+  .idea-meta{display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 16px}
+  .pill{font-size:.73rem; padding:.26em .68em; border-radius:999px; font-weight:500;
+    border:1px solid var(--line); background:var(--surface-2); color:var(--ink-soft)}
+  .pill.axis{background:var(--info-soft); color:var(--info-ink); border-color:transparent}
+  .pill.conf{background:var(--accent-soft); color:var(--accent-ink); border-color:transparent}
+  .pill.cx{background:var(--warn-soft); color:var(--warn-ink); border-color:transparent}
+  dl.fields{margin:0; display:grid; grid-template-columns:max-content 1fr; gap:6px 18px}
+  dl.fields dt{font-size:.72rem; text-transform:uppercase; letter-spacing:.07em;
+    color:var(--ink-faint); font-weight:600; padding-top:2px}
+  dl.fields dd{margin:0}
+  dl.fields dd p{margin:0 0 .5em}
+  .basis{border-left:2px solid var(--line); padding-left:12px; margin:.2em 0}
+  .basis .tag{font-family:var(--mono); font-size:.8rem; font-weight:500}
+  .tag.direct{color:var(--accent-ink)} .tag.external{color:var(--info-ink)} .tag.reasoned{color:var(--warn-ink)}
+  figure{margin:18px 0; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:14px}
+  figure svg{display:block; width:100%; height:auto}
+  figcaption{font-size:.8rem; color:var(--ink-faint); margin-top:8px}
+  .callout{border-radius:var(--radius); padding:14px 18px; margin:18px 0; font-size:.95rem}
+  .callout.info{background:var(--info-soft); border:1px solid transparent}
+  .callout.info .lab{color:var(--info-ink); font-weight:600; font-size:.74rem; letter-spacing:.07em; text-transform:uppercase}
+  .callout.accent{background:var(--accent-soft)}
+  .callout.accent .lab{color:var(--accent-ink); font-weight:600; font-size:.74rem; letter-spacing:.07em; text-transform:uppercase}
+  footer.composition-signal{margin-top:64px; padding-top:18px; border-top:1px solid var(--line);
+    font-size:.8rem; color:var(--ink-faint)}
+  .svg-label{font-family:var(--sans); font-size:13px; fill:var(--ink)}
+  .svg-label.soft{fill:var(--ink-soft); font-size:12px}
+  .svg-mono{font-family:var(--mono); font-size:11.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Compound Engineering · Ideation</div>
+  <h1>Loop Engineering — where our loop meets, exceeds, and lags the playbook</h1>
+  <p class="sub">A gap analysis of <code>loop-engineering-anything</code> against the generic agent-loop anatomy from the LinkedIn "Loop Engineering" post — and the concrete moves to bridge the real gaps.</p>
+  <div class="meta">
+    <span class="chip">date: 2026-06-16</span>
+    <span class="chip">topic: loop-engineering-gap-analysis</span>
+    <span class="chip">mode: repo-grounded</span>
+    <span class="chip k">focus: eval vs post · find &amp; bridge gaps</span>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="n">7</div><div class="l">Ranked ideas</div></div>
+    <div class="stat"><div class="n">39 → 13</div><div class="l">Raw → deduped</div></div>
+    <div class="stat"><div class="n">6</div><div class="l">Cut (with reasons)</div></div>
+    <div class="stat"><div class="n">5</div><div class="l">Axes covered</div></div>
+    <div class="stat"><div class="n">13/13</div><div class="l">Bases verified sound</div></div>
+  </div>
+</header>
+
+<section>
+  <h2>Grounding Context</h2>
+  <p class="lead">The headline finding: this isn't a "do we do loops?" question. The repo's entire thesis <em>is</em> Loop Engineering — it already ships the controller, memory, and convergence policy the post calls for. The interesting question is narrower: our loop is a <strong>specialized outer loop</strong> (drive a tool to Grade A), and the post describes the <strong>generic agent loop</strong> (per-iteration think→act→observe→reflect). Where the two diverge is where the gaps — and some defensible non-gaps — live.</p>
+
+  <p><strong>What the repo is.</strong> <code>loop-engineering-anything</code> drives any target (API/service or codebase) into a self-improving agent-native CLI via a closed loop: route → generate → judge (<a href="https://github.com/wjlgatech/cli-judge">CLI-Judge</a>, a reality-grounded referee: 5 dims, A–F, hard safety gate) → refactor (<code>/ce-work</code>) → re-judge → compound (<code>/ce-compound</code> records a learning + a regression test). The novelty is the controller + SQLite memory + multi-signal convergence policy, depending only on protocols (<code>Judge / Refiner / Compounder / Checkpoint / Factory</code>). Maker≠checker integrity is enforced; a human-confirm gate guards shipping.</p>
+
+  <p><strong>Where we already meet or exceed the post.</strong> Several of the post's "failure modes" are things we solved structurally, and some of our strengths the post never mentions:</p>
+  <table>
+    <thead><tr><th>Post element</th><th>Our coverage</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td>Hallucinated observations (failure mode)</td><td class="verdict-ok">Exceeds — solved by design</td><td>Quality comes only from an independent referee grading real payloads, never from the model admiring its own code (KTD4)</td></tr>
+      <tr><td>Memory corruption / re-fixing bugs (failure mode)</td><td class="verdict-ok">Exceeds</td><td>Every accepted fix is compounded into a regression test (<code>/ce-compound</code>) — the post never mentions anti-regression memory</td></tr>
+      <tr><td>Weak termination (failure mode)</td><td class="verdict-ok">Exceeds</td><td>Multi-signal convergence: target grade <em>or</em> plateau <em>or</em> budget <em>or</em> safety-block — not naïve "until Grade A"</td></tr>
+      <tr><td>Guardrails / unsafe actions</td><td class="verdict-ok">Exceeds</td><td>Unbypassable terminal <code>BLOCKED_SAFETY</code> state + subprocess jail + env-prune + full-SHA pinning</td></tr>
+      <tr><td>Iteration limits</td><td class="verdict-ok">Met</td><td>Hard <code>max_iterations</code> cap at the convergence gate</td></tr>
+      <tr><td>Observability</td><td class="verdict-ok">Met</td><td>Every run/iteration/grade/learning in SQLite; cross-run trend/plateau/recurring queries; research report</td></tr>
+      <tr><td>Human escalation</td><td class="verdict-ok">Met</td><td><code>VerificationGate</code> human-confirm (ON by default; scheduled runs always confirm-required)</td></tr>
+      <tr><td>Degradation / "flying turd" (beyond the post)</td><td class="verdict-ok">Exceeds</td><td>Regression rollback: a refactor that doesn't raise the grade reverts to the prior git checkpoint</td></tr>
+      <tr><td>State collection · Execution · Observation (anatomy)</td><td class="verdict-ok">Met</td><td>Verdict assembly → refiner call → re-judge are explicit named steps</td></tr>
+      <tr><td>Reasoning (anatomy)</td><td class="verdict-partial">Partial</td><td>Deterministic convergence reasoning at the controller; inner reasoning delegated to the refiner</td></tr>
+      <tr><td>Action selection (anatomy)</td><td class="verdict-gap">Gap</td><td>One fixed action — refactor the lowest-scoring dim. No dynamic choice. → Ideas A, G, J(cut)</td></tr>
+      <tr><td>Reflection — "am I stuck? change strategy?"</td><td class="verdict-gap">Gap</td><td>Detection-only: plateau → STOP. No strategy pivot; cross-run memory unused mid-run. → Ideas A, B</td></tr>
+      <tr><td>Retry logic</td><td class="verdict-gap">Gap</td><td>Tool/subprocess failures normalized to <code>ok=False</code>, never retried; confused with quality regression. → Idea C</td></tr>
+      <tr><td>Budget controls (token/tool cost)</td><td class="verdict-gap">Gap (latent bug)</td><td>Token budget advisory; <code>tokens_spent</code> never updated from the measured cost, so the gate compares to 0. → Idea D</td></tr>
+      <tr><td>State compression (loop context)</td><td class="verdict-partial">Partial</td><td>Artifact compressed (U7); the refiner's own loop context is not. → Idea E (cut, watchlist)</td></tr>
+      <tr><td>Multi-agent loop (evolution rung 4)</td><td class="verdict-partial">Partial</td><td>Embarrassingly-parallel <em>isolated</em> loops; no coordination. → Ideas G, H</td></tr>
+    </tbody>
+  </table>
+
+  <figure>
+    <svg viewBox="0 0 880 250" role="img" aria-label="The post's 7-phase agent-loop anatomy mapped onto our controller, color-coded by coverage.">
+      <!-- title -->
+      <text x="12" y="22" class="svg-label" font-weight="600">Post's per-iteration anatomy → our controller's coverage</text>
+      <!-- phases as a ring/row -->
+      <g>
+        <!-- helper: 7 boxes -->
+        <!-- 1 State -->
+        <rect x="12"  y="60" width="112" height="58" rx="8" fill="var(--accent-soft)" stroke="none"/>
+        <text x="68"  y="84" text-anchor="middle" class="svg-label" font-weight="600">State</text>
+        <text x="68"  y="102" text-anchor="middle" class="svg-label soft">Verdict</text>
+        <!-- 2 Reason -->
+        <rect x="136" y="60" width="112" height="58" rx="8" fill="var(--warn-soft)" stroke="none"/>
+        <text x="192" y="84" text-anchor="middle" class="svg-label" font-weight="600">Reason</text>
+        <text x="192" y="102" text-anchor="middle" class="svg-label soft">partial</text>
+        <!-- 3 Act-select -->
+        <rect x="260" y="60" width="112" height="58" rx="8" fill="var(--bad-soft)" stroke="none"/>
+        <text x="316" y="84" text-anchor="middle" class="svg-label" font-weight="600">Act-select</text>
+        <text x="316" y="102" text-anchor="middle" class="svg-label soft">fixed → gap</text>
+        <!-- 4 Execute -->
+        <rect x="384" y="60" width="112" height="58" rx="8" fill="var(--accent-soft)" stroke="none"/>
+        <text x="440" y="84" text-anchor="middle" class="svg-label" font-weight="600">Execute</text>
+        <text x="440" y="102" text-anchor="middle" class="svg-label soft">refiner</text>
+        <!-- 5 Observe -->
+        <rect x="508" y="60" width="112" height="58" rx="8" fill="var(--accent-soft)" stroke="none"/>
+        <text x="564" y="84" text-anchor="middle" class="svg-label" font-weight="600">Observe</text>
+        <text x="564" y="102" text-anchor="middle" class="svg-label soft">re-judge</text>
+        <!-- 6 Reflect -->
+        <rect x="632" y="60" width="112" height="58" rx="8" fill="var(--bad-soft)" stroke="none"/>
+        <text x="688" y="84" text-anchor="middle" class="svg-label" font-weight="600">Reflect</text>
+        <text x="688" y="102" text-anchor="middle" class="svg-label soft">stop-only → gap</text>
+        <!-- 7 Terminate -->
+        <rect x="756" y="60" width="112" height="58" rx="8" fill="var(--accent-soft)" stroke="none"/>
+        <text x="812" y="84" text-anchor="middle" class="svg-label" font-weight="600">Terminate</text>
+        <text x="812" y="102" text-anchor="middle" class="svg-label soft">multi-signal</text>
+      </g>
+      <!-- flow arrows -->
+      <g stroke="var(--ink-faint)" stroke-width="1.4" fill="none" marker-end="url(#ah)">
+        <line x1="124" y1="89" x2="134" y2="89"/>
+        <line x1="248" y1="89" x2="258" y2="89"/>
+        <line x1="372" y1="89" x2="382" y2="89"/>
+        <line x1="496" y1="89" x2="506" y2="89"/>
+        <line x1="620" y1="89" x2="630" y2="89"/>
+        <line x1="744" y1="89" x2="754" y2="89"/>
+      </g>
+      <!-- loop-back -->
+      <path d="M812 118 L812 150 L68 150 L68 120" stroke="var(--ink-faint)" stroke-width="1.4" fill="none" stroke-dasharray="4 4" marker-end="url(#ah)"/>
+      <text x="440" y="166" text-anchor="middle" class="svg-label soft">continue-loop</text>
+      <!-- legend -->
+      <g>
+        <rect x="12" y="196" width="14" height="14" rx="3" fill="var(--accent-soft)"/>
+        <text x="32" y="208" class="svg-label soft">met / exceeds</text>
+        <rect x="150" y="196" width="14" height="14" rx="3" fill="var(--warn-soft)"/>
+        <text x="170" y="208" class="svg-label soft">partial</text>
+        <rect x="250" y="196" width="14" height="14" rx="3" fill="var(--bad-soft)"/>
+        <text x="270" y="208" class="svg-label soft">gap — addressed by ideas below</text>
+      </g>
+      <defs>
+        <marker id="ah" markerWidth="7" markerHeight="7" refX="6" refY="3.2" orient="auto">
+          <path d="M0,0 L7,3.2 L0,6.4 Z" fill="var(--ink-faint)"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>Five of seven anatomy phases are solidly covered; the two red phases (dynamic action selection, real reflection) are where the post's framework is genuinely ahead of us. Illustrative — the prose table above is authoritative.</figcaption>
+  </figure>
+
+  <div class="callout accent">
+    <div class="lab">The shape of the gaps</div>
+    <p style="margin:.4em 0 0">Three of our four hardest gaps share one root cause: <strong>we built the machinery and never connected the wire.</strong> <code>recurring_failures()</code> exists but is called only in tests. <code>parse_token_cost()</code> measures cost but the result never reaches the budget gate. The <code>Connector</code> protocol declares actions the controller never calls. These are cheap, high-confidence bridges — not new subsystems.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Topic Axes</h2>
+  <ul>
+    <li><strong>iteration-anatomy</strong> — making state→reason→act→observe→reflect→terminate first-class (vs collapsed/delegated)</li>
+    <li><strong>action-repertoire</strong> — dynamic action selection vs our single fixed "refactor lowest dim" action</li>
+    <li><strong>reflection-strategy</strong> — "am I stuck? change strategy?" and cross-run learning feedback</li>
+    <li><strong>production-hardening</strong> — retry, budget/cost gate, context compression, observability</li>
+    <li><strong>multiagent-coordination</strong> — the post's evolution rung 4 (coordinated multi-loop systems)</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Ranked Ideas</h2>
+  <div class="jump">
+    <strong style="font-size:.8rem; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint)">Jump to</strong>
+    <ul>
+      <li><a href="#i1">1. Wire <code>recurring_failures()</code> into the brief</a></li>
+      <li><a href="#i2">2. Plateau triggers a pivot, not a stop</a></li>
+      <li><a href="#i3">3. Three responses to three failure types</a></li>
+      <li><a href="#i4">4. Make the cost budget real</a></li>
+      <li><a href="#i5">5. Wire Connectors as refereed actions</a></li>
+      <li><a href="#i6">6. Portfolio coordination over the shared store</a></li>
+      <li><a href="#i7">7. Name the three non-gaps</a></li>
+    </ul>
+  </div>
+
+  <!-- IDEA 1 -->
+  <article class="idea" id="i1">
+    <div class="idea-head"><span class="rank">#1</span><h3>Wire <code>recurring_failures()</code> into the refactor brief</h3></div>
+    <div class="idea-meta">
+      <span class="pill axis">reflection-strategy</span>
+      <span class="pill conf">Confidence 92%</span>
+      <span class="pill cx">Complexity Low</span>
+      <span class="pill">top pick</span>
+    </div>
+    <dl class="fields">
+      <dt>Description</dt><dd><p>The post's "memory" pillar and Reflexion's episodic-lesson mechanism are already half-built here — and unplugged. <code>recurring_failures()</code> returns the fixtures that fail across ≥2 distinct runs, ranked by frequency, but it is called only in a test. <code>build_refactor_brief()</code> constructs every brief from the <em>current</em> verdict alone. Pass the store into brief construction and prepend cross-run repeat-offenders to the brief's <code>failing_fixtures</code>, so run N starts knowing what defeated runs 1…N-1.</p></dd>
+      <dt>Basis</dt><dd>
+        <div class="basis"><span class="tag direct">direct:</span> <code>recurring_failures()</code> defined at <code>memory/store.py:311</code>, called only in <code>tests/test_memory_store.py</code>; <code>build_refactor_brief</code> (<code>loop/refactor_brief.py:12-23</code>) takes only <code>verdict</code> + <code>goal</code> — no store, no history. Confirmed by the fresh-context verifier reading both files.</div>
+        <div class="basis"><span class="tag external">external:</span> Reflexion (Shinn et al., 2023, arXiv:2303.11366) — storing verbal lessons in episodic memory to avoid repeating failures; 91% pass@1 on HumanEval. Same shape, SQLite-backed.</div>
+      </dd>
+      <dt>Rationale</dt><dd><p>This is the cheapest, highest-leverage bridge in the set — ~5 lines turn a write-only audit log into a compounding strategy prior. It directly realizes the repo's own thesis ("each unit of work makes the next easier") at the loop-control level, where it currently isn't.</p></dd>
+      <dt>Downsides</dt><dd><p>Risk of over-anchoring on historically-hard fixtures that a new generation already fixed — gate by recency or cap the prepended count. Cross-run signal is only as good as fixture-naming stability across runs.</p></dd>
+    </dl>
+  </article>
+
+  <!-- IDEA 2 -->
+  <article class="idea" id="i2">
+    <div class="idea-head"><span class="rank">#2</span><h3>Plateau triggers a strategy pivot, not a stop</h3></div>
+    <div class="idea-meta">
+      <span class="pill axis">reflection-strategy</span>
+      <span class="pill conf">Confidence 85%</span>
+      <span class="pill cx">Complexity Medium</span>
+    </div>
+    <dl class="fields">
+      <dt>Description</dt><dd><p>This is the post's single sharpest legitimate critique. Today plateau detection emits a terminal <code>STOPPED</code> — the post's whole "Reflection" stage is about <em>changing strategy when stuck</em>, and we treat stuck as the end. Add one <code>PIVOT</code> branch before <code>STOPPED</code>: on first plateau, change the approach once and reset patience. Candidate pivots, smallest-first: rotate to the second-lowest dimension; switch the injected refiner (Claude ↔ fallback-LLM); or — the most ambitious — spawn N divergent briefs against the same checkpoint, judge all, keep the best (the immune system's affinity-maturation: when current antibodies fail, mutate harder and select the best binder).</p></dd>
+      <dt>Basis</dt><dd>
+        <div class="basis"><span class="tag direct">direct:</span> <code>loop/convergence.py:65-66</code> — <code>if plateaued: return Decision(STOPPED, …)</code>; <code>controller.py</code> maps any non-CONTINUE decision straight to finish. No change-of-approach branch exists. Verified.</div>
+        <div class="basis"><span class="tag external">external:</span> ReAct→Reflexion lineage and the OODA loop's "Orient → different action before terminating"; affinity maturation (somatic hypermutation) as the biological analog of plateau-driven divergent search.</div>
+      </dd>
+      <dt>Rationale</dt><dd><p>Plateau-stops are currently dead ends that force a manual restart with no context carry-over. Each variant stays checkpoint-isolated and re-judged, so maker≠checker and the safety gate are untouched — this is brief construction, not inner-loop surgery. Pairs naturally with #1 (the pivot can be informed by cross-run memory).</p></dd>
+      <dt>Downsides</dt><dd><p>The N-variant version multiplies cost per plateau — must be budget-gated (see #4). Risk of thrashing between strategies; cap pivots to one or two before honoring <code>STOPPED</code>.</p></dd>
+    </dl>
+    <figure>
+      <svg viewBox="0 0 760 150" role="img" aria-label="Before: plateau goes straight to STOPPED. After: plateau routes through one PIVOT attempt before STOPPED.">
+        <text x="12" y="20" class="svg-label" font-weight="600">Before</text>
+        <rect x="12" y="34" width="120" height="40" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+        <text x="72" y="59" text-anchor="middle" class="svg-label">plateau?</text>
+        <rect x="210" y="34" width="120" height="40" rx="8" fill="var(--bad-soft)" stroke="none"/>
+        <text x="270" y="59" text-anchor="middle" class="svg-label">STOPPED</text>
+        <line x1="132" y1="54" x2="208" y2="54" stroke="var(--ink-faint)" stroke-width="1.4" marker-end="url(#ah2)"/>
+        <text x="170" y="46" text-anchor="middle" class="svg-label soft">yes</text>
+
+        <text x="12" y="104" class="svg-label" font-weight="600">After</text>
+        <rect x="12" y="116" width="120" height="34" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+        <text x="72" y="138" text-anchor="middle" class="svg-label">plateau?</text>
+        <rect x="210" y="116" width="150" height="34" rx="8" fill="var(--accent-soft)" stroke="none"/>
+        <text x="285" y="138" text-anchor="middle" class="svg-label">PIVOT (once)</text>
+        <rect x="470" y="116" width="120" height="34" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+        <text x="530" y="138" text-anchor="middle" class="svg-label">still stuck?</text>
+        <rect x="640" y="116" width="108" height="34" rx="8" fill="var(--bad-soft)" stroke="none"/>
+        <text x="694" y="138" text-anchor="middle" class="svg-label">STOPPED</text>
+        <line x1="132" y1="133" x2="208" y2="133" stroke="var(--ink-faint)" stroke-width="1.4" marker-end="url(#ah2)"/>
+        <line x1="360" y1="133" x2="468" y2="133" stroke="var(--ink-faint)" stroke-width="1.4" marker-end="url(#ah2)"/>
+        <line x1="590" y1="133" x2="638" y2="133" stroke="var(--ink-faint)" stroke-width="1.4" marker-end="url(#ah2)"/>
+        <path d="M285 116 L285 92 L72 92 L72 116" stroke="var(--accent)" stroke-width="1.4" fill="none" stroke-dasharray="4 4" marker-end="url(#ah2g)"/>
+        <text x="178" y="86" text-anchor="middle" class="svg-label soft">retry with new approach</text>
+        <defs>
+          <marker id="ah2" markerWidth="7" markerHeight="7" refX="6" refY="3.2" orient="auto"><path d="M0,0 L7,3.2 L0,6.4 Z" fill="var(--ink-faint)"/></marker>
+          <marker id="ah2g" markerWidth="7" markerHeight="7" refX="6" refY="3.2" orient="auto"><path d="M0,0 L7,3.2 L0,6.4 Z" fill="var(--accent)"/></marker>
+        </defs>
+      </svg>
+      <figcaption>One new state between plateau and termination. Illustrative — exact pivot policy is a brainstorm/plan decision.</figcaption>
+    </figure>
+  </article>
+
+  <!-- IDEA 3 -->
+  <article class="idea" id="i3">
+    <div class="idea-head"><span class="rank">#3</span><h3>Three responses to three failure types: infra-retry / pivot / rollback</h3></div>
+    <div class="idea-meta">
+      <span class="pill axis">production-hardening</span>
+      <span class="pill conf">Confidence 88%</span>
+      <span class="pill cx">Complexity Medium</span>
+    </div>
+    <dl class="fields">
+      <dt>Description</dt><dd><p>The post lists retry as a core control; we have none. But the deeper bug is <em>conflation</em>: when <code>run_tool()</code> returns <code>ok=False</code> (a timeout, a quota spike, a SIGKILL — an <em>infrastructure</em> failure), the controller re-judges anyway, sees no improvement, and treats it identically to a genuine quality regression — which can falsely trip plateau detection. TCP never confuses "packet lost" (retransmit) with "packet wrong." Introduce the same distinction: <strong>infra failure → bounded backoff retry of the tool invocation</strong>; <strong>quality non-improvement → rollback</strong> (already correct, and superior to retry for semantic work); <strong>safety-block → never retry</strong>.</p></dd>
+      <dt>Basis</dt><dd>
+        <div class="basis"><span class="tag direct">direct:</span> <code>adapters/safety.py:81-111</code> — <code>run_tool</code> normalizes <code>TimeoutExpired</code>/<code>FileNotFoundError</code> into <code>ProcResult(ok=False)</code>; <code>controller.py</code> calls <code>judge.judge()</code> regardless and rolls back on non-improvement. No retry path anywhere (grep confirmed). Verified.</div>
+        <div class="basis"><span class="tag external">external:</span> TCP exponential backoff + fast-retransmit — separating transient-loss recovery from systemic failure.</div>
+      </dd>
+      <dt>Rationale</dt><dd><p>This protects <em>every</em> downstream convergence signal: a flaky timeout currently looks like "the code failed to improve," poisoning plateau and regression logic. Naming rollback as the right primitive for semantic failure (and infra-retry as a separate, narrow addition) prevents a naïve "just add retry everywhere" change that would burn budget re-running identical briefs.</p></dd>
+      <dt>Downsides</dt><dd><p>Classifying "transient vs genuine" from a subprocess result is heuristic (exit code + empty stdout + timeout signal); a misclassification either wastes retries or masks a real failure. Keep attempts low (2–3) and exclude any output mentioning safety/blocked.</p></dd>
+    </dl>
+    <figure>
+      <svg viewBox="0 0 760 170" role="img" aria-label="A refactor outcome routed three ways: infra failure retries, quality regression rolls back, safety block terminates.">
+        <rect x="300" y="14" width="160" height="40" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+        <text x="380" y="39" text-anchor="middle" class="svg-label">refactor outcome</text>
+        <!-- three branches -->
+        <rect x="36" y="100" width="200" height="50" rx="8" fill="var(--warn-soft)" stroke="none"/>
+        <text x="136" y="121" text-anchor="middle" class="svg-label" font-weight="600">infra failure</text>
+        <text x="136" y="139" text-anchor="middle" class="svg-label soft">→ backoff retry (bounded)</text>
+        <rect x="280" y="100" width="200" height="50" rx="8" fill="var(--info-soft)" stroke="none"/>
+        <text x="380" y="121" text-anchor="middle" class="svg-label" font-weight="600">quality regression</text>
+        <text x="380" y="139" text-anchor="middle" class="svg-label soft">→ rollback (already correct)</text>
+        <rect x="524" y="100" width="200" height="50" rx="8" fill="var(--bad-soft)" stroke="none"/>
+        <text x="624" y="121" text-anchor="middle" class="svg-label" font-weight="600">safety block</text>
+        <text x="624" y="139" text-anchor="middle" class="svg-label soft">→ terminal, never retry</text>
+        <g stroke="var(--ink-faint)" stroke-width="1.4" fill="none" marker-end="url(#ah3)">
+          <path d="M340 54 L136 96"/>
+          <path d="M380 54 L380 96"/>
+          <path d="M420 54 L624 96"/>
+        </g>
+        <defs><marker id="ah3" markerWidth="7" markerHeight="7" refX="6" refY="3.2" orient="auto"><path d="M0,0 L7,3.2 L0,6.4 Z" fill="var(--ink-faint)"/></marker></defs>
+      </svg>
+      <figcaption>One outcome, three signal classes — today all three collapse into "no improvement." Illustrative.</figcaption>
+    </figure>
+  </article>
+
+  <!-- IDEA 4 -->
+  <article class="idea" id="i4">
+    <div class="idea-head"><span class="rank">#4</span><h3>Make the cost budget real (fix the latent <code>tokens_spent</code> bug)</h3></div>
+    <div class="idea-meta">
+      <span class="pill axis">production-hardening</span>
+      <span class="pill conf">Confidence 90%</span>
+      <span class="pill cx">Complexity Low</span>
+    </div>
+    <dl class="fields">
+      <dt>Description</dt><dd><p>The post calls for budget controls; we ship an iteration cap but the <em>cost</em> budget is a quiet no-op. <code>config.py</code> marks <code>token_budget</code> "advisory until a measurement source exists" — but the source <em>does</em> exist: <code>parse_token_cost()</code> extracts per-iteration tokens. The verifier surfaced this as a two-step bug: the controller initializes <code>tokens_spent = 0</code> and <strong>never updates it</strong> from the refiner's measured <code>last_token_cost</code>, so the convergence predicate <code>tokens_spent &gt;= budget.token_budget</code> always compares against 0. Wire the measured cost into the accumulator and promote the predicate to a hard terminal signal alongside <code>max_iterations</code> (optionally add <code>max_wall_seconds</code>).</p></dd>
+      <dt>Basis</dt><dd>
+        <div class="basis"><span class="tag direct">direct:</span> <code>config.py:97</code> "advisory until a measurement source exists"; <code>controller.py:84</code> <code>tokens_spent = 0</code> never updated; <code>compound_engineering.py:77</code> sets <code>last_token_cost</code> on the refiner, never read back; <code>convergence.py:62</code> gates on <code>tokens_spent</code>. Verifier explicitly flagged this as a real latent bug, not just stale docs.</div>
+      </dd>
+      <dt>Rationale</dt><dd><p>"Autonomous, go to the beach" only works if an unattended run can't quietly burn an unbounded bill before reaching the human-confirm gate. This is also a prerequisite for #2's N-variant pivots (which add cost) and for safely running the free-LLM fallback path unattended. An advisory limit that isn't enforced is a lie in the config schema.</p></dd>
+      <dt>Downsides</dt><dd><p>Token cost is only measurable for refiners that report it (Claude <code>-p</code> JSON); the fallback-LLM chain may need its own accounting, and a wall-clock budget is the safer universal backstop where token counts are unavailable.</p></dd>
+    </dl>
+  </article>
+
+  <!-- IDEA 5 -->
+  <article class="idea" id="i5">
+    <div class="idea-head"><span class="rank">#5</span><h3>Wire Connectors as refereed actions — give the loop a real action repertoire</h3></div>
+    <div class="idea-meta">
+      <span class="pill axis">action-repertoire</span>
+      <span class="pill conf">Confidence 70%</span>
+      <span class="pill cx">Complexity High</span>
+    </div>
+    <dl class="fields">
+      <dt>Description</dt><dd><p>The post's "action selection" stage chooses dynamically among many actions; our loop has exactly one (refactor the lowest dim via <code>/ce-work</code>). The extension point is already declared and unwired: the <code>Connector</code> protocol exposes typed <code>capabilities</code> + a structured <code>act(payload)</code>, but <code>LoopController</code> never calls it. Route by capability: when a brief's target dimension matches a registered connector's capability (e.g. a telemetry-injector owns "observability", a migration-runner owns a schema dim), dispatch <code>connector.act()</code> and re-judge; otherwise fall through to the refiner. Crucially, every connector action is still graded by the same single referee — this is also the identity-preserving seed of the post's "multi-specialist" rung (specialists as <em>refereed</em> actions, not autonomous peers).</p></dd>
+      <dt>Basis</dt><dd>
+        <div class="basis"><span class="tag direct">direct:</span> <code>connectors/base.py:83-103</code> declares <code>capabilities</code> + <code>act()</code>; grep of <code>controller.py</code>/<code>runner.py</code> finds zero connector references — the actuator surface is fully decoupled from the loop. Verified.</div>
+        <div class="basis"><span class="tag external">external:</span> OpenAI Agents SDK handoffs / tool-routing and Anthropic's orchestrator-workers pattern as the dynamic-action-selection prior art.</div>
+      </dd>
+      <dt>Rationale</dt><dd><p>This is the structural bridge to the post's biggest genuine gap (fixed → dynamic action), and it reuses two things already built (the Connector protocol + the single-referee model) rather than importing a multi-agent framework that would break wrap-don't-fork.</p></dd>
+      <dt>Downsides</dt><dd><p>Highest complexity here: capability↔dimension matching, payload contracts, and the install/credential isolation the connector layer already mandates. Easy to over-build — start with one capability that a dimension cleanly maps to, behind the existing safety boundary.</p></dd>
+    </dl>
+    <figure>
+      <svg viewBox="0 0 720 150" role="img" aria-label="The brief's target dimension routes to a matching connector action when one exists, otherwise to the refiner; both are graded by the same judge.">
+        <rect x="12" y="56" width="150" height="40" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+        <text x="87" y="81" text-anchor="middle" class="svg-mono">brief.target_dim</text>
+        <rect x="220" y="56" width="140" height="40" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+        <text x="290" y="81" text-anchor="middle" class="svg-label">capability match?</text>
+        <rect x="420" y="14" width="170" height="38" rx="8" fill="var(--info-soft)" stroke="none"/>
+        <text x="505" y="38" text-anchor="middle" class="svg-label">connector.act()</text>
+        <rect x="420" y="100" width="170" height="38" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+        <text x="505" y="124" text-anchor="middle" class="svg-label">refiner.refactor()</text>
+        <rect x="630" y="56" width="78" height="40" rx="8" fill="var(--accent-soft)" stroke="none"/>
+        <text x="669" y="81" text-anchor="middle" class="svg-label">judge</text>
+        <g stroke="var(--ink-faint)" stroke-width="1.4" fill="none" marker-end="url(#ah5)">
+          <line x1="162" y1="76" x2="218" y2="76"/>
+          <path d="M360 70 L418 36"/>
+          <path d="M360 82 L418 116"/>
+          <path d="M590 33 L630 66"/>
+          <path d="M590 119 L630 86"/>
+        </g>
+        <text x="392" y="44" class="svg-label soft">yes</text>
+        <text x="392" y="112" class="svg-label soft">no</text>
+        <defs><marker id="ah5" markerWidth="7" markerHeight="7" refX="6" refY="3.2" orient="auto"><path d="M0,0 L7,3.2 L0,6.4 Z" fill="var(--ink-faint)"/></marker></defs>
+      </svg>
+      <figcaption>Both action types funnel through the one referee — dynamic selection without weakening maker≠checker. Illustrative.</figcaption>
+    </figure>
+  </article>
+
+  <!-- IDEA 6 -->
+  <article class="idea" id="i6">
+    <div class="idea-head"><span class="rank">#6</span><h3>Portfolio coordination over the shared store (the honest multi-agent rung)</h3></div>
+    <div class="idea-meta">
+      <span class="pill axis">multiagent-coordination</span>
+      <span class="pill conf">Confidence 72%</span>
+      <span class="pill cx">Complexity Medium</span>
+    </div>
+    <dl class="fields">
+      <dt>Description</dt><dd><p>The post's top evolution rung is "multi-agent loop." We run embarrassingly-parallel <em>isolated</em> loops (worktree fan-out + a passive cadence scheduler) that already share one SQLite store but never read each other. Two coordination moves that respect per-loop isolation: <strong>(a) cross-target failure surveillance</strong> — when one worktree hits a safety-block or hard regression, a lightweight read-only signal lets siblings avoid the same landmine (epidemiology's shared surveillance without merging populations); <strong>(b) scheduler triage</strong> — at finite compute, rank due targets by recent grade-slope instead of firing everything on a flat cadence, so compute flows to high-velocity targets and away from saturated ones.</p></dd>
+      <dt>Basis</dt><dd>
+        <div class="basis"><span class="tag direct">direct:</span> <code>autonomous/parallel.py</code> — loops share one <code>MemoryStore</code> (WAL + lock) with no cross-read; <code>scheduler/heartbeat.py</code> fires by cadence only (<code>last_fired + interval</code>), no grade weighting. Verified.</div>
+        <div class="basis"><span class="tag external">external:</span> Anthropic's multi-agent research system — portfolio-level observability to prevent compute concentration on saturated work.</div>
+      </dd>
+      <dt>Rationale</dt><dd><p>This is the only honest path up the post's ladder that doesn't break our isolation identity: <em>coordinate the allocation, never the agents</em>. No message bus, no shared rewards — just read-only signals over the channel that already exists.</p></dd>
+      <dt>Downsides</dt><dd><p>Cross-target signals risk false transfer (a landmine in target A may be irrelevant to B); keep them advisory, not hard constraints. Slope-based triage needs enough run history per target to be meaningful, and could starve slow-but-improving targets without a fairness floor.</p></dd>
+    </dl>
+  </article>
+
+  <!-- IDEA 7 -->
+  <article class="idea" id="i7">
+    <div class="idea-head"><span class="rank">#7</span><h3>Name the three non-gaps — what the post is generic about for our domain</h3></div>
+    <div class="idea-meta">
+      <span class="pill axis">iteration-anatomy</span>
+      <span class="pill conf">Confidence 88%</span>
+      <span class="pill cx">Complexity Low</span>
+    </div>
+    <dl class="fields">
+      <dt>Description</dt><dd><p>A gap analysis is only honest if it also says which "gaps" are deliberate design choices we should <em>name and defend</em> rather than close. Three:</p>
+        <p><strong>(K1) Outer-loop sovereignty.</strong> We referee the refiner's <em>output</em>, never its inner tokens; the inner think-act-observe is a swappable vendor (Claude ↔ fallback-LLM). The post optimizes one agent's loop; we are the meta-loop any agent loop plugs into. Don't chase inner-loop instrumentation — it would break wrap-don't-fork.</p>
+        <p><strong>(K2) Single referee of record.</strong> The post wants multi-source observation/reflection; we deliberately read exactly one quality signal — the Verdict from a maker-distinct judge. Admitting a second quality source (refiner self-report, inner confidence) would risk collapsing maker≠checker. The multi-signal richness lives <em>inside</em> the judge's 5 dims + safety gate, not across multiple authorities. The constraint is the moat.</p>
+        <p><strong>(K3) Human gate as anti-cognitive-surrender — make it legible.</strong> We chose human-confirm at the shipping step (not mid-loop), hardened against silent auto-ship. The one improvement worth making: surface <em>why</em> the gate fired (which dim was borderline, what the judge was unsure of) so the human makes a decision, not a rubber-stamp — and record that decision (the cut idea M) as compoundable signal about judge blind spots.</p>
+      </dd>
+      <dt>Basis</dt><dd>
+        <div class="basis"><span class="tag reasoned">reasoned:</span> <code>controller.py</code> never introspects refiner internals (only re-judges output); <code>integrity.py:43-57</code> fails closed if refiner is judge, so a second quality source would risk collapsing the two roles; <code>VerificationGate</code> returns only <code>shippable: bool</code> with the firing reason absent. The arguments follow directly from these enforced invariants — verifier concurred all three are sound.</div>
+      </dd>
+      <dt>Rationale</dt><dd><p>Cheapest high-value output of the whole analysis: it prevents well-meaning "be more like the post" changes that would silently break the core safety invariants, and it converts the repo's biggest apparent weaknesses into thesis. Mostly a STRATEGY.md / AGENTS.md naming pass plus the small legibility addition to the gate.</p></dd>
+      <dt>Downsides</dt><dd><p>Naming a choice as deliberate can ossify it — revisit K1/K2 if a future need for richer quality signals or inner-loop visibility genuinely emerges. The gate-legibility piece needs the firing reason plumbed through, which is small but non-zero.</p></dd>
+    </dl>
+  </article>
+</section>
+
+<section>
+  <h2>Rejection Summary</h2>
+  <table>
+    <thead><tr><th>Idea</th><th>Axis</th><th>Reason cut</th></tr></thead>
+    <tbody>
+      <tr><td>E · Compress the refiner's loop context across iterations</td><td>production-hardening</td><td>Sound, but not yet biting at the 10-iteration cap; partially overlaps #2's within-run strategy memory. Watchlist — promote when runs deepen.</td></tr>
+      <tr><td>F · Dynamic refiner switch on quota hit</td><td>action-repertoire</td><td>Subsumed by #2's "switch refiner" pivot; <code>FallbackLLMRefiner</code> already has an internal provider fallback chain, so the gap is narrower than stated.</td></tr>
+      <tr><td>I · Structured/queryable learnings + compound-on-rollback</td><td>iteration-anatomy</td><td>Enabling substrate for #1 (and a cut Thompson-sampling idea), not a standalone direction — surface it during the brainstorm of #1.</td></tr>
+      <tr><td>J · Thompson-sampling action selection</td><td>action-repertoire</td><td>Premature: injects stochasticity into a deliberately deterministic convergence signal (which #7-K2 defends). Brainstorm variant of #1, not its own bet.</td></tr>
+      <tr><td>L · Referee drift detection (re-grade held-out known-grade artifacts)</td><td>reflection-strategy</td><td>Strongest cut — genuinely novel (guards the one trusted fixed point), but reasoned-basis, higher effort, and overlaps the existing <code>judge-variance</code> probe. Promote if judge calibration over time becomes a concern.</td></tr>
+      <tr><td>M · VerificationGate audit trail (record human approve/reject)</td><td>multiagent-coordination</td><td>Sound but low-leverage alone; folded into #7-K3 as the capture half of a legible human gate.</td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--ink-faint); font-size:.9rem">All 5 axes have at least one survivor; no recovery dispatch was needed. Every candidate's factual basis was verified sound against the code by a fresh-context skeptic.</p>
+</section>
+
+<footer class="composition-signal">
+  Composed 2026-06-16 by ce-ideate · source: user prompt comparing <code>loop-engineering-anything</code> against the "Loop Engineering" LinkedIn post · grounded in repo code + web research (ReAct, Reflexion, Anthropic agent patterns, ACON/FoldAct, OODA) · 39 raw → 13 deduped → 7 ranked.
+</footer>
+
+</div>
+</body>
+</html>
