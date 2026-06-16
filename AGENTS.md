@@ -62,13 +62,13 @@ protocol, so the refine engine is selectable:
 | `src/loopeng/preflight.py` | dependency detection (per-mechanism); `missing_for_refine` (no factory) |
 | `src/loopeng/router.py` | thin shim → `domains.REGISTRY.resolve`, adapts to legacy `LaneDecision` (U3; registry-backed plan-004 U11) |
 | `src/loopeng/domains/` | domain SDK: `Domain` plugin protocol + `DomainRegistry` (classify→resolve, supersedes router heuristics); `software.py` re-homes service/codebase lanes as registered domains. A new domain is a `register()`, never a controller/router edit (plan-004 U9/U11, KTD1/R11) |
-| `src/loopeng/memory/` | SQLite run history + trend/plateau/recurring queries (U2); `runs.finished` wall-clock; `iterations.score` continuous signal + score-aware `is_plateaued(on_score=)` (plan-004 U9/U10) |
+| `src/loopeng/memory/` | SQLite run history + trend/plateau/recurring queries (U2); `runs.finished` wall-clock; `iterations.score` continuous signal + score-aware `is_plateaued(on_score=)` (plan-004 U9/U10); concurrency-safe for parallel fan-out — writes serialized through one shared connection + `RLock` in WAL mode (plan-004 U16, R9) |
 | `src/loopeng/adapters/` | contracts, `safety.py` (subprocess/jail/env-prune), factory + judge shells (U4/U5), `compound_engineering.py` (`/ce-work` refiner), `llm_refiner.py` (claude-free fallback-chain refiner) |
 | `src/loopeng/adopt.py` | catalog tool adopter — venv-isolated, env-pruned, full-SHA-pinned (proof pipeline U1, KTD7) |
 | `src/loopeng/proof.py` | `ProofPack` builder + `StoreBackedCompounder` (proof pipeline U3) |
 | `src/loopeng/loop/` | controller, convergence, brief, compound, `GitCheckpoint` (U6) |
-| `src/loopeng/autonomous/` | research report + autonomous runner; `run_refine_loop` (refine-only, proof pipeline U2) |
-| `src/loopeng/scheduler/` | `Heartbeat` cadence engine — durable `schedule_state`, due-calc, failure isolation, resume anchor; runner-agnostic (injected, KTD7). `loop-anything schedule add/list/remove/tick` (plan-004 U14, R7) |
+| `src/loopeng/autonomous/` | research report + autonomous runner; `run_refine_loop` (refine-only, proof pipeline U2); `parallel.py` — worktree fan-out (`run_parallel`): one git worktree per target, bounded by `max_parallel`, crash-isolated, auto-cleaned (plan-004 U16, R9) |
+| `src/loopeng/scheduler/` | `Heartbeat` cadence engine — durable `schedule_state`, due-calc, failure isolation, resume anchor; runner-agnostic (injected, KTD7). `tick` (sequential) + `tick_parallel` (fans due targets through `autonomous/parallel.py` into isolated worktrees, plan-004 U16). `loop-anything schedule add/list/remove/tick` (plan-004 U14, R7) |
 | `src/loopeng/demos/` | demo manifest/registry + result fixtures (validated; SSRF/traversal/secret guards) |
 | `src/loopeng/showcase/` | self-contained HTML catalog generator (context-aware escaping) |
 | `demos/` · `docs/recipes/` | community demo manifests + fixtures; aspirational loop recipes |

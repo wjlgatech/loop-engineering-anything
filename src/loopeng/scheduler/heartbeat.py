@@ -15,9 +15,10 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable
 
+from ..autonomous.parallel import ParallelTarget, run_parallel
 from ..memory.store import MemoryStore, ScheduleEntry
 
 
@@ -117,6 +118,73 @@ class Heartbeat:
                 continue
             self.store.mark_scheduled_fired(entry.target, now, run_id)
             fired.append(run_id)
+        return fired
+
+    # ----- parallel fan-out (U16, R9) -------------------------------------
+
+    def tick_parallel(
+        self,
+        now: float,
+        *,
+        repo_dir: str,
+        worktrees_root: str,
+        max_parallel: int = 2,
+    ) -> list[int]:
+        """Fire every due target, each in its **own git worktree**, at most
+        ``max_parallel`` concurrently (excess queue), and return the run ids of
+        the successful fires.
+
+        Cadence stays here; concurrency is delegated to
+        :func:`autonomous.parallel.run_parallel`. Each due target's ``runner`` is
+        invoked with its ``ScheduledFire`` rebased onto the per-target worktree
+        path, so its checkpoints/rollbacks are isolated. As with the sequential
+        :meth:`tick`, a crashed run is recorded (stamped so it does not hot-loop)
+        and does **not** abort its siblings; a successful run records its id as the
+        resume anchor.
+        """
+        due = [e for e in self.store.schedules() if self._is_due(e, now)]
+        if not due:
+            return []
+
+        fires = {
+            entry.target: ScheduledFire(
+                target=entry.target,
+                goal=entry.goal or "",
+                domain=entry.domain,
+                lane=entry.lane,
+                workspace=self._workspace_for(entry.target),
+                resume_run_id=entry.last_run_id,
+            )
+            for entry in due
+        }
+
+        def _make_run(target: str):
+            base_fire = fires[target]
+
+            def _run(worktree: str) -> int:
+                # The worktree is the isolated working tree for this fire; the
+                # runner checkpoints/rolls back within it without touching siblings.
+                return self.runner(replace(base_fire, workspace=worktree))
+
+            return _run
+
+        ptargets = [ParallelTarget(key=entry.target, run=_make_run(entry.target)) for entry in due]
+        results = run_parallel(
+            ptargets,
+            repo_dir=repo_dir,
+            worktrees_root=worktrees_root,
+            max_parallel=max_parallel,
+        )
+
+        fired: list[int] = []
+        prior = {entry.target: entry.last_run_id for entry in due}
+        for res in results:
+            if res.ok and isinstance(res.value, int):
+                self.store.mark_scheduled_fired(res.key, now, res.value)
+                fired.append(res.value)
+            else:
+                # Failure isolation: stamp the attempt, keep the prior anchor.
+                self.store.mark_scheduled_fired(res.key, now, prior.get(res.key))
         return fired
 
     # ----- helpers --------------------------------------------------------
