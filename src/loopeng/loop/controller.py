@@ -85,7 +85,11 @@ class LoopController:
         accepted = 0  # count of kept improvements, for compression cadence
 
         while True:
-            plateaued = self.store.is_plateaued(run_id, self.budget.plateau_patience)
+            plateaued = self.store.is_plateaued(
+                run_id,
+                self.budget.plateau_patience,
+                on_score=self.budget.target_score is not None,
+            )
             decision = cv.evaluate(
                 verdict,
                 self.budget,
@@ -145,6 +149,7 @@ class LoopController:
             safety_ok=verdict.safety_ok,
             failing_fixtures=verdict.failing_fixtures,
             diff_ref=diff_ref,
+            score=verdict.score,
         )
 
     def _finish(self, run_id: int, decision: cv.Decision, verdict: Verdict, n: int) -> LoopOutcome:

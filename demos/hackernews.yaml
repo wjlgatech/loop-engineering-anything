@@ -1,0 +1,11 @@
+id: hackernews
+title: Hacker News CLI (Printing-Press) — refine-loop proof
+domain: News / social aggregation
+target: https://hacker-news.firebaseio.com
+lane: service
+goal: raise the published Hacker News CLI to Grade A — error handling, retries, and FTS depth
+kind: demo
+contributor: wjlgatech
+exit_criteria:
+  target_grade: A
+  max_iterations: 10

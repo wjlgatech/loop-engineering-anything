@@ -137,7 +137,15 @@ class VarianceReport:
 
 
 def probe_grade_variance(judge: Judge, tool_path: str, k: int = 5) -> VarianceReport:
-    """Re-judge an unchanged tool ``k`` times and report grade/score variance."""
+    """Re-judge an unchanged tool ``k`` times and report grade/score variance.
+
+    This is the multi-seed variance probe a continuous-score domain needs (U10):
+    a stochastic referee (e.g. a sim averaging rollouts) re-seeds on each
+    ``judge`` call, so the score spread across ``k`` calls measures referee
+    noise. A non-deterministic referee MUST run with ``Budget.min_score_gain``
+    set to at least ``recommended_min_score_gain`` (> 0) so the loop does not
+    accept sub-noise jitter as a real gain.
+    """
     if k < 2:
         raise ValueError("k must be >= 2 to measure variance")
     verdicts = [judge.judge(tool_path) for _ in range(k)]

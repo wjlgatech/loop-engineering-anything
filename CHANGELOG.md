@@ -6,6 +6,108 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Loop-engine domain generalization, Phase A — U9** (plan
+  `docs/plans/2026-06-15-004-feat-loop-engine-domain-generalization-plan.md`):
+  widen the loop's contracts so a target can be *any* domain, not just code,
+  with **no new states or branches in `loop/controller.py`** (KTD1).
+  - **`Domain` plugin protocol** (`src/loopeng/domains/base.py`, new): binds a
+    target shape to its adapters via `classify`/`name`/`dependencies`,
+    `factory() -> Factory | None` (`None` = refine-only adopt-as-baseline, KTD5),
+    and `judge() -> Judge`. The cross-domain safety signal stays on
+    `Verdict.safety_ok` (the judge owns per-domain derivation, KTD2), so it is
+    not a separate accessor. Imports only the adapter protocols — never the
+    controller.
+  - **Persisted `score`** (`memory/schema.sql`, `memory/store.py`): `iterations`
+    gains a nullable `score REAL` column (additive + idempotent migration for
+    pre-existing DBs), threaded through `record_iteration`/`Iteration` and from
+    the controller's `_record`. `grade` stays `NOT NULL` — every domain projects
+    its native signal onto **both** `score` (primary) and a coarse `grade`
+    letter, so the controller, `LoopOutcome`, and the NOT-NULL schema are
+    untouched. Legacy `score=NULL` rows still read.
+  - `Verdict` docstring clarified: `score` is the primary continuous
+    cross-domain signal, `grade` the coarse projection (no shape change,
+    back-compatible).
+  - Tests: `tests/test_contracts_generalization.py`,
+    `tests/test_domain_protocol.py` (R1/R2/R11 — software loop unregressed).
+- **Loop-engine domain generalization, Phase A — U10** (same plan):
+  score-based convergence + per-domain variance band, so a domain can converge
+  on a continuous **score target** with noise handling (R3/R6).
+  - **`Budget.target_score: float | None`** (`config.py`): when set, convergence
+    and acceptance decide on the score; when `None`, the letter path is
+    unchanged.
+  - **`convergence.evaluate`** (`loop/convergence.py`): the unbypassable
+    `safety_ok=False → BLOCKED_SAFETY` check stays first; then a score target
+    converges on `score >= target_score` and **skips the letter ladder
+    entirely**; otherwise the existing `grade_rank` path runs unchanged
+    (structural ordering, KTD4).
+  - **`convergence.is_improvement`**: under a score target, keep/rollback is
+    decided on the **score delta vs `min_score_gain`** (not the letter), so a
+    real gain/regression inside one letter band is not masked.
+  - **Score-aware plateau** (`memory/store.py`): new `score_trajectory`;
+    `is_plateaued(..., on_score=True)` ranks the persisted `score` column (falls
+    back to grades if any score is unrecorded). The controller passes
+    `on_score` only when a score target is set, so the software letter-plateau
+    behavior is byte-identical (R2). The "flying turd" guard is otherwise
+    untouched.
+  - **Variance probe** (`adapters/judge.py`): `probe_grade_variance` documented
+    as the multi-seed measurement a stochastic score referee needs — it must run
+    with `min_score_gain ≥ recommended_min_score_gain` (> 0).
+  - Tests: `tests/test_score_convergence.py` (new) + `tests/test_convergence.py`
+    regression pins stay green.
+- **Catalog-to-proof pipeline, Phase A** (plan
+  `docs/plans/2026-06-15-003-feat-catalog-proof-pipeline-plan.md`): turns real
+  clianything.cc / printingpress.dev CLIs into verified before/after loop proofs
+  by adopting them as refine-only baselines — proving the loop's own value, not
+  the generators it wraps.
+  - **Catalog adopter** (`src/loopeng/adopt.py`, U1): installs an already-generated
+    catalog CLI into a workspace as a baseline. Security-first (KTD7): installs
+    into an isolated `--target`/venv dir, spawns the install with a
+    credential-pruned environment so third-party install-time code can't read
+    ambient secrets, pins by a **full 40-char commit SHA** (tags/branches
+    rejected), and only adopts from an allowlisted catalog host. `run_tool` gained
+    an `env=` parameter to support the pruned environment.
+  - **Refine-only loop entrypoint** (`run_refine_loop` in
+    `src/loopeng/autonomous/runner.py`, U2): drives the loop over an
+    already-present tool with no generate step — the controller's initial judge
+    is the recorded "before" baseline (controller unchanged, KTD1). Adds
+    `preflight.missing_for_refine` (gates on judge + refinement engine only, no
+    factory) and stamps wall-clock end via the new `runs.finished` column.
+  - **Proof pack** (`src/loopeng/proof.py`, U3): `ProofPack.from_run` assembles
+    before/after grades, per-dimension score diff, iterations, elapsed, token
+    cost (best-effort; omitted, never faked), and compounded regression tests.
+    `StoreBackedCompounder` records each accepted-fix learning to the store so
+    the proof's regression-test field is real. Result schema extended additively
+    with an optional `proof` block (existing illustrative fixtures still
+    validate). Secret-scan pattern set broadened (bearer/JWT, GCP, HuggingFace,
+    Stripe). `claude -p --output-format json` token usage is now parsed.
+  - **`loop-anything demo proof <id>`** (`src/loopeng/cli.py`, U4): orchestrates
+    adopt → refine loop → proof pack → record. Flips a card to `live_verified`
+    only through the shared `demo record` write path (KTD2); a safety-blocked run
+    is recorded as `blocked_safety`, never as a passing proof (R6). `--dry-run`
+    prints the plan without writing. The showcase now headlines the before/after
+    proof line on verified cards.
+  - **Proof targets** (U5): `arxiv` (first-light), `hackernews`, `wikipedia`
+    manifests (public-API, no-credential, service lane) + self-contained
+    per-target CLI-Judge adapters under `demos/adapters/`. CLI-Judge ships its
+    own generic D1–D5 fixtures, so the adapter is the only target-specific piece.
+    Cards ship in **draft** (no fabricated trajectory) until a real proof runs.
+  - **Gated proof e2e** (`tests/e2e/test_proof_loop.py`, U6): drives the
+    refine-only proof against a real adopted tool; skips (never fails) when the
+    `claude -p` quota, the grader, or the target are absent.
+  - **Docs** (U8): `CONTRIBUTING-demos.md` proof-target section (adopt flags,
+    fixture provenance, human-review + full-SHA rules); `docs/solutions/`
+    decision records (refine-only baseline, provenance honesty, adopter
+    isolation, P0 gate status); `docs/e2e-runbook.md` proof run steps.
+  - **Provider-agnostic LLM refiner** (`src/loopeng/adapters/llm_refiner.py`):
+    a claude-free, quota-free `Refiner` that drives any OpenAI-compatible chat
+    endpoint with a free-tier **fallback chain** (NVIDIA NIM → Groq → Gemini →
+    local Ollama, per the `free-llm` design) using stdlib `urllib` (no new
+    dependency). Edits are applied as jailed full-file rewrites
+    (`within_workspace`); model output is never executed. `demo proof` gains
+    `--refiner claude|llm`; preflight's refine gate drops the compound-engineering
+    requirement for `llm`; the gated proof e2e accepts `LOOPENG_PROOF_REFINER=llm`
+    with a free provider key instead of the `claude -p` quota. This removes the
+    quota as a hard blocker on running a real before/after proof.
 - Project scaffold: `pyproject.toml`, `loop-anything` CLI entrypoint, package
   layout under `src/loopeng/` (U1).
 - `AGENTS.md` agent guide and GitHub Actions CI (pytest on Python 3.11–3.13 for

@@ -41,6 +41,28 @@ def test_refiner_returns_none_when_no_changes(monkeypatch):
     assert ce.ClaudeCodeRefiner().refactor("tool/", _brief()) is None
 
 
+def test_parse_token_cost_sums_usage():
+    out = '{"result": "ok", "usage": {"input_tokens": 1000, "output_tokens": 500}}'
+    assert ce.parse_token_cost(out) == 1500
+
+
+def test_parse_token_cost_none_when_not_json():
+    assert ce.parse_token_cost("done") is None
+    assert ce.parse_token_cost('{"result": "ok"}') is None  # no usage block
+
+
+def test_refiner_captures_last_token_cost(monkeypatch):
+    def fake_run(args, **kw):
+        if args[0] == "claude":
+            return ProcResult(0, '{"usage": {"input_tokens": 200, "output_tokens": 100}}', "")
+        return ProcResult(0, " 1 file changed", "")
+
+    monkeypatch.setattr(ce, "run_tool", fake_run)
+    r = ce.ClaudeCodeRefiner()
+    r.refactor("tool/", _brief())
+    assert r.last_token_cost == 300
+
+
 def test_compounder_invokes_ce_compound(monkeypatch):
     calls = []
     monkeypatch.setattr(ce, "run_tool", lambda args, **kw: calls.append(args) or ProcResult(0, "", ""))

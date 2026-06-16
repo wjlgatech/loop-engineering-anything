@@ -24,12 +24,22 @@ from ..config import Lane
 _SCHEMA_PATH = Path(__file__).resolve().parents[3] / "demos" / "SCHEMA.json"
 
 # Credential-like patterns rejected from any committed manifest/fixture string.
+# Committed proof-pack payload fixtures pass through this scan too, so the set is
+# broadened beyond the original five (security finding) to cover bearer/JWT,
+# cloud, and other common token shapes. A maintained scanner (gitleaks/detect-
+# secrets) as a CI gate is the deferred follow-up; this is the in-process guard.
 _SECRET_PATTERNS = [
-    re.compile(r"AKIA[0-9A-Z]{16}"),            # AWS access key id
-    re.compile(r"ghp_[A-Za-z0-9]{20,}"),          # GitHub PAT
-    re.compile(r"sk-[A-Za-z0-9]{20,}"),           # OpenAI-style key
-    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY"), # PEM private key
-    re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}"),  # Slack token
+    re.compile(r"AKIA[0-9A-Z]{16}"),                  # AWS access key id
+    re.compile(r"ghp_[A-Za-z0-9]{20,}"),              # GitHub PAT
+    re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}"),        # other GitHub token kinds
+    re.compile(r"sk-[A-Za-z0-9-]{20,}"),              # OpenAI / Anthropic (sk-ant-) keys
+    re.compile(r"sk_live_[A-Za-z0-9]{20,}"),          # Stripe live key
+    re.compile(r"hf_[A-Za-z0-9]{20,}"),               # HuggingFace token
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY"),     # PEM private key
+    re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}"),      # Slack token
+    re.compile(r"\"private_key_id\"\s*:"),            # GCP service-account JSON
+    re.compile(r"(?i)bearer\s+[A-Za-z0-9._-]{20,}"),  # bearer token / JWT in a header
+    re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"),  # JWT
 ]
 
 

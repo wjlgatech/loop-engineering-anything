@@ -63,3 +63,43 @@ loop-anything report <run_id>
 
 The e2e test skips (never fails) when these prerequisites are absent, so a green
 default suite does **not** imply the live loop has been exercised.
+
+## 4. Run a refine-only proof on a catalog tool (the proof pipeline)
+
+The proof pipeline adopts an already-built catalog CLI as a baseline and runs
+the loop refine-only (no generate step). It is the `demo proof` path.
+
+```bash
+# 1. dry-run (writes nothing) — confirms the adopt + loop plan:
+loop-anything demo proof arxiv --catalog printing-press --name arxiv \
+    --sha <full-40-char-commit-sha> --install-kind pp_binary --dry-run
+
+# 2a. real run via /ce-work (needs the claude -p quota + the target binary):
+loop-anything demo proof arxiv --catalog printing-press --name arxiv \
+    --sha <full-40-char-commit-sha> --install-kind pp_binary
+
+# 2b. real run WITHOUT claude — the free-tier LLM fallback chain (no quota):
+#     drives NIM -> Groq -> Gemini -> Ollama; set at least one provider key.
+GROQ_API_KEY=gsk_... loop-anything demo proof arxiv --refiner llm \
+    --catalog printing-press --name arxiv \
+    --sha <full-40-char-commit-sha> --install-kind pp_binary
+```
+
+The `--refiner llm` path removes the `claude -p` quota as a blocker. Tune it with
+`LOOPENG_REFINER_CHAIN` (e.g. `groq,gemini,ollama`) and
+`LOOPENG_REFINER_MODEL_<KEY>`. Probe a provider before trusting it (free model
+ids churn — see the `free-llm` skill).
+
+Or drive the gated e2e directly (skips unless all prerequisites are present):
+
+```bash
+export LOOPENG_PROOF_DEMO="arxiv"           # a demo id with demos/adapters/<id>.py
+export LOOPENG_PROOF_BINARY="/path/to/arxiv"  # the adopted tool to grade + refine
+export LOOPENG_PROOF_REFINER="llm"          # "claude" (default) | "llm" (quota-free)
+pytest tests/e2e/test_proof_loop.py -v
+```
+
+Honesty gates apply: a card flips to `live_verified` only via this path against a
+real run; `blocked_safety` and no-gain runs are recorded as-is, never as a
+passing proof. Pin by a **full 40-char commit SHA** (KTD7); tags/branches are
+rejected. The refine half is quota-gated until the `claude -p` window opens.

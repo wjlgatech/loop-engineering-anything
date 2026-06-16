@@ -56,6 +56,37 @@ def test_live_verified_card_shows_trajectory_and_verified_badge(tmp_path):
     assert "demos/results/clinical-trials.report.md" in html
 
 
+def test_verified_card_renders_proof_pack_line(tmp_path):
+    proof = {
+        "before_grade": "C",
+        "after_grade": "A",
+        "dim_diff": {"D3": {"before": 10, "after": 28, "delta": 18}},
+        "iterations": 4,
+        "elapsed_seconds": 38.0,
+    }
+    reg = _registry(
+        tmp_path,
+        [_manifest(result_ref="clinical-trials.json")],
+        [_result(proof=proof)],
+    )
+    html = render_catalog(reg)
+    assert 'class="proof"' in html
+    assert "top: D3 +18" in html
+    assert "4 iters" in html
+    assert "38s" in html
+
+
+def test_illustrative_card_does_not_render_proof_line(tmp_path):
+    proof = {"before_grade": "C", "after_grade": "A", "iterations": 3}
+    reg = _registry(
+        tmp_path,
+        [_manifest(result_ref="clinical-trials.json")],
+        [_result(source="illustrative", proof=proof)],
+    )
+    html = render_catalog(reg)
+    assert 'class="proof"' not in html  # proof line is verified-only
+
+
 def test_illustrative_card_is_badged_not_verified(tmp_path):
     reg = _registry(
         tmp_path,

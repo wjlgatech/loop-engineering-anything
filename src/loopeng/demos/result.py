@@ -28,6 +28,7 @@ class Result:
     report_ref: str | None = None
     recorded_at: str | None = None
     engine_version: str | None = None
+    proof: dict | None = None  # proof pack (live_verified only); see RESULT_SCHEMA.json
 
     @property
     def verified(self) -> bool:
@@ -49,6 +50,7 @@ def from_dict(data: dict) -> Result:
         report_ref=data.get("report_ref"),
         recorded_at=data.get("recorded_at"),
         engine_version=data.get("engine_version"),
+        proof=data.get("proof"),
     )
 
 

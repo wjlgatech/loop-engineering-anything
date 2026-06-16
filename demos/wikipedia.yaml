@@ -1,0 +1,11 @@
+id: wikipedia
+title: Wikipedia CLI (Printing-Press) — refine-loop proof
+domain: Reference / encyclopedic search
+target: https://en.wikipedia.org/api/rest_v1
+lane: service
+goal: raise the published Wikipedia CLI to Grade A — section extraction, language fallback, offline cache
+kind: demo
+contributor: wjlgatech
+exit_criteria:
+  target_grade: A
+  max_iterations: 10

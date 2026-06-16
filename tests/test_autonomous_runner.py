@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from loopeng.adapters.base import GenerateResult, Verdict
-from loopeng.autonomous.runner import run_loop
+from loopeng.autonomous.runner import run_loop, run_refine_loop
 from loopeng.autonomous.report import render_report
 from loopeng.config import Budget, Config
 from loopeng.loop.checkpoint import NoopCheckpoint
@@ -99,3 +99,62 @@ def test_blocked_safety_reported(store, tmp_path):
     assert result.outcome.final_state is LoopState.BLOCKED_SAFETY
     report = render_report(store, result.run_id)
     assert "blocked_safety" in report
+
+
+# ----- U2: refine-only loop (proof pipeline) -----------------------------
+
+
+def _refine(store, tool_path, judge, *, budget=None, check_missing=None, compounder=None, ws=None):
+    return run_refine_loop(
+        tool_path,
+        "improve it",
+        judge=judge,
+        refiner=FakeRefiner(),
+        compounder=compounder or RecordingCompounder(),
+        store=store,
+        workspace_root=ws or str(tool_path),
+        budget=budget or Budget(target_grade="A"),
+        checkpoint=NoopCheckpoint(),
+        check_missing=check_missing or (lambda: []),
+    )
+
+
+def test_refine_only_records_before_baseline_and_after(store, tmp_path):
+    tool = tmp_path / "ws" / "adopted"
+    tool.mkdir(parents=True)
+    result = _refine(store, str(tool), ScriptedJudge([v("C"), v("B"), v("A")]), ws=str(tmp_path / "ws"))
+    assert result.outcome.final_state is LoopState.CONVERGED
+    traj = store.grade_trajectory(result.run_id)
+    assert traj[0] == "C"  # the adopted tool, judged as-is = baseline
+    assert traj[-1] == "A"
+    # wall-clock end stamped for the proof pack
+    assert store.get_run(result.run_id).finished is not None
+
+
+def test_refine_only_rejects_tool_outside_workspace(store, tmp_path):
+    with pytest.raises(ValueError, match="outside the workspace"):
+        _refine(store, "/etc", ScriptedJudge([v("A")]), ws=str(tmp_path / "ws"))
+
+
+def test_refine_only_preflight_gate(store, tmp_path):
+    tool = tmp_path / "ws" / "adopted"
+    tool.mkdir(parents=True)
+    blocked = [ToolStatus("cli-judge", "CLI-Judge", False, "not on PATH")]
+    with pytest.raises(RuntimeError, match="preflight"):
+        _refine(store, str(tool), ScriptedJudge([v("A")]), ws=str(tmp_path / "ws"),
+                check_missing=lambda: blocked)
+
+
+def test_refine_only_blocked_safety_at_baseline(store, tmp_path):
+    tool = tmp_path / "ws" / "adopted"
+    tool.mkdir(parents=True)
+    result = _refine(store, str(tool), ScriptedJudge([v("C", safety_ok=False)]), ws=str(tmp_path / "ws"))
+    assert result.outcome.final_state is LoopState.BLOCKED_SAFETY
+
+
+def test_refine_only_already_grade_a_converges_at_baseline(store, tmp_path):
+    tool = tmp_path / "ws" / "adopted"
+    tool.mkdir(parents=True)
+    result = _refine(store, str(tool), ScriptedJudge([v("A")]), ws=str(tmp_path / "ws"))
+    assert result.outcome.final_state is LoopState.CONVERGED
+    assert result.outcome.iterations == 1  # nothing to prove; converged as-is

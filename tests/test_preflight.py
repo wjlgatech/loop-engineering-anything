@@ -82,3 +82,22 @@ def test_cli_preflight_lane_gate_exits_nonzero_when_blocked(none_present):
     result = CliRunner().invoke(main, ["preflight", "--lane", "service"])
     assert result.exit_code == 1
     assert "blocked" in result.output.lower()
+
+
+def test_refine_keys_claude_requires_compound_engineering():
+    keys = pf.required_keys_for_refine("claude")
+    assert "cli-judge" in keys
+    assert "compound-engineering" in keys
+    assert "printing-press" not in keys and "cli-anything" not in keys  # no factory
+
+
+def test_refine_keys_llm_drops_compound_engineering():
+    keys = pf.required_keys_for_refine("llm")
+    assert "cli-judge" in keys
+    assert "compound-engineering" not in keys  # LLM refiner needs no claude
+
+
+def test_missing_for_refine_llm_ignores_absent_compound_engineering(none_present):
+    blocked = {s.key for s in pf.missing_for_refine(refiner="llm")}
+    assert "compound-engineering" not in blocked
+    assert "cli-judge" in blocked

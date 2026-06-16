@@ -34,6 +34,7 @@ class Run:
     status: str
     final_grade: str | None
     started: str
+    finished: str | None = None
 
 
 @dataclass
@@ -47,6 +48,7 @@ class Iteration:
     safety_ok: bool
     token_cost: int | None
     diff_ref: str | None
+    score: float | None = None
 
 
 class MemoryStore:
@@ -57,7 +59,21 @@ class MemoryStore:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(_SCHEMA.read_text())
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Additive, idempotent migrations for DBs created before a column existed.
+
+        ``CREATE TABLE IF NOT EXISTS`` won't add columns to a pre-existing table,
+        so add any missing nullable columns here (proof-pack ``runs.finished``).
+        """
+        cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(runs)").fetchall()}
+        if "finished" not in cols:
+            self._conn.execute("ALTER TABLE runs ADD COLUMN finished TEXT")
+        it_cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(iterations)").fetchall()}
+        if "score" not in it_cols:
+            self._conn.execute("ALTER TABLE iterations ADD COLUMN score REAL")
 
     @classmethod
     def default(cls) -> "MemoryStore":
@@ -83,6 +99,13 @@ class MemoryStore:
         )
         self._conn.commit()
 
+    def record_finished(self, run_id: int, finished: str) -> None:
+        """Stamp the run's wall-clock end (ISO-8601). Set by the runner after
+        ``controller.run`` returns, since ``finish_run`` fires inside the
+        controller and the runner owns the elapsed measurement (proof-pack)."""
+        self._conn.execute("UPDATE runs SET finished = ? WHERE id = ?", (finished, run_id))
+        self._conn.commit()
+
     def get_run(self, run_id: int) -> Run | None:
         row = self._conn.execute("SELECT * FROM runs WHERE id = ?", (run_id,)).fetchone()
         return self._row_to_run(row) if row else None
@@ -103,15 +126,17 @@ class MemoryStore:
         failing_fixtures: list | None = None,
         token_cost: int | None = None,
         diff_ref: str | None = None,
+        score: float | None = None,
     ) -> int:
         cur = self._conn.execute(
             """INSERT INTO iterations
-               (run_id, n, grade, dims_json, failing_fixtures_json, safety_ok, token_cost, diff_ref)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               (run_id, n, grade, score, dims_json, failing_fixtures_json, safety_ok, token_cost, diff_ref)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 run_id,
                 n,
                 grade,
+                score,
                 json.dumps(dims),
                 json.dumps(failing_fixtures or []),
                 1 if safety_ok else 0,
@@ -152,15 +177,36 @@ class MemoryStore:
         """Ordered list of grades across the run's iterations (R6 trend)."""
         return [it.grade for it in self.iterations(run_id)]
 
-    def is_plateaued(self, run_id: int, patience: int) -> bool:
-        """True if the last ``patience`` iterations did not beat the best grade
+    def score_trajectory(self, run_id: int) -> list[float | None]:
+        """Ordered list of continuous scores across the run's iterations (U10).
+
+        Entries are ``None`` for legacy rows written before the score column.
+        """
+        return [it.score for it in self.iterations(run_id)]
+
+    def is_plateaued(self, run_id: int, patience: int, *, on_score: bool = False) -> bool:
+        """True if the last ``patience`` iterations did not beat the best value
         achieved before that window. Needs more than ``patience`` iterations to
-        evaluate -- fewer means not plateaued."""
-        grades = [grade_rank(g) for g in self.grade_trajectory(run_id)]
-        if patience < 1 or len(grades) <= patience:
+        evaluate -- fewer means not plateaued.
+
+        ``on_score`` selects the trajectory used for the no-gain test: by default
+        the letter-grade ladder (unchanged software behavior, R2); when a domain
+        runs under a continuous score target, the persisted ``score`` column so a
+        score-only domain plateaus on real reward instead of a constant projected
+        grade rank (U10/KTD4). Falls back to grades if any score is unrecorded.
+        """
+        if on_score:
+            scores = self.score_trajectory(run_id)
+            if scores and all(s is not None for s in scores):
+                values: list[float] = scores  # type: ignore[assignment]
+            else:
+                values = [grade_rank(g) for g in self.grade_trajectory(run_id)]
+        else:
+            values = [grade_rank(g) for g in self.grade_trajectory(run_id)]
+        if patience < 1 or len(values) <= patience:
             return False
-        best_before = max(grades[:-patience])
-        recent_best = max(grades[-patience:])
+        best_before = max(values[:-patience])
+        recent_best = max(values[-patience:])
         return recent_best <= best_before
 
     def recurring_failures(self, min_runs: int = 2) -> list[tuple[str, int]]:
@@ -191,6 +237,7 @@ class MemoryStore:
             status=row["status"],
             final_grade=row["final_grade"],
             started=row["started"],
+            finished=row["finished"],
         )
 
     @staticmethod
@@ -205,4 +252,5 @@ class MemoryStore:
             safety_ok=bool(row["safety_ok"]),
             token_cost=row["token_cost"],
             diff_ref=row["diff_ref"],
+            score=row["score"],
         )

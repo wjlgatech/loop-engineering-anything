@@ -49,10 +49,22 @@ class ProcResult:
         return self.returncode == 0 and not self.timed_out
 
 
-def run_tool(args: list[str], *, cwd: str | None = None, timeout: float | None = None) -> ProcResult:
+def run_tool(
+    args: list[str],
+    *,
+    cwd: str | None = None,
+    timeout: float | None = None,
+    env: dict[str, str] | None = None,
+) -> ProcResult:
     """Run an external tool with ``shell=False``. Never raises for tool failure,
     timeout, or a missing executable -- those are normalized into ``ProcResult``
-    so adapters return a structured result instead of leaking a stack trace."""
+    so adapters return a structured result instead of leaking a stack trace.
+
+    ``env`` lets callers pass an explicit (e.g. credential-pruned) environment.
+    When ``None`` the process inherits the parent environment, as before. The
+    adopter (KTD7) passes a pruned env so install-time code from a third-party
+    package cannot read ambient secrets like ``ANTHROPIC_API_KEY``.
+    """
     try:
         cp = subprocess.run(
             args,
@@ -61,6 +73,7 @@ def run_tool(args: list[str], *, cwd: str | None = None, timeout: float | None =
             text=True,
             timeout=timeout,
             shell=False,
+            env=env,
         )
         return ProcResult(cp.returncode, cp.stdout, cp.stderr)
     except subprocess.TimeoutExpired as exc:

@@ -1,0 +1,11 @@
+id: arxiv
+title: arXiv search CLI (Printing-Press) — refine-loop proof
+domain: Research / scholarly search
+target: https://export.arxiv.org/api
+lane: service
+goal: raise the published arXiv CLI to Grade A — pagination, query handling, and offline cache
+kind: demo
+contributor: wjlgatech
+exit_criteria:
+  target_grade: A
+  max_iterations: 10

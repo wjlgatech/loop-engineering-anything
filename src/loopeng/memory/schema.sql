@@ -9,14 +9,16 @@ CREATE TABLE IF NOT EXISTS runs (
     goal        TEXT,
     status      TEXT NOT NULL DEFAULT 'running',  -- running|converged|blocked_safety|stopped
     final_grade TEXT,
-    started     TEXT NOT NULL                      -- ISO-8601, supplied by caller
+    started     TEXT NOT NULL,                     -- ISO-8601, supplied by caller
+    finished    TEXT                               -- ISO-8601 wall-clock end (proof-pack elapsed); nullable
 );
 
 CREATE TABLE IF NOT EXISTS iterations (
     id                   INTEGER PRIMARY KEY AUTOINCREMENT,
     run_id               INTEGER NOT NULL REFERENCES runs(id),
     n                    INTEGER NOT NULL,          -- iteration index within the run
-    grade                TEXT NOT NULL,
+    grade                TEXT NOT NULL,             -- coarse letter (every domain projects onto it, KTD1)
+    score                REAL,                      -- primary continuous signal; nullable for legacy rows (U9)
     dims_json            TEXT NOT NULL,             -- per-dimension scores
     failing_fixtures_json TEXT NOT NULL DEFAULT '[]',
     safety_ok            INTEGER NOT NULL,          -- 0/1
