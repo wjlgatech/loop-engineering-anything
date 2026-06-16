@@ -107,8 +107,10 @@ def _demo_card(manifest, result, base_url: str = "") -> str:
     if result is None:
         body = (
             '<p class="traj" aria-label="not yet run">&mdash; not yet run &mdash;</p>'
+            '<div class="badges">'
             '<span class="badge grade g-q" aria-label="no grade yet">?</span>'
             '<span class="badge prov draft">draft</span>'
+            '</div>'
         )
     else:
         grade_cls = _GRADE_CLASS.get(result.final_grade, "g-q")
@@ -125,9 +127,10 @@ def _demo_card(manifest, result, base_url: str = "") -> str:
             f'<p class="traj" aria-label="grade trajectory {_a(" to ".join(result.grade_trajectory))}">'
             f'{_trajectory(result)}</p>'
             f'{_proof_line(result) if result.verified else ""}'
+            f'<div class="badges">'
             f'<span class="badge grade {grade_cls}">{_t(result.final_grade)}</span>'
             f'<span class="badge conv {_a(result.convergence_status)}">{_t(result.convergence_status)}</span>'
-            f'{prov}{report}'
+            f'{prov}</div>{report}'
         )
     foot = f'<p class="by">{_t("by @" + manifest.contributor) if manifest.contributor else ""}</p></article>'
     return head + body + foot
@@ -142,7 +145,7 @@ def _recipe_card(manifest, base_url: str = "") -> str:
         f'<h3>{_t(manifest.title)}</h3>'
         f'<p class="domain">{_t(manifest.domain)}</p>'
         f'<p class="goal">{_t(manifest.goal)}</p>'
-        f'<span class="badge prov recipe">recipe &mdash; not runnable yet</span>{link}</article>'
+        f'<div class="badges"><span class="badge prov recipe">recipe &mdash; not runnable yet</span></div>{link}</article>'
     )
 
 
@@ -157,35 +160,78 @@ def _leaderboard(reg: Registry, base_url: str = "") -> str:
 
 
 _CSS = """
-:root{--bg:#0d1117;--card:#161b22;--fg:#e6edf3;--mut:#8b949e;--acc:#58a6ff;--line:#30363d}
-*{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--fg)}
-.wrap{max-width:1080px;margin:0 auto;padding:24px}
-.hero{text-align:center;padding:48px 16px 24px}.hero h1{font-size:2.2rem;margin:.2em 0}
-.hero p{color:var(--mut);max-width:640px;margin:.4em auto}
-.cta{display:inline-block;margin:12px 6px 0;padding:8px 16px;border:1px solid var(--line);border-radius:8px;color:var(--acc);text-decoration:none}
-.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:24px 0}
-.controls input{flex:1;min-width:200px;padding:8px 12px;background:var(--card);border:1px solid var(--line);border-radius:8px;color:var(--fg)}
-.chip{padding:6px 12px;background:var(--card);border:1px solid var(--line);border-radius:20px;color:var(--fg);cursor:pointer;font-size:.85rem}
-.chip[aria-pressed=true]{border-color:var(--acc);color:var(--acc)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
-.card h3{margin:.1em 0;font-size:1.05rem}.card .domain{color:var(--acc);font-size:.8rem;margin:.2em 0}
-.card .target,.card .goal{color:var(--mut);font-size:.85rem;word-break:break-word}
-.traj{font-size:1.3rem;font-weight:600;letter-spacing:1px;margin:.4em 0}
-.proof{font-size:.8rem;color:#9aa4b2;margin:.2em 0 .5em;font-variant-numeric:tabular-nums}
-.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.72rem;margin:2px 4px 2px 0}
-.grade{font-weight:700}.g-a{background:#1a7f37;color:#fff}.g-b{background:#2f6f4f;color:#fff}.g-c{background:#9e6a03;color:#fff}.g-d{background:#bb5a00;color:#fff}.g-f{background:#cf222e;color:#fff}.g-q{background:#30363d;color:var(--mut)}
-.conv{background:#21262d;color:var(--mut)}.conv.blocked_safety{background:#cf222e;color:#fff}
-.prov.verified{background:#1f6feb;color:#fff}.prov.illustrative{background:#30363d;color:#d29922;border:1px solid #d29922}
-.prov.draft{background:#30363d;color:var(--mut)}.prov.recipe{background:#30363d;color:#a371f7;border:1px solid #a371f7}
-.report{display:block;margin-top:8px;color:var(--acc);font-size:.85rem;text-decoration:none}
-.by{color:var(--mut);font-size:.78rem;margin:.5em 0 0}
-.recipes{margin-top:48px;border-top:1px dashed var(--line);padding-top:24px}
-.empty{color:var(--mut);text-align:center;padding:32px}
-.leaderboard{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:8px}.leaderboard li{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 12px}
-.count{color:var(--acc);font-weight:700}
-h2{border-bottom:1px solid var(--line);padding-bottom:6px;margin-top:40px}
-@media(max-width:560px){.grid{grid-template-columns:1fr}.traj{word-break:break-word}}
+:root{
+  --bg:#fbfbfd;--card:#ffffff;--fg:#1a1f29;--mut:#5b6573;--faint:#8a93a3;
+  --acc:#3b5bdb;--acc-soft:#eef1fe;--line:#e6e8ec;--line-2:#d7dbe2;
+  --ok:#1a7f37;--ok-soft:#e8f5ec;--warn:#9a6700;--warn-soft:#fbf3e0;
+  --bad:#cf222e;--bad-soft:#fdeceb;--info:#1f6feb;--info-soft:#e8f1fe;
+  --violet:#7048c4;--violet-soft:#f1ecfb;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0d1117;--card:#161b22;--fg:#e9edf3;--mut:#9aa4b2;--faint:#6e7888;
+  --acc:#7aa2ff;--acc-soft:#18203a;--line:#262c36;--line-2:#333b47;
+  --ok:#3fb950;--ok-soft:#12261a;--warn:#d29922;--warn-soft:#2a2113;
+  --bad:#f0816c;--bad-soft:#2a1715;--info:#58a6ff;--info-soft:#13243d;
+  --violet:#b083f0;--violet-soft:#221a33;
+}}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--sans);font-size:15px;line-height:1.6;background:var(--bg);color:var(--fg);
+  font-feature-settings:"cv05","ss01";-webkit-font-smoothing:antialiased}
+a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px 80px}
+.topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;
+  gap:16px;padding:14px 24px;background:color-mix(in srgb,var(--bg) 86%,transparent);
+  backdrop-filter:saturate(1.4) blur(8px);border-bottom:1px solid var(--line)}
+.topbar .brand{font-weight:650;letter-spacing:-.01em;color:var(--fg)}
+.topbar nav a{color:var(--mut);margin-left:18px;font-size:.9rem}
+.topbar nav a:hover{color:var(--fg);text-decoration:none}
+.hero{text-align:center;padding:72px 16px 40px;max-width:720px;margin:0 auto}
+.eyebrow{font-size:.72rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+.hero h1{font-size:2.6rem;line-height:1.1;letter-spacing:-.03em;font-weight:720;margin:.28em 0 .25em}
+.hero p{color:var(--mut);font-size:1.08rem;max-width:600px;margin:.4em auto 0}
+.cta{display:inline-block;margin:22px 5px 0;padding:9px 18px;border-radius:9px;font-size:.92rem;font-weight:550}
+.cta.primary{background:var(--acc);color:#fff}.cta.primary:hover{text-decoration:none;filter:brightness(1.06)}
+.cta.ghost{border:1px solid var(--line-2);color:var(--fg)}.cta.ghost:hover{text-decoration:none;border-color:var(--mut)}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 28px}
+.controls input{flex:1;min-width:220px;padding:10px 14px;background:var(--card);border:1px solid var(--line);
+  border-radius:10px;color:var(--fg);font-size:.92rem}
+.controls input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+.chip{padding:7px 14px;background:var(--card);border:1px solid var(--line);border-radius:999px;color:var(--mut);
+  cursor:pointer;font-size:.83rem;font-weight:500}
+.chip:hover{border-color:var(--line-2);color:var(--fg)}
+.chip[aria-pressed=true]{background:var(--acc-soft);border-color:transparent;color:var(--acc);font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;
+  display:flex;flex-direction:column;transition:border-color .15s,transform .15s}
+.card:hover{border-color:var(--line-2);transform:translateY(-2px)}
+.card h3{margin:0 0 .5em;font-size:1.06rem;font-weight:620;letter-spacing:-.01em}
+.card .domain{display:inline-block;align-self:flex-start;color:var(--acc);background:var(--acc-soft);
+  font-size:.72rem;font-weight:600;letter-spacing:.02em;padding:2px 9px;border-radius:999px;margin:0 0 .6em}
+.card .target,.card .goal{color:var(--mut);font-size:.86rem;word-break:break-word;margin:0 0 .8em}
+.traj{font-family:var(--mono);font-size:1.18rem;font-weight:600;letter-spacing:.04em;margin:.2em 0 .5em;color:var(--fg)}
+.proof{font-family:var(--mono);font-size:.78rem;color:var(--mut);margin:0 0 .7em;font-variant-numeric:tabular-nums}
+.badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:.71rem;font-weight:600;margin:0 6px 0 0;letter-spacing:.01em}
+.grade{font-variant-numeric:tabular-nums}
+.g-a{background:var(--ok-soft);color:var(--ok)}.g-b{background:var(--ok-soft);color:var(--ok)}
+.g-c{background:var(--warn-soft);color:var(--warn)}.g-d{background:var(--warn-soft);color:var(--warn)}
+.g-f{background:var(--bad-soft);color:var(--bad)}.g-q{background:var(--line);color:var(--mut)}
+.conv{background:var(--line);color:var(--mut)}.conv.blocked_safety{background:var(--bad-soft);color:var(--bad)}
+.prov.verified{background:var(--info-soft);color:var(--info)}
+.prov.illustrative{background:var(--warn-soft);color:var(--warn)}
+.prov.draft{background:var(--line);color:var(--mut)}
+.prov.recipe{background:var(--violet-soft);color:var(--violet)}
+.badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto}
+.report{margin-top:14px;color:var(--acc);font-size:.86rem;font-weight:550}
+.by{color:var(--faint);font-size:.76rem;margin:14px 0 0}
+.recipes{margin-top:64px;padding-top:8px}
+.empty{color:var(--mut);text-align:center;padding:40px;border:1px dashed var(--line-2);border-radius:14px}
+.leaderboard{list-style:none;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:10px}
+.leaderboard li{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font-size:.88rem}
+.count{color:var(--acc);font-weight:700;font-variant-numeric:tabular-nums}
+h2{font-size:1.05rem;font-weight:650;letter-spacing:-.01em;margin:56px 0 18px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+@media(max-width:560px){.wrap{padding:0 16px 56px}.hero{padding:48px 8px 32px}.hero h1{font-size:2.1rem}.grid{grid-template-columns:1fr}.traj{word-break:break-word}}
 """
 
 _JS = """
@@ -234,12 +280,18 @@ def render_catalog(reg: Registry, base_url: str = "") -> str:
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>loop-engineering-anything &mdash; demo showcase</title>
 <style>{_CSS}</style></head>
-<body><div class="wrap">
+<body>
+<div class="topbar">
+<span class="brand">&#9851;&#65039; loop-anything-hub</span>
+<nav><a href="#grid">Demos</a><a href="https://github.com/wjlgatech/loop-engineering-anything">GitHub</a><a href="{contrib}">Contribute</a></nav>
+</div>
+<div class="wrap">
 <header class="hero">
+<p class="eyebrow">loop-engineering-anything</p>
 <h1>Tools that grade themselves better</h1>
 <p>Each demo is a real target our loop made agent-native, then refactored toward Grade A &mdash; generate &rarr; judge &rarr; refactor, with the grade trajectory shown.</p>
-<a class="cta" href="#grid">Browse demos</a>
-<a class="cta" href="{contrib}">Add your own</a>
+<a class="cta primary" href="#grid">Browse demos</a>
+<a class="cta ghost" href="{contrib}">Add your own</a>
 </header>
 <div class="controls" role="search">
 {chips}

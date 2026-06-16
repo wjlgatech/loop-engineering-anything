@@ -5,6 +5,19 @@ All notable changes to this project are documented here, following
 
 ## [Unreleased]
 
+### Changed
+- **loop-anything-hub redesign (dogfooded)** — restyled the self-contained
+  showcase generator (`src/loopeng/showcase/generate.py`) toward the flat,
+  type-led, generous-whitespace pattern of [printingpress.dev](https://printingpress.dev):
+  light canvas with one restrained accent (and a `prefers-color-scheme: dark`
+  variant as the 10×), a sticky top nav, an eyebrow + stronger hero hierarchy,
+  flat bordered cards with subtle hover, pill domain tags, soft-tint badge pills,
+  and a monospace grade trajectory. We dogfooded our own loop: printingpress.dev's
+  pattern was the **judge** (`docs/solutions/showcase-design-rubric.md`), the CSS
+  rewrite was the refactor, and before/after screenshots were the re-judge —
+  graded **C → A** on design while holding the two hard gates (self-containment,
+  context-aware escaping) and all 13 showcase tests.
+
 ### Fixed
 - **U3 retry was dead for `FallbackLLMRefiner`** (follow-up to plan
   `docs/plans/2026-06-16-005-...`, found in code review): the claude-free refiner
