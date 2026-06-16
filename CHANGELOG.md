@@ -54,6 +54,27 @@ All notable changes to this project are documented here, following
     with `min_score_gain ≥ recommended_min_score_gain` (> 0).
   - Tests: `tests/test_score_convergence.py` (new) + `tests/test_convergence.py`
     regression pins stay green.
+- **Loop-engine domain generalization, Phase A — U11** (same plan):
+  domain registry supersedes the router's hard-coded lane heuristics; the two
+  software lanes become registered domains with identical behavior (R2/R11).
+  - **`DomainRegistry`** (`domains/registry.py`, new): `resolve(target, forced=)`
+    asks each registered domain `classify(target)`; a `forced` name overrides;
+    an unmatched target raises listing the registered domains. `REGISTRY` is the
+    default instance the router shim + runner resolve against. A new domain
+    arrives as a `register()` call — never a `router.py`/controller edit.
+  - **Software domains** (`domains/software.py`, new): `software-service`
+    (Printing-Press) and `software-codebase` (CLI-Anything), both refereed by
+    CLI-Judge. The precedence logic (local path > spec > URL) is extracted into
+    one reason-carrying `classify_software` so the router shim and each domain's
+    `classify` cannot drift. Factory/Judge instances stay injected at the runner
+    boundary; the domain names the binding (`lane`/`factory_key`), not the
+    instance.
+  - **`router.route`** (`router.py`): now a thin compatibility shim — handles the
+    forced-lane path, delegates classification to `REGISTRY.resolve`, and adapts
+    the resolved software domain back into the legacy `LaneDecision`. Public API
+    and the actionable `--lane` error message are unchanged; all of
+    `tests/test_router.py` stays green.
+  - Tests: `tests/test_domain_registry.py` (new).
 - **Catalog-to-proof pipeline, Phase A** (plan
   `docs/plans/2026-06-15-003-feat-catalog-proof-pipeline-plan.md`): turns real
   clianything.cc / printingpress.dev CLIs into verified before/after loop proofs

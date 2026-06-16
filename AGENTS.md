@@ -60,8 +60,8 @@ protocol, so the refine engine is selectable:
 |---|---|
 | `src/loopeng/config.py` | budgets, convergence knobs, dependency table |
 | `src/loopeng/preflight.py` | dependency detection (per-mechanism); `missing_for_refine` (no factory) |
-| `src/loopeng/router.py` | target → lane classification (U3) |
-| `src/loopeng/domains/` | domain SDK: the `Domain` plugin protocol — binds Factory\|adopt-baseline + Judge per target so a target can be anything without controller branches (plan-004 U9/U11, KTD1) |
+| `src/loopeng/router.py` | thin shim → `domains.REGISTRY.resolve`, adapts to legacy `LaneDecision` (U3; registry-backed plan-004 U11) |
+| `src/loopeng/domains/` | domain SDK: `Domain` plugin protocol + `DomainRegistry` (classify→resolve, supersedes router heuristics); `software.py` re-homes service/codebase lanes as registered domains. A new domain is a `register()`, never a controller/router edit (plan-004 U9/U11, KTD1/R11) |
 | `src/loopeng/memory/` | SQLite run history + trend/plateau/recurring queries (U2); `runs.finished` wall-clock; `iterations.score` continuous signal + score-aware `is_plateaued(on_score=)` (plan-004 U9/U10) |
 | `src/loopeng/adapters/` | contracts, `safety.py` (subprocess/jail/env-prune), factory + judge shells (U4/U5), `compound_engineering.py` (`/ce-work` refiner), `llm_refiner.py` (claude-free fallback-chain refiner) |
 | `src/loopeng/adopt.py` | catalog tool adopter — venv-isolated, env-pruned, full-SHA-pinned (proof pipeline U1, KTD7) |

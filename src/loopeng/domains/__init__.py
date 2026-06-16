@@ -8,5 +8,6 @@ given target. See ``base.Domain``.
 """
 
 from .base import Domain
+from .registry import REGISTRY, DomainRegistry, default_registry
 
-__all__ = ["Domain"]
+__all__ = ["Domain", "DomainRegistry", "REGISTRY", "default_registry"]

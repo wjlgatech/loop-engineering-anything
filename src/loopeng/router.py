@@ -1,33 +1,24 @@
-"""Target router (U3, R1).
+"""Target router (U3, R1) — now a thin shim over the domain registry (U11).
 
-Classifies a target into a lane and selects the factory:
+Classification lives in the ``DomainRegistry``: ``route`` delegates to it and
+adapts the resolved software domain back into the legacy ``LaneDecision`` its
+callers (CLI, autonomous runner) expect, so a new domain registers without
+touching this file (R11) while existing behavior is byte-identical (R2).
+
   - service lane  -> CLI-Printing-Press: http(s) URL, .har file, or OpenAPI spec
   - codebase lane -> CLI-Anything: local directory or git repo URL
 
 Ambiguous inputs resolve by precedence (local path > spec file > URL); a forced
-``--lane`` always wins. Returns a ``LaneDecision`` carrying the reason so the
+``--lane`` always wins. The ``LaneDecision`` carries the reason so the
 classification is auditable.
 """
 
 from __future__ import annotations
 
-import os
-import re
 from dataclasses import dataclass
 
 from .config import Lane
-
-_OPENAPI_SUFFIXES = (".json", ".yaml", ".yml")
-_HAR_SUFFIX = ".har"
-# A URL that looks like a git repository -> codebase lane, not service.
-_GIT_REPO_URL = re.compile(
-    r"""^(?:https?://|git@)         # scheme
-        (?:github\.com|gitlab\.com|bitbucket\.org|[^/\s]*\bgit\b[^/\s]*)
-        [:/].+                       # owner/repo
-    """,
-    re.VERBOSE | re.IGNORECASE,
-)
-_URL = re.compile(r"^https?://", re.IGNORECASE)
+from .domains.registry import REGISTRY
 
 
 @dataclass(frozen=True)
@@ -59,34 +50,22 @@ def route(target: str, forced_lane: Lane | None = None) -> LaneDecision:
             reason=f"forced via --lane {forced_lane.value}",
         )
 
-    # Precedence 1: an existing local path is a codebase target.
-    if os.path.exists(target):
-        if os.path.isdir(target):
-            return LaneDecision(Lane.CODEBASE, "cli-anything", target, "local directory")
-        lower = target.lower()
-        if lower.endswith(_HAR_SUFFIX):
-            return LaneDecision(Lane.SERVICE, "printing-press", target, "HAR capture file")
-        if lower.endswith(_OPENAPI_SUFFIXES):
-            return LaneDecision(Lane.SERVICE, "printing-press", target, "OpenAPI spec file")
-        # An existing non-spec file is treated as a codebase entry point.
-        return LaneDecision(Lane.CODEBASE, "cli-anything", target, "local file")
+    try:
+        domain = REGISTRY.resolve(target)
+    except ValueError:
+        # Preserve the router's actionable, --lane-aware guidance (R2).
+        raise ValueError(
+            f"could not classify target {target!r}. "
+            "Accepted: a local directory/repo, a .har file, an OpenAPI spec "
+            "(.json/.yaml/.yml), a git repo URL, or an http(s) service URL. "
+            "Use --lane to force a lane."
+        ) from None
 
-    # Precedence 2: spec-like path that does not exist yet (still a spec target).
-    lower = target.lower()
-    if lower.endswith(_HAR_SUFFIX):
-        return LaneDecision(Lane.SERVICE, "printing-press", target, "HAR capture file")
-    if lower.endswith(_OPENAPI_SUFFIXES):
-        return LaneDecision(Lane.SERVICE, "printing-press", target, "OpenAPI spec file")
-
-    # Precedence 3: URLs. A git-repo URL is a codebase; any other URL is a service.
-    if _GIT_REPO_URL.match(target):
-        return LaneDecision(Lane.CODEBASE, "cli-anything", target, "git repository URL")
-    if _URL.match(target) or target.startswith("git@"):
-        return LaneDecision(Lane.SERVICE, "printing-press", target, "service URL")
-
-    raise ValueError(
-        f"could not classify target {target!r}. "
-        "Accepted: a local directory/repo, a .har file, an OpenAPI spec "
-        "(.json/.yaml/.yml), a git repo URL, or an http(s) service URL. "
-        "Use --lane to force a lane."
-    )
+    # The legacy router only ever drives software domains; a non-software domain
+    # (e.g. the sim domain) is resolved through the registry directly, not here.
+    if not hasattr(domain, "lane") or not hasattr(domain, "factory_key"):
+        raise ValueError(
+            f"target {target!r} resolved to domain {domain.name!r}, which is not a "
+            "lane-based software domain — resolve it via the domain registry, not route()."
+        )
+    return LaneDecision(domain.lane, domain.factory_key, target, domain.reason(target))
