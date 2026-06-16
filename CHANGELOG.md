@@ -30,6 +30,20 @@ All notable changes to this project are documented here, following
   so the retry contract is complete. Tests in `tests/test_llm_refiner.py`.
 
 ### Added
+- **Fleet orchestration layer, Phase A — U1: lifecycle state + persistence**
+  (plan `docs/plans/2026-06-16-006-feat-fleet-orchestration-layer-plan.md`): the
+  foundation for coordinating multiple self-improving loops under one goal.
+  - **`src/loopeng/memory/fleet_state.py`** (new): `FleetItemStatus` /
+    `FleetRunStatus` enums + a fail-closed legal-transition guard
+    (`assert_item_transition`) mirroring the controller's `LoopState`, plus
+    `FleetItem` / `FleetRun` dataclasses. Pure data, no IO — lives in `memory/`
+    so the store enforces the guard without a layering cycle.
+  - **`src/loopeng/memory/schema.sql`** + **`store.py`**: new `fleet_runs` /
+    `fleet_items` tables (`CREATE TABLE IF NOT EXISTS`) + `create_fleet`,
+    `set_fleet_status`, `add_fleet_item`, `set_item_status` (guard-enforced),
+    `record_item_outcome`, `fleet_items`, `escalations`, `get_fleet`.
+  - Tests: `tests/test_fleet_state.py` (new) + fleet persistence in
+    `tests/test_memory_store.py`.
 - **Loop-engineering gap-bridges, U6 — name the three deliberate non-gaps**
   (same plan): documents outer-loop sovereignty, single referee of record, and
   the gated human-confirm posture as design choices (each with the failure mode

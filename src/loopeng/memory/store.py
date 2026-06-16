@@ -28,6 +28,14 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 
+from .fleet_state import (
+    FleetItem,
+    FleetItemStatus,
+    FleetRun,
+    FleetRunStatus,
+    assert_item_transition,
+)
+
 _SCHEMA = Path(__file__).with_name("schema.sql")
 
 # Grade ranking for trend/plateau math. CLI-Judge grades A-F (no E in the
@@ -296,6 +304,86 @@ class MemoryStore:
             )
             self._conn.commit()
 
+    # ----- fleet orchestration (plan-006 U1) ------------------------------
+
+    def create_fleet(self, goal: str | None, started: str) -> int:
+        with self._wlock:
+            cur = self._conn.execute(
+                "INSERT INTO fleet_runs (goal, status, started) VALUES (?, 'running', ?)",
+                (goal, started),
+            )
+            self._conn.commit()
+            return int(cur.lastrowid)
+
+    def set_fleet_status(
+        self, fleet_id: int, status: FleetRunStatus | str, finished: str | None = None
+    ) -> None:
+        with self._wlock:
+            self._conn.execute(
+                "UPDATE fleet_runs SET status = ?, finished = ? WHERE id = ?",
+                (FleetRunStatus(status).value, finished, fleet_id),
+            )
+            self._conn.commit()
+
+    def get_fleet(self, fleet_id: int) -> FleetRun | None:
+        with self._wlock:
+            row = self._conn.execute("SELECT * FROM fleet_runs WHERE id = ?", (fleet_id,)).fetchone()
+        return self._row_to_fleet(row) if row else None
+
+    def add_fleet_item(self, fleet_id: int, key: str, depends_on: list | None = None) -> int:
+        with self._wlock:
+            cur = self._conn.execute(
+                "INSERT INTO fleet_items (fleet_id, key, status, depends_on_json) "
+                "VALUES (?, ?, 'pending', ?)",
+                (fleet_id, key, json.dumps(list(depends_on or []))),
+            )
+            self._conn.commit()
+            return int(cur.lastrowid)
+
+    def set_item_status(
+        self, item_id: int, status: FleetItemStatus | str, *, run_id: int | None = None
+    ) -> None:
+        """Transition a fleet item to ``status``, enforcing the legal-transition
+        guard (U1) so every persisted change is legal by construction. ``run_id``
+        is set when a worker run is (re)spawned for the item."""
+        dst = FleetItemStatus(status)
+        with self._wlock:
+            row = self._conn.execute(
+                "SELECT status FROM fleet_items WHERE id = ?", (item_id,)
+            ).fetchone()
+            if row is None:
+                raise KeyError(f"no fleet item {item_id}")
+            assert_item_transition(FleetItemStatus(row["status"]), dst)
+            if run_id is not None:
+                self._conn.execute(
+                    "UPDATE fleet_items SET status = ?, run_id = ? WHERE id = ?",
+                    (dst.value, run_id, item_id),
+                )
+            else:
+                self._conn.execute(
+                    "UPDATE fleet_items SET status = ? WHERE id = ?", (dst.value, item_id)
+                )
+            self._conn.commit()
+
+    def record_item_outcome(self, item_id: int, outcome: dict) -> None:
+        with self._wlock:
+            self._conn.execute(
+                "UPDATE fleet_items SET outcome_json = ? WHERE id = ?",
+                (json.dumps(outcome), item_id),
+            )
+            self._conn.commit()
+
+    def fleet_items(self, fleet_id: int) -> list[FleetItem]:
+        with self._wlock:
+            rows = self._conn.execute(
+                "SELECT * FROM fleet_items WHERE fleet_id = ? ORDER BY id", (fleet_id,)
+            ).fetchall()
+        return [self._row_to_fleet_item(r) for r in rows]
+
+    def escalations(self, fleet_id: int) -> list[FleetItem]:
+        """Only the items awaiting a human (status escalated) for this fleet."""
+        return [i for i in self.fleet_items(fleet_id) if i.status is FleetItemStatus.ESCALATED]
+
     # ----- transcendent queries ------------------------------------------
 
     def grade_trajectory(self, run_id: int) -> list[str]:
@@ -400,6 +488,28 @@ class MemoryStore:
             interval_seconds=row["interval_seconds"],
             last_fired=row["last_fired"],
             last_run_id=row["last_run_id"],
+        )
+
+    @staticmethod
+    def _row_to_fleet(row: sqlite3.Row) -> FleetRun:
+        return FleetRun(
+            id=row["id"],
+            goal=row["goal"],
+            status=FleetRunStatus(row["status"]),
+            started=row["started"],
+            finished=row["finished"],
+        )
+
+    @staticmethod
+    def _row_to_fleet_item(row: sqlite3.Row) -> FleetItem:
+        return FleetItem(
+            id=row["id"],
+            fleet_id=row["fleet_id"],
+            key=row["key"],
+            status=FleetItemStatus(row["status"]),
+            depends_on=json.loads(row["depends_on_json"]),
+            run_id=row["run_id"],
+            outcome=json.loads(row["outcome_json"]) if row["outcome_json"] else None,
         )
 
     @staticmethod
