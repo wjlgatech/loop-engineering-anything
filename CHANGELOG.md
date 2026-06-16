@@ -5,6 +5,17 @@ All notable changes to this project are documented here, following
 
 ## [Unreleased]
 
+### Fixed
+- **U3 retry was dead for `FallbackLLMRefiner`** (follow-up to plan
+  `docs/plans/2026-06-16-005-...`, found in code review): the claude-free refiner
+  never set `last_infra_failure`, so a fully-throttled provider chain (the exact
+  transient case U3's retry was built for) was treated as a clean no-change and
+  rolled back instead of retried. Fix: `FallbackLLMRefiner` now sets
+  `last_infra_failure = (content is None)` — `True` only when the whole chain
+  failed, `False` when a provider answered (even with no usable edits). The
+  attribute is now declared on the `Refiner` protocol alongside `last_token_cost`
+  so the retry contract is complete. Tests in `tests/test_llm_refiner.py`.
+
 ### Added
 - **Loop-engineering gap-bridges, U6 — name the three deliberate non-gaps**
   (same plan): documents outer-loop sovereignty, single referee of record, and

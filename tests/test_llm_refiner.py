@@ -90,6 +90,7 @@ def test_fallback_advances_past_failing_provider(tool, monkeypatch):
     assert calls == ["nim", "groq"]  # advanced past the throttled rung
     assert r.last_provider == "groq"
     assert ref is not None
+    assert r.last_infra_failure is False  # a provider answered -> not an infra failure
 
 
 def test_whole_chain_failure_returns_none(tool, monkeypatch):
@@ -99,12 +100,18 @@ def test_whole_chain_failure_returns_none(tool, monkeypatch):
     monkeypatch.setattr(lr, "_chat", boom)
     r = lr.FallbackLLMRefiner(chain=[_provider(), _provider("gemini")])
     assert r.refactor(str(tool), _brief()) is None
+    # A fully-throttled chain is an INFRA failure the controller must retry (U3),
+    # not a clean no-change -- this is the bug the fix closes.
+    assert r.last_infra_failure is True
 
 
-def test_unparseable_response_returns_none(tool, monkeypatch):
+def test_unparseable_response_is_not_infra_failure(tool, monkeypatch):
+    # A provider answered but the response had no usable edits -> clean no-change,
+    # NOT an infra failure (must not be retried as transient).
     monkeypatch.setattr(lr, "_chat", lambda p, m, *, timeout: "I cannot help with that.")
     r = lr.FallbackLLMRefiner(chain=[_provider()])
     assert r.refactor(str(tool), _brief()) is None
+    assert r.last_infra_failure is False
 
 
 def test_parse_edits_tolerates_json_fence():
