@@ -27,6 +27,50 @@ reality, and refactors until the grade stops climbing — then tells you what it
 
 ---
 
+## 🎯 10+ things you can put in a loop — [loop-anything-hub](https://wjlgatech.github.io/loop-engineering-anything/)
+
+Point the loop at a domain and it turns *"generate once, hope it's good"* into
+*"improve until an independent referee says it's good."* The
+**[loop-anything-hub](https://wjlgatech.github.io/loop-engineering-anything/)** is a
+live catalog of these loops, auto-published from `demos/` on every push — each card
+headlines the **loop outcome** (grade trajectory + convergence + report), which a
+plain CLI gallery can't.
+
+| Domain | What "improving itself" looks like |
+| --- | --- |
+| 🔀 **PR lifecycle** | a loop that drives a PR green — tests, review comments, conflicts — until it merges |
+| ⚖️ **Legal** | clause/contract tooling refined against a rubric of real redlines |
+| 🧪 **Clinical trials** | eligibility/protocol tooling graded against real trial criteria |
+| 🧬 **Biotech** | assay/pipeline CLIs improved against captured lab data |
+| 📈 **Quant** | a strategy/backtest tool refined against held-out market data |
+| 💼 **VC** | deal-screening tooling graded against a real diligence rubric |
+| 🏛️ **Software architecture** | architecture-review CLIs climbing a quality rubric |
+| 🎓 **Education** | tutoring/grading tools refined against answer keys + rubrics |
+| ⚡ **Smart grid** | load/forecast tooling graded against real telemetry |
+| 📦 **Supply chain** | routing/inventory CLIs improved against real logistics data |
+
+> **← Your application here.** Each row is a loop waiting to be built. Add one in a
+> single PR — see [`CONTRIBUTING-demos.md`](CONTRIBUTING-demos.md). Domains beyond the
+> engine's current reach ship as **[loop recipes](docs/recipes/)** (the map, not fake
+> demos); starter cards are badged `illustrative` until a live run is recorded.
+
+```bash
+loop-anything demo list                      # registered demos + recipes
+loop-anything showcase --out showcase.html   # the self-contained gallery
+
+# Turn a real catalog CLI into a verified before/after proof (refine-only):
+loop-anything demo proof <id> --catalog cli-anything --name <entry> \
+    --sha <full-40-char-commit-sha> --install-kind pip_git_subdir --dry-run
+```
+
+> **Proofs validate the refine loop, not the generate frontier.** `demo proof` adopts
+> an *already-generated* catalog CLI as the baseline ("before"), runs the loop
+> (judge → `/ce-work` → re-judge → `/ce-compound`), and records a `live_verified` card
+> with the before/after grade, the per-dimension diff, iterations, and the regression
+> tests it compounded.
+
+---
+
 ## 🧠 Why a loop?
 
 Building agent-native tooling today is a **one-shot act**: generate a CLI, eyeball it, stop.
@@ -195,7 +239,7 @@ loop-engineering-anything/
 │   ├── loop/                  # controller state machine, convergence, brief, compound, GitCheckpoint
 │   └── autonomous/            # research report + autonomous runner
 ├── skills/loop-anything/      # the /loop-anything agent skill
-├── tests/                     # 74 tests — loop dynamics validated against recorded verdicts
+├── tests/                     # 286 tests — loop dynamics validated against recorded verdicts
 └── docs/plans/                # the implementation plan
 ```
 
@@ -210,7 +254,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
 loop-anything preflight        # check the four dependencies
-pytest -q                      # 74 passing
+pytest -q                      # 286 passing
 ```
 
 **Preflight tells you exactly what's wired:**
@@ -293,40 +337,6 @@ live run.
 </div>
 
 ---
-
-## 🖼️ Demos & community showcase — [loop-anything-hub](https://wjlgatech.github.io/loop-engineering-anything/)
-
-The **[loop-anything-hub](https://wjlgatech.github.io/loop-engineering-anything/)** is a
-live GitHub Pages catalog of loops, auto-published from `demos/` on every push to
-`main`. Modeled on [printingpress.dev](https://printingpress.dev) and
-[clianything.cc](https://clianything.cc), but each card headlines the **loop outcome**
-(grade trajectory + convergence + report), which a plain CLI gallery can't.
-
-```bash
-loop-anything demo list                 # registered demos + recipes
-loop-anything demo validate             # the CI gate (manifests + fixtures)
-loop-anything showcase --out showcase.html   # generate the self-contained gallery
-
-# Turn a real catalog CLI into a verified before/after proof (refine-only):
-loop-anything demo proof <id> --catalog cli-anything --name <entry> \
-    --sha <full-40-char-commit-sha> --install-kind pip_git_subdir --dry-run
-```
-
-> **Proofs validate the refine loop, not the generate frontier.** `demo proof`
-> adopts an *already-generated* catalog CLI as the baseline ("before"), runs the
-> loop (judge → `/ce-work` → re-judge → `/ce-compound`), and records a
-> `live_verified` card whose proof pack carries the before/after grade, the
-> per-dimension diff, iterations, and the regression tests it compounded. A
-> live run needs the `claude -p` quota and a per-target CLI-Judge adapter at
-> `demos/adapters/<id>.py`.
-
-Ten starter demos seed the catalog from the *Infinite Improvement Loop* domains
-(PR lifecycle, legal, clinical trials, biotech, quant, VC, software architecture,
-education, smart grid, supply chain), each mapped to a concrete agent-native
-target. Domains beyond the engine's reach ship as **[loop recipes](docs/recipes/)**,
-not fake demos. Starter results are `illustrative` (badged as not-a-verified-run)
-until a live run is recorded. Add your own in one PR — see
-[`CONTRIBUTING-demos.md`](CONTRIBUTING-demos.md).
 
 ## 🤝 Contributing
 
