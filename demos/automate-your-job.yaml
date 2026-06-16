@@ -1,0 +1,10 @@
+id: automate-your-job
+title: Automate-your-own-job-first loop
+domain: Personal automation & DX
+target: your team's internal API, runbook, or repo for a repetitive role
+lane: codebase
+goal: build an agent-native CLI that does the repetitive 60% of a role, judged against
+  real captured task payloads and refactored until it reliably passes — so you own the
+  automation instead of being erased by it
+kind: recipe
+contributor: wjlgatech
