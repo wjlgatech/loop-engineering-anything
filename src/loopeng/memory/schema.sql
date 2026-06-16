@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS iterations (
     id                   INTEGER PRIMARY KEY AUTOINCREMENT,
     run_id               INTEGER NOT NULL REFERENCES runs(id),
     n                    INTEGER NOT NULL,          -- iteration index within the run
-    grade                TEXT NOT NULL,
+    grade                TEXT NOT NULL,             -- coarse letter (every domain projects onto it, KTD1)
+    score                REAL,                      -- primary continuous signal; nullable for legacy rows (U9)
     dims_json            TEXT NOT NULL,             -- per-dimension scores
     failing_fixtures_json TEXT NOT NULL DEFAULT '[]',
     safety_ok            INTEGER NOT NULL,          -- 0/1

@@ -145,6 +145,7 @@ class LoopController:
             safety_ok=verdict.safety_ok,
             failing_fixtures=verdict.failing_fixtures,
             diff_ref=diff_ref,
+            score=verdict.score,
         )
 
     def _finish(self, run_id: int, decision: cv.Decision, verdict: Verdict, n: int) -> LoopOutcome:

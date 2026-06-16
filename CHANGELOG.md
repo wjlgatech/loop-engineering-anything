@@ -6,6 +6,29 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Loop-engine domain generalization, Phase A — U9** (plan
+  `docs/plans/2026-06-15-004-feat-loop-engine-domain-generalization-plan.md`):
+  widen the loop's contracts so a target can be *any* domain, not just code,
+  with **no new states or branches in `loop/controller.py`** (KTD1).
+  - **`Domain` plugin protocol** (`src/loopeng/domains/base.py`, new): binds a
+    target shape to its adapters via `classify`/`name`/`dependencies`,
+    `factory() -> Factory | None` (`None` = refine-only adopt-as-baseline, KTD5),
+    and `judge() -> Judge`. The cross-domain safety signal stays on
+    `Verdict.safety_ok` (the judge owns per-domain derivation, KTD2), so it is
+    not a separate accessor. Imports only the adapter protocols — never the
+    controller.
+  - **Persisted `score`** (`memory/schema.sql`, `memory/store.py`): `iterations`
+    gains a nullable `score REAL` column (additive + idempotent migration for
+    pre-existing DBs), threaded through `record_iteration`/`Iteration` and from
+    the controller's `_record`. `grade` stays `NOT NULL` — every domain projects
+    its native signal onto **both** `score` (primary) and a coarse `grade`
+    letter, so the controller, `LoopOutcome`, and the NOT-NULL schema are
+    untouched. Legacy `score=NULL` rows still read.
+  - `Verdict` docstring clarified: `score` is the primary continuous
+    cross-domain signal, `grade` the coarse projection (no shape change,
+    back-compatible).
+  - Tests: `tests/test_contracts_generalization.py`,
+    `tests/test_domain_protocol.py` (R1/R2/R11 — software loop unregressed).
 - **Catalog-to-proof pipeline, Phase A** (plan
   `docs/plans/2026-06-15-003-feat-catalog-proof-pipeline-plan.md`): turns real
   clianything.cc / printingpress.dev CLIs into verified before/after loop proofs

@@ -48,6 +48,7 @@ class Iteration:
     safety_ok: bool
     token_cost: int | None
     diff_ref: str | None
+    score: float | None = None
 
 
 class MemoryStore:
@@ -70,6 +71,9 @@ class MemoryStore:
         cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(runs)").fetchall()}
         if "finished" not in cols:
             self._conn.execute("ALTER TABLE runs ADD COLUMN finished TEXT")
+        it_cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(iterations)").fetchall()}
+        if "score" not in it_cols:
+            self._conn.execute("ALTER TABLE iterations ADD COLUMN score REAL")
 
     @classmethod
     def default(cls) -> "MemoryStore":
@@ -122,15 +126,17 @@ class MemoryStore:
         failing_fixtures: list | None = None,
         token_cost: int | None = None,
         diff_ref: str | None = None,
+        score: float | None = None,
     ) -> int:
         cur = self._conn.execute(
             """INSERT INTO iterations
-               (run_id, n, grade, dims_json, failing_fixtures_json, safety_ok, token_cost, diff_ref)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               (run_id, n, grade, score, dims_json, failing_fixtures_json, safety_ok, token_cost, diff_ref)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 run_id,
                 n,
                 grade,
+                score,
                 json.dumps(dims),
                 json.dumps(failing_fixtures or []),
                 1 if safety_ok else 0,
@@ -225,4 +231,5 @@ class MemoryStore:
             safety_ok=bool(row["safety_ok"]),
             token_cost=row["token_cost"],
             diff_ref=row["diff_ref"],
+            score=row["score"],
         )

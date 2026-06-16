@@ -14,11 +14,15 @@ from typing import Protocol, runtime_checkable
 
 @dataclass(frozen=True)
 class Verdict:
-    """A CLI-Judge result, normalized (U5, R2/R3).
+    """A referee result, normalized across domains (U5/U9, R2/R3).
 
-    ``safety_ok`` is the strict safety-gate signal: ``False`` whenever the
-    safety dimension failed OR the grade was capped at C by the gate. The
-    controller treats ``safety_ok=False`` as terminal (KTD5, R3).
+    ``score`` is the **primary continuous signal** every domain projects onto;
+    ``grade`` is a coarse letter every domain also projects (software uses
+    CLI-Judge's native letter, a sim domain bands mean reward), kept non-null so
+    the controller / ``LoopOutcome`` / NOT-NULL schema stay untouched (KTD1).
+    ``dims`` is a free-form per-dimension dict. ``safety_ok`` is the single
+    cross-domain safety signal: ``False`` whenever a safety dimension failed OR
+    the gate capped the grade; the controller treats it as terminal (KTD5, R3).
     """
 
     grade: str
