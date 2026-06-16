@@ -1,0 +1,3 @@
+Fleet #1  status=converged  goal=ship a product solo: an API CLI + a daily digest that depends on it
+  - product-api      converged  grade=A
+  - daily-digest     converged  grade=A  deps=product-api

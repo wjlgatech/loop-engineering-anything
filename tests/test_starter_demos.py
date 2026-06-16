@@ -30,7 +30,7 @@ PROOF_TARGET_IDS = {"arxiv", "hackernews", "wikipedia"}
 # Graduated self-contained demos: recipes that became real, `live_verified` demos
 # via an actual F->A loop run + `demo record` (a third cohort, distinct from the 10
 # article starters and the catalog proof-targets). These legitimately ship verified.
-GRADUATED_DEMO_IDS = {"automate-your-job", "factcli"}
+GRADUATED_DEMO_IDS = {"automate-your-job", "factcli", "one-person-industrial-engine"}
 
 
 def _reg():

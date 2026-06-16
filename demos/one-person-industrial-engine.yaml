@@ -1,9 +1,11 @@
 id: one-person-industrial-engine
 title: One-person industrial engine (fleet loop)
 domain: Solo founder / one-person company
-target: a product's surface — its API client, codebase, and docs site
+target: a 2-slice product fleet — an API CLI and a dependent daily-digest CLI
 lane: codebase
-goal: a coordinated fleet of loops, each making one product slice agent-native and
-  grading it to A under one goal, so a single person ships what used to require a team
-kind: recipe
+goal: a coordinated fleet of loops, one per product slice, each graded to A under one
+  goal in dependency order with upstream outcomes routed downstream — so one person ships
+  what used to require a team
+kind: demo
 contributor: wjlgatech
+result_ref: one-person-industrial-engine.json
