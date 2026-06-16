@@ -1,0 +1,11 @@
+{
+  "_comment": "A captured task payload: one real day of raw activity a team-lead used to hand-turn into a standup digest. The loop's target must reproduce that digest.",
+  "events": [
+    {"type": "commit", "msg": "fix pagination drift in the reports API"},
+    {"type": "pr", "msg": "opened #214: standup digest CLI"},
+    {"type": "review", "msg": "reviewed #209 and left 3 comments"},
+    {"type": "note", "msg": "blocked on staging DB creds from infra"},
+    {"type": "plan", "msg": "wire the CLI-Judge adapter and record a real run"},
+    {"type": "plan", "msg": "pair with Sam on the retry backoff"}
+  ]
+}

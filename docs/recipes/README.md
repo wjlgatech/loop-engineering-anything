@@ -28,5 +28,7 @@ CLI-Judge adapter, then `loop-anything demo record` a real run.
 - [Predictive grid dispatch](smart-grid-dispatch.md)
 - [Autonomous logistics reroute](supply-chain-reroute.md)
 - [Trial-protocol refinement](clinical-trial-protocol.md)
-- [Automate-your-own-job-first loop](automate-your-job.md)
 - [One-person industrial engine](one-person-industrial-engine.md)
+
+> _Graduated:_ **Automate-your-own-job-first** is now a runnable, `live_verified`
+> demo (a real F→A run) — see `demos/targets/standup/PROOF.md`.

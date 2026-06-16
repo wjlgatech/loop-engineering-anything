@@ -1,0 +1,17 @@
+{
+  "$schema": "../../schemas/task.schema.json",
+  "id": "d2.standup.digest",
+  "dimension": "D2",
+  "title": "standup digest must structure captured activity into yesterday/today/blockers",
+  "fixture": "fixtures/ayj/standup_digest.fixture.json",
+  "call": { "argv": ["standup", "digest", "--json"] },
+  "assert": [
+    { "kind": "stdout_is_json" },
+    { "kind": "stdout_json_path", "path": "yesterday", "op": "exists" },
+    { "kind": "stdout_json_path", "path": "today", "op": "exists" },
+    { "kind": "stdout_json_path", "path": "blockers", "op": "array_len_gt", "value": 0 },
+    { "kind": "stdout_contains", "value": "staging DB creds" }
+  ],
+  "points": 10,
+  "provenance": "loop-engineering-anything/automate-your-job"
+}

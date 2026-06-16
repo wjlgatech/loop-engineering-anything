@@ -6,6 +6,19 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **`automate-your-job` graduated from recipe → live `live_verified` demo** — the
+  first recipe to become a real, recorded run. A team-lead's repetitive task
+  (turn a captured day of activity into a standup digest) was handed to the loop:
+  the real `cli-judge` referee graded it against the **captured task payload**
+  (`demos/targets/standup/activity.json`) and the free-tier `FallbackLLMRefiner`
+  (Gemini, no Anthropic) refactored the buggy CLI **F(0) → A(100)**, trajectory
+  `F → A`, converged in 2 iterations. Recorded via `loop-anything demo record`
+  (the only path to `live_verified`, KTD2). Ships the runnable target
+  (`demos/targets/standup/`), adapter (`demos/adapters/automate-your-job.py`),
+  suite + captured-payload task (`demos/suites/`), result + report
+  (`demos/results/automate-your-job.*`), and `PROOF.md`. The hub now shows its
+  first **verified-run** card (14 demos / 6 recipes). New cohort recognized in
+  `tests/test_starter_demos.py` (the 10 article starters still ship illustrative).
 - **Two agency-themed loop recipes in the hub** — from an external AI-agency
   brainstorm, kept only the ideas that actually map to a loop engine (the rest
   were consumer/psych products, off-identity): `demos/automate-your-job.yaml` +
