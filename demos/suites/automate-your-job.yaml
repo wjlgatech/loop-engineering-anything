@@ -1,0 +1,5 @@
+name: automate-your-job
+description: Automate-your-own-job-first — standup digest graded against a captured task payload.
+tasks:
+  - d2.standup.digest
+  - d2.repl.banner_signature

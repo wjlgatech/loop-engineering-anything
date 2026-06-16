@@ -1,0 +1,9 @@
+{
+  "$schema": "../../schemas/fixture.schema.json",
+  "id": "standup_digest",
+  "type": "subprocess_transcript",
+  "provenance": "loop-engineering-anything/automate-your-job",
+  "description": "The target reads its own captured activity.json; this fixture documents the case (no replay needed).",
+  "synthetic": false,
+  "transcript": {}
+}

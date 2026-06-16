@@ -27,13 +27,21 @@ SHIPPED_DOMAINS = {
 # they ship WITHOUT a fixture (draft) and earn a card only via a real `demo proof`.
 PROOF_TARGET_IDS = {"arxiv", "hackernews", "wikipedia"}
 
+# Graduated self-contained demos: recipes that became real, `live_verified` demos
+# via an actual F->A loop run + `demo record` (a third cohort, distinct from the 10
+# article starters and the catalog proof-targets). These legitimately ship verified.
+GRADUATED_DEMO_IDS = {"automate-your-job"}
+
 
 def _reg():
     return Registry.load()  # the real repo demos/ directory
 
 
 def _starters(reg):
-    return [m for m in reg.demos() if m.id not in PROOF_TARGET_IDS]
+    return [
+        m for m in reg.demos()
+        if m.id not in PROOF_TARGET_IDS and m.id not in GRADUATED_DEMO_IDS
+    ]
 
 
 def test_all_manifests_and_fixtures_validate():
@@ -63,6 +71,17 @@ def test_proof_targets_are_draft_or_illustrative_never_unearned_verified():
         assert result is None or result.source != "live_verified", (
             f"{demo_id} must not be live_verified without a real run"
         )
+
+
+def test_graduated_demo_is_live_verified():
+    # The first recipe to graduate: automate-your-job earned a real, recorded run.
+    reg = _reg()
+    for demo_id in GRADUATED_DEMO_IDS:
+        assert demo_id in reg.manifests, f"{demo_id} manifest missing"
+        result = reg.result_for(reg.manifests[demo_id])
+        assert result is not None, f"{demo_id} has no recorded result"
+        assert result.source == "live_verified", f"{demo_id} must be live_verified (a real run)"
+        assert result.final_grade == "A", f"{demo_id} recorded grade should be A"
 
 
 def test_domains_match_shipped_set_and_credentials_declared():

@@ -1,0 +1,12 @@
+{
+  "demo_id": "automate-your-job",
+  "source": "live_verified",
+  "grade_trajectory": [
+    "F",
+    "A"
+  ],
+  "final_grade": "A",
+  "convergence_status": "converged",
+  "report_ref": "automate-your-job.report.md",
+  "engine_version": "0.1.0"
+}

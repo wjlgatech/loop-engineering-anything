@@ -1,0 +1,67 @@
+{
+  "suite": "automate-your-job",
+  "adapter": "automate-your-job",
+  "score": 0.0,
+  "grade": "F",
+  "safety_blocker": false,
+  "points": 0.0,
+  "max_points": 13.0,
+  "dimensions": {
+    "D2": {
+      "points": 0.0,
+      "max_points": 13.0
+    }
+  },
+  "tasks": [
+    {
+      "id": "d2.standup.digest",
+      "dimension": "D2",
+      "points": 0.0,
+      "max_points": 10.0,
+      "provenance": "loop-engineering-anything/automate-your-job",
+      "findings": [
+        {
+          "severity": "friction",
+          "code": "D2_STDOUT_IS_JSON",
+          "message": "stdout_is_json failed",
+          "evidence": "stdout not valid JSON"
+        },
+        {
+          "severity": "friction",
+          "code": "D2_STDOUT_JSON_PATH",
+          "message": "stdout_json_path failed",
+          "evidence": "stdout not JSON"
+        },
+        {
+          "severity": "friction",
+          "code": "D2_STDOUT_JSON_PATH",
+          "message": "stdout_json_path failed",
+          "evidence": "stdout not JSON"
+        },
+        {
+          "severity": "friction",
+          "code": "D2_STDOUT_JSON_PATH",
+          "message": "stdout_json_path failed",
+          "evidence": "stdout not JSON"
+        }
+      ],
+      "exit_code": 0
+    },
+    {
+      "id": "d2.repl.banner_signature",
+      "dimension": "D2",
+      "points": 0.0,
+      "max_points": 3.0,
+      "provenance": "HKUDS/CLI-Anything#278",
+      "findings": [
+        {
+          "severity": "friction",
+          "code": "D2_EXIT_CODE",
+          "message": "exit_code failed",
+          "evidence": "exit=1 expected 0"
+        }
+      ],
+      "exit_code": 1
+    }
+  ]
+}

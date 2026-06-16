@@ -1,10 +1,11 @@
 id: automate-your-job
 title: Automate-your-own-job-first loop
 domain: Personal automation & DX
-target: your team's internal API, runbook, or repo for a repetitive role
+target: a daily standup-digest CLI over a captured day of team activity
 lane: codebase
-goal: build an agent-native CLI that does the repetitive 60% of a role, judged against
-  real captured task payloads and refactored until it reliably passes — so you own the
-  automation instead of being erased by it
-kind: recipe
+goal: build an agent-native CLI that turns captured daily activity into a structured
+  standup digest (yesterday / today / blockers), judged against the real captured
+  payload and refactored until it passes — so you own the automation
+kind: demo
 contributor: wjlgatech
+result_ref: automate-your-job.json
