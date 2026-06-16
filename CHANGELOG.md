@@ -76,6 +76,16 @@ All notable changes to this project are documented here, following
   authority, R10 lifted to the fleet). `rebrief_item` re-runs a single escalated
   worker with a human note added to its brief context, updating the existing item
   row in place. Tests: `tests/test_fleet_escalation.py` (new).
+- **Fleet orchestration layer, Phase A — U5: fleet CLI + report** (same plan):
+  a `loop-anything fleet` command group (`run` / `status` / `report` /
+  `escalations`). **`src/loopeng/orchestration/spec.py`** (new) parses + validates
+  a hand-authored fleet spec (rejects dangling deps before any row is created) and
+  materializes the fleet; **`src/loopeng/orchestration/fleet_report.py`** (new)
+  aggregates per-item lifecycle/grade/escalations (keeping `autonomous/report.py`
+  the untouched per-run building block). `fleet run` materializes the fleet and
+  is honest that live per-item execution needs the factory adapters (same gate as
+  `run`); the coordinator is exercised in tests. Tests: `tests/test_fleet_cli.py`
+  (new).
 - **Loop-engineering gap-bridges, U6 — name the three deliberate non-gaps**
   (same plan): documents outer-loop sovereignty, single referee of record, and
   the gated human-confirm posture as design choices (each with the failure mode
