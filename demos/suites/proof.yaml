@@ -1,0 +1,10 @@
+# Self-contained D2 contract for the loop-anything 'factcli' proof target.
+# CLI-Judge resolves suites from its own checkout's suites/ dir, so copy this
+# file there once:  cp demos/suites/proof.yaml ~/.cache/loopeng/cli-judge/suites/
+# (all three tasks are upstream-free — no replay server needed).
+name: proof
+description: Self-contained D2 contract for the loop-anything proof target (factcli).
+tasks:
+  - d2.repl.banner_signature
+  - d2.noninteractive.mode
+  - d2.json.empty_result

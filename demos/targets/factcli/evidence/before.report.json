@@ -1,0 +1,71 @@
+{
+  "suite": "proof",
+  "adapter": "factcli",
+  "score": 0.0,
+  "grade": "F",
+  "safety_blocker": false,
+  "points": 0.0,
+  "max_points": 13.0,
+  "dimensions": {
+    "D2": {
+      "points": 0.0,
+      "max_points": 13.0
+    }
+  },
+  "tasks": [
+    {
+      "id": "d2.repl.banner_signature",
+      "dimension": "D2",
+      "points": 0.0,
+      "max_points": 3.0,
+      "provenance": "HKUDS/CLI-Anything#278",
+      "findings": [
+        {
+          "severity": "friction",
+          "code": "D2_EXIT_CODE",
+          "message": "exit_code failed",
+          "evidence": "exit=1 expected 0"
+        }
+      ],
+      "exit_code": 1
+    },
+    {
+      "id": "d2.noninteractive.mode",
+      "dimension": "D2",
+      "points": 0.0,
+      "max_points": 5.0,
+      "provenance": "HKUDS/CLI-Anything#214",
+      "findings": [
+        {
+          "severity": "friction",
+          "code": "D2_EXIT_CODE",
+          "message": "exit_code failed",
+          "evidence": "exit=1 expected 0"
+        },
+        {
+          "severity": "friction",
+          "code": "D2_STDOUT_IS_JSON",
+          "message": "stdout_is_json failed",
+          "evidence": "stdout not valid JSON"
+        }
+      ],
+      "exit_code": 1
+    },
+    {
+      "id": "d2.json.empty_result",
+      "dimension": "D2",
+      "points": 0.0,
+      "max_points": 5.0,
+      "provenance": "HKUDS/CLI-Anything#217",
+      "findings": [
+        {
+          "severity": "friction",
+          "code": "D2_STDOUT_JSON_PATH",
+          "message": "stdout_json_path failed",
+          "evidence": "items=<missing>"
+        }
+      ],
+      "exit_code": 0
+    }
+  ]
+}

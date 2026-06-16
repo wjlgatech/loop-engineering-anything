@@ -5,6 +5,18 @@ All notable changes to this project are documented here, following
 
 ## [Unreleased]
 
+### Added
+- **First real end-to-end live proof (F → A) — the refine frontier, validated.**
+  A self-contained proof target (`demos/targets/factcli/`) + CLI-Judge adapter
+  (`demos/adapters/factcli.py`) + a three-task D2 suite (`demos/suites/proof.yaml`),
+  driven by the real `LoopController` with the real `cli-judge` referee and the
+  free-tier `FallbackLLMRefiner` (Gemini → Ollama, **no Anthropic quota**). The
+  loop refactored a deliberately-buggy CLI from **grade F (0)** to **grade A
+  (100)** — trajectory `F → F → F → A`, converged in 4 iterations, with two
+  no-gain refactors rolled back live. Evidence + reproduction in
+  `demos/targets/factcli/PROOF.md`. Needs no external catalog tool or Go
+  toolchain. Next: wire it as a recorded `live_verified` hub card via `demo record`.
+
 ### Changed
 - **loop-anything-hub redesign (dogfooded)** — restyled the self-contained
   showcase generator (`src/loopeng/showcase/generate.py`) toward the flat,

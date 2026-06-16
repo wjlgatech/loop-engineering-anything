@@ -1,0 +1,44 @@
+{
+  "suite": "proof",
+  "adapter": "factcli",
+  "score": 100.0,
+  "grade": "A",
+  "safety_blocker": false,
+  "points": 13.0,
+  "max_points": 13.0,
+  "dimensions": {
+    "D2": {
+      "points": 13.0,
+      "max_points": 13.0
+    }
+  },
+  "tasks": [
+    {
+      "id": "d2.repl.banner_signature",
+      "dimension": "D2",
+      "points": 3.0,
+      "max_points": 3.0,
+      "provenance": "HKUDS/CLI-Anything#278",
+      "findings": [],
+      "exit_code": 0
+    },
+    {
+      "id": "d2.noninteractive.mode",
+      "dimension": "D2",
+      "points": 5.0,
+      "max_points": 5.0,
+      "provenance": "HKUDS/CLI-Anything#214",
+      "findings": [],
+      "exit_code": 0
+    },
+    {
+      "id": "d2.json.empty_result",
+      "dimension": "D2",
+      "points": 5.0,
+      "max_points": 5.0,
+      "provenance": "HKUDS/CLI-Anything#217",
+      "findings": [],
+      "exit_code": 0
+    }
+  ]
+}
