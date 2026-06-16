@@ -69,6 +69,31 @@ def outcome_summary(result: RunResult) -> dict:
     }
 
 
+def apply_item_result(
+    store: MemoryStore,
+    item: FleetItem,
+    res,
+    classify: Callable[[RunResult], FleetItemStatus],
+    *,
+    on_fail: FleetItemStatus,
+) -> RunResult | None:
+    """Map one ``ParallelResult`` onto a fleet item's status + outcome. Shared by
+    the coordinator's wave loop and escalation's single re-brief so the two never
+    drift. ``on_fail`` is the status for a crashed/unexpected result (coordinator:
+    ``STOPPED``; re-brief: ``ESCALATED``). The outcome is recorded **before** the
+    status flips to converged, so a converged item always has its outcome present
+    when a later wave's dependent pulls it (closes the converged-without-outcome
+    window)."""
+    if not res.ok or not isinstance(res.value, RunResult):
+        store.set_item_status(item.id, on_fail)
+        store.record_item_outcome(item.id, {"error": res.error or "no RunResult"})
+        return None
+    result = res.value
+    store.record_item_outcome(item.id, outcome_summary(result))
+    store.set_item_status(item.id, classify(result), run_id=result.run_id)
+    return result
+
+
 def _assert_acyclic(items: dict[str, FleetItem]) -> None:
     """Reject a cycle or a dangling dependency before any work starts (KTD3)."""
     for it in items.values():
@@ -118,6 +143,9 @@ def run_fleet(
     _assert_acyclic(items)  # fail closed before any worktree is created
 
     while True:
+        # One snapshot per wave: marking an item blocked_on_dep can't make it
+        # ready (its dep is non-converged, so it fails the all-converged test),
+        # so the ready set is computable from the same snapshot the marking used.
         items = {i.key: i for i in store.fleet_items(fleet_id)}
         converged = {k for k, i in items.items() if i.status is FleetItemStatus.CONVERGED}
 
@@ -128,9 +156,6 @@ def run_fleet(
             ):
                 store.set_item_status(i.id, FleetItemStatus.BLOCKED_ON_DEP)
 
-        # Refresh after marking, then compute the ready wave.
-        items = {i.key: i for i in store.fleet_items(fleet_id)}
-        converged = {k for k, i in items.items() if i.status is FleetItemStatus.CONVERGED}
         ready = [
             i
             for i in items.values()
@@ -143,9 +168,9 @@ def run_fleet(
             store.set_item_status(i.id, FleetItemStatus.RUNNING)
 
         def _make_run(item: FleetItem) -> Callable[[str], RunResult]:
-            # Pull this item's dependencies' recorded outcomes (U3) once, before
-            # dispatch, and hand them to the runner as upstream context.
-            upstream = gather_upstream_outcomes(store, fleet_id, item)
+            # Pull this item's dependencies' recorded outcomes (U3) from the wave
+            # snapshot already in hand -- no extra store read per item.
+            upstream = gather_upstream_outcomes(store, fleet_id, item, items_by_key=items)
 
             def _run(worktree: str) -> RunResult:
                 return runner(item, worktree, upstream)
@@ -160,16 +185,9 @@ def run_fleet(
         )
 
         for res in results:
-            item = items[res.key]
-            if not res.ok or not isinstance(res.value, RunResult):
-                # Worker crashed or returned an unexpected value -> not converged.
-                store.set_item_status(item.id, FleetItemStatus.STOPPED)
-                store.record_item_outcome(item.id, {"error": res.error or "no RunResult"})
-                continue
-            result = res.value
-            store.set_item_status(item.id, classify(result), run_id=result.run_id)
-            # Record the outcome now so dependents pulled in a later wave see it (U3).
-            store.record_item_outcome(item.id, outcome_summary(result))
+            apply_item_result(
+                store, items[res.key], res, classify, on_fail=FleetItemStatus.STOPPED
+            )
 
     # Finalize the fleet run status.
     final = store.fleet_items(fleet_id)

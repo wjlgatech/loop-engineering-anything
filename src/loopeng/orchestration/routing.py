@@ -15,11 +15,22 @@ from ..memory.fleet_state import FleetItem
 from ..memory.store import MemoryStore
 
 
-def gather_upstream_outcomes(store: MemoryStore, fleet_id: int, item: FleetItem) -> list[dict]:
+def gather_upstream_outcomes(
+    store: MemoryStore,
+    fleet_id: int,
+    item: FleetItem,
+    items_by_key: dict[str, FleetItem] | None = None,
+) -> list[dict]:
     """The recorded outcome summaries of ``item``'s direct dependencies, each
     tagged with the upstream item key. Empty when the item has no dependencies or
-    none have recorded an outcome yet."""
-    by_key = {i.key: i for i in store.fleet_items(fleet_id)}
+    none have recorded an outcome yet.
+
+    ``items_by_key`` lets a caller that already holds the fleet's items (the
+    coordinator's per-wave snapshot) avoid an extra full read; omitted, it reads
+    once from the store."""
+    by_key = items_by_key if items_by_key is not None else {
+        i.key: i for i in store.fleet_items(fleet_id)
+    }
     outcomes: list[dict] = []
     for dep_key in item.depends_on:
         dep = by_key.get(dep_key)

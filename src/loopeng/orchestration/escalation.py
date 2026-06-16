@@ -19,7 +19,7 @@ from ..autonomous.runner import RunResult
 from ..loop.controller import LoopState
 from ..memory.fleet_state import FleetItem, FleetItemStatus
 from ..memory.store import MemoryStore
-from .coordinator import outcome_summary
+from .coordinator import apply_item_result
 from .routing import gather_upstream_outcomes
 
 
@@ -76,10 +76,6 @@ def rebrief_item(
         worktrees_root=worktrees_root,
         max_parallel=1,
     )
-    if not res.ok or not isinstance(res.value, RunResult):
-        store.set_item_status(item.id, FleetItemStatus.ESCALATED)  # re-brief failed
-        return None
-    result = res.value
-    store.set_item_status(item.id, classify(result), run_id=result.run_id)
-    store.record_item_outcome(item.id, outcome_summary(result))
-    return result
+    # Shared result-mapping with the coordinator; on a crashed re-run the item
+    # returns to escalated (not stopped), so the human can try again.
+    return apply_item_result(store, item, res, classify, on_fail=FleetItemStatus.ESCALATED)

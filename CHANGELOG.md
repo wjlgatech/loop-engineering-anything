@@ -29,6 +29,16 @@ All notable changes to this project are documented here, following
   attribute is now declared on the `Refiner` protocol alongside `last_token_cost`
   so the retry contract is complete. Tests in `tests/test_llm_refiner.py`.
 
+### Changed
+- **Fleet coordinator cleanup (post-code-review, non-behavioral)**: extracted a
+  shared `apply_item_result` so the coordinator's wave loop and
+  `escalation.rebrief_item` map a result identically (recording the outcome
+  *before* flipping status to converged, closing the converged-without-outcome
+  window); the coordinator now reads `fleet_items` once per wave and passes that
+  snapshot to `gather_upstream_outcomes` (no per-item re-read); added a test
+  asserting the `schema.sql` status DEFAULTs match the `FleetItemStatus` /
+  `FleetRunStatus` enum values.
+
 ### Added
 - **Fleet orchestration layer, Phase A — U6: boundary docs** (same plan):
   **`docs/solutions/fleet-orchestration-boundary.md`** (new) names the

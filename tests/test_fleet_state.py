@@ -32,3 +32,16 @@ def test_illegal_transitions_rejected():
     # cannot jump pending straight to converged (must run first).
     with pytest.raises(FleetTransitionError):
         assert_item_transition(FleetItemStatus.PENDING, FleetItemStatus.CONVERGED)
+
+
+def test_schema_defaults_match_enum_values():
+    # The schema hardcodes status DEFAULTs; they must equal the enum values they
+    # represent so a rename can't silently desync new rows from the model.
+    import pathlib
+
+    import loopeng.memory as mem
+    from loopeng.memory.fleet_state import FleetItemStatus, FleetRunStatus
+
+    schema = (pathlib.Path(mem.__file__).parent / "schema.sql").read_text()
+    assert f"status   TEXT NOT NULL DEFAULT '{FleetRunStatus.RUNNING.value}'" in schema
+    assert f"status          TEXT NOT NULL DEFAULT '{FleetItemStatus.PENDING.value}'" in schema
