@@ -43,3 +43,36 @@ Entry template:
   2. Measure whether the dogfood/meta line earns its place or distracts a
      first-time reader (drop it in the short variant and compare).
   3. Confirm the "286 tests" number is current before posting.
+
+---
+
+## 002 — 2026-06-16 — long-form + 2 short A/B posts — applying the kit
+
+- **Hypothesis:** The kit (one fact base + template + grader) can produce a
+  full-length in-depth article AND two short posts that A/B the hook, all
+  consistent and all defensible — proving the kit scales across formats, not just
+  one post shape.
+- **Changes vs. 001:** First *application* of the kit. Produced three dated
+  instances in `marketing/content/`: a ~1500-word article
+  (`2026-06-16-longform-stop-generating-tools.md`) and the two hook variants the
+  001 "next test" flagged — pain-first (`short-a`) and thesis-first (`short-b`).
+  Re-verified the test count against `main` before citing it (286, still current).
+- **Grade (pre-publish, checklist §4):** Pass on all three. Notes:
+  - Long-form: numbered mechanism became section headers (altitude shift for
+    article length); kept the thesis in title + close; honesty section is explicit
+    about the deferred generate frontier.
+  - Shorts: both lead with a single ownable claim, one numbered mechanism, one
+    engagement question, one CTA. Variant A opens on pain, B on thesis — the only
+    deliberate difference, so the A/B is clean.
+- **Result:** _not yet posted — fill in per-variant impressions/reactions/comments._
+- **Learned (from building it):**
+  - The "N dimensions / N stop-signals" device carries the article the same way
+    it carries the short post — specificity scales across length.
+  - Dating + frontmatter (`date`, `channel`, `hook_variant`) makes instances
+    self-describing and lets the dogfood log reference them unambiguously.
+- **Next test:**
+  1. Post A and B to the same channel a few days apart; compare engagement on the
+     two hooks and record the winner here.
+  2. For the long-form, test whether opening with the "bug hiding in every
+     AI-built tool" frame outperforms a straight "what it does" lede.
+  3. Roll the winning hook back into `linkedin-launch.md` as the new default.

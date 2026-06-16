@@ -14,6 +14,7 @@ draft → grade against a checklist → revise → ship → record the learning.
 | [`show-hn.md`](show-hn.md) | Show HN title + technical first comment (honest about maturity). |
 | [`taglines.md`](taglines.md) | Reusable hooks, one-liners, and proof points. |
 | [`dogfood-log.md`](dogfood-log.md) | The optimization log — one entry per launch, with hypothesis → result → learning. |
+| [`content/`](content/) | **Dated, ready-to-post instances** produced from the kit (e.g. `2026-06-16-longform-*`, `2026-06-16-short-a/b-*`). Templates above are reusable; these are the generated copies, each with a `date` + `channel` in frontmatter. |
 
 ## How to use it
 
