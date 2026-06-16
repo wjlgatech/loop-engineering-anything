@@ -6,6 +6,38 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Loop-engine domain generalization, Phase C — U17: maker/checker contract +
+  anti-cognitive-surrender gates** (plan `docs/plans/2026-06-15-004-...`): make
+  "maker ≠ checker" an *enforced* precondition and add the verification gate
+  unattended loops demand (R6/R10, KTD6). Why: a maker that referees its own
+  work, or is graded on seeds it trained on, can silently reward-hack — these
+  must fail closed *before* a loop runs.
+  - **`src/loopeng/loop/integrity.py`** (new): `assert_loop_integrity` (the
+    single preflight call) plus `assert_maker_distinct_from_checker` (refiner
+    and judge must be distinct *objects*, by identity), `assert_referee_immutable_to_maker`
+    (rejects a wiring where a referee path lives inside the maker's declared
+    write surface — the contract-level model of KTD6's filesystem boundary),
+    and `assert_heldout_disjoint` (dev seeds vs held-out seeds must not overlap,
+    and the held-out set may not be empty). All raise `IntegrityError`
+    fail-closed with *names, not values* (mirrors the credential gate).
+  - **Human-confirm verification gate** (`config.VerificationGate`, default in
+    `Config.gate`): a `CONVERGED` outcome is a *claim* until confirmed. Gate is
+    **ON by default**. **Bypass is access-controlled (security finding):** there
+    is no caller-settable bypass flag; the only bypass keys on a CI-infrastructure
+    env var (`CI`, attended runs only); **scheduled/unattended runs default to
+    confirm-required regardless of CI** — a scheduler that sets `CI=true` cannot
+    auto-ship a reward-hacked result. `RunResult.shippable` reports the gate's
+    verdict (`gate_requires_confirmation` / `confirm_convergence` in
+    `loop/integrity.py`).
+  - **Runner hook** (`autonomous/runner.py`): `run_loop` / `run_refine_loop`
+    call `assert_loop_integrity` before any work (after `validate_target`,
+    alongside the credential gate) and gate the `CONVERGED` outcome via new
+    `scheduled` / `confirmed` params + optional `referee_paths` /
+    `maker_write_paths` / `dev_seeds` / `heldout_seeds` integrity inputs.
+  - Tests: `tests/test_maker_checker.py` (new) — same-object maker/checker
+    rejected before any run, held-out overlap/empty rejected, referee
+    immutability at the contract level, and the full CI-vs-scheduled gate
+    matrix through the runner. Existing `test_autonomous_runner.py` stays green.
 - **Loop-engine domain generalization, Phase A — U9** (plan
   `docs/plans/2026-06-15-004-feat-loop-engine-domain-generalization-plan.md`):
   widen the loop's contracts so a target can be *any* domain, not just code,

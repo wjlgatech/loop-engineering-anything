@@ -34,6 +34,15 @@ implementation plan.
   ONLY via `demo record` / `demo proof` against a real run. Never hand-edit a
   fixture to `live_verified`, and never record a `blocked_safety` run as a
   passing proof.
+- **Maker ≠ checker is enforced, not assumed (U17/R6/R10/KTD6).** Before any
+  loop runs, `loop.integrity.assert_loop_integrity` fails closed if the refiner
+  (maker) and judge (checker) are the same object, if a referee path lives
+  inside the maker's write surface, or if the held-out grade seeds overlap the
+  maker's dev seeds. A `CONVERGED` result is a *claim*: `RunResult.shippable`
+  is gated by the human-confirm `VerificationGate` (ON by default). Do NOT add a
+  caller-settable bypass — the only bypass keys on the CI-infrastructure env var
+  for **attended** runs; **scheduled** runs stay confirm-required regardless of
+  `CI`, so a scheduler can't silently auto-ship.
 
 ## Proof pipeline (refine-only)
 
@@ -58,7 +67,7 @@ protocol, so the refine engine is selectable:
 
 | Path | Purpose |
 |---|---|
-| `src/loopeng/config.py` | budgets, convergence knobs, dependency table |
+| `src/loopeng/config.py` | budgets, convergence knobs, dependency table; `VerificationGate` (human-confirm gate, ON by default, CI-bypass for attended runs only — plan-004 U17) |
 | `src/loopeng/preflight.py` | dependency detection (per-mechanism); `missing_for_refine` (no factory) |
 | `src/loopeng/router.py` | thin shim → `domains.REGISTRY.resolve`, adapts to legacy `LaneDecision` (U3; registry-backed plan-004 U11) |
 | `src/loopeng/domains/` | domain SDK: `Domain` plugin protocol + `DomainRegistry` (classify→resolve, supersedes router heuristics); `software.py` re-homes service/codebase lanes as registered domains. A new domain is a `register()`, never a controller/router edit (plan-004 U9/U11, KTD1/R11) |
@@ -66,8 +75,8 @@ protocol, so the refine engine is selectable:
 | `src/loopeng/adapters/` | contracts, `safety.py` (subprocess/jail/env-prune), factory + judge shells (U4/U5), `compound_engineering.py` (`/ce-work` refiner), `llm_refiner.py` (claude-free fallback-chain refiner) |
 | `src/loopeng/adopt.py` | catalog tool adopter — venv-isolated, env-pruned, full-SHA-pinned (proof pipeline U1, KTD7) |
 | `src/loopeng/proof.py` | `ProofPack` builder + `StoreBackedCompounder` (proof pipeline U3) |
-| `src/loopeng/loop/` | controller, convergence, brief, compound, `GitCheckpoint` (U6) |
-| `src/loopeng/autonomous/` | research report + autonomous runner; `run_refine_loop` (refine-only, proof pipeline U2) |
+| `src/loopeng/loop/` | controller, convergence, brief, compound, `GitCheckpoint` (U6); `integrity.py` — maker≠checker / referee-immutability / held-out-disjoint assertions + human-confirm verification gate, all fail-closed (plan-004 U17, R6/R10, KTD6) |
+| `src/loopeng/autonomous/` | research report + autonomous runner; `run_refine_loop` (refine-only, proof pipeline U2); runs the U17 integrity preflight + gates `CONVERGED` via `RunResult.shippable` (`scheduled`/`confirmed`) |
 | `src/loopeng/scheduler/` | `Heartbeat` cadence engine — durable `schedule_state`, due-calc, failure isolation, resume anchor; runner-agnostic (injected, KTD7). `loop-anything schedule add/list/remove/tick` (plan-004 U14, R7) |
 | `src/loopeng/demos/` | demo manifest/registry + result fixtures (validated; SSRF/traversal/secret guards) |
 | `src/loopeng/showcase/` | self-contained HTML catalog generator (context-aware escaping) |
