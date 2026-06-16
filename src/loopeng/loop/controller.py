@@ -18,7 +18,9 @@ Invariants enforced here:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import logging
+import time
+from dataclasses import dataclass, field
 from enum import Enum
 
 from ..adapters.base import Checkpoint, Compounder, Judge, Refiner, Verdict
@@ -26,6 +28,12 @@ from ..config import Budget
 from ..memory.store import MemoryStore
 from . import convergence as cv
 from .refactor_brief import build_refactor_brief
+
+_log = logging.getLogger(__name__)
+
+# Base backoff for transient (infra) refiner-failure retries (U3); doubles per
+# attempt. The wall-clock budget (U4) bounds total retry time.
+_TOOL_RETRY_BASE_SECONDS = 2.0
 
 
 class LoopState(str, Enum):
@@ -53,6 +61,10 @@ class LoopOutcome:
     grade: str
     reason: str
     iterations: int
+    # Final verdict signal, carried so the verification gate can compose a legible
+    # firing reason (which dimension/score was borderline) without re-judging (U5).
+    score: float = 0.0
+    dims: dict = field(default_factory=dict)
 
 
 class LoopController:
@@ -66,6 +78,7 @@ class LoopController:
         store: MemoryStore,
         budget: Budget | None = None,
         compressor=None,
+        sleeper=time.sleep,
     ):
         self.judge = judge
         self.refiner = refiner
@@ -75,6 +88,8 @@ class LoopController:
         self.budget = budget or Budget()
         # Optional History Compression Engine (U7); None = no compression pass.
         self.compressor = compressor
+        # Injectable so tests can drive retry backoff without real sleeps (U3).
+        self.sleeper = sleeper
 
     def run(self, run_id: int, tool_path: str, goal: str = "") -> LoopOutcome:
         # Initial grade.
@@ -83,12 +98,34 @@ class LoopController:
         self._record(run_id, n, verdict, diff_ref=None)
         tokens_spent = 0
         accepted = 0  # count of kept improvements, for compression cadence
+        start = time.monotonic()  # controller owns the clock; evaluate stays pure (U4)
+        warned_no_cost = False  # one-time warning when token_budget set but cost unreported
+
+        # Cross-run history (U1): fixtures that have failed across prior runs of
+        # THIS target. Scoped to the target so an unrelated target's history never
+        # leaks in. Computed once -- prior-run history does not change mid-run.
+        run = self.store.get_run(run_id)
+        recurring_fixtures = (
+            [fx for fx, _ in self.store.recurring_failures(target=run.target)]
+            if run is not None
+            else []
+        )
+
+        # Plateau-pivot state (U2): on a sole plateau, rotate to the next-lowest
+        # dimension once (per pivot budget) before stopping. ``pivot_offset`` resets
+        # the plateau window; ``active_exclude`` demotes the hammered dims;
+        # ``targeted_since_pivot`` records the lead dims tried since the last pivot.
+        pivots_used = 0
+        pivot_offset = 0
+        active_exclude: set[str] = set()
+        targeted_since_pivot: list[str] = []
 
         while True:
             plateaued = self.store.is_plateaued(
                 run_id,
                 self.budget.plateau_patience,
                 on_score=self.budget.target_score is not None,
+                since_iteration=pivot_offset,
             )
             decision = cv.evaluate(
                 verdict,
@@ -96,18 +133,50 @@ class LoopController:
                 iterations_done=n,
                 plateaued=plateaued,
                 tokens_spent=tokens_spent,
+                elapsed_seconds=time.monotonic() - start,
             )
             if decision.kind != cv.CONTINUE:
-                return self._finish(run_id, decision, verdict, n)
+                # Pivot ONLY on a sole plateau with budget remaining -- a cap stop
+                # (iteration/token/wall) always wins and never pivots.
+                if decision.reason_code == cv.PLATEAU and pivots_used < self.budget.plateau_pivots:
+                    pivots_used += 1
+                    pivot_offset = n  # reset the plateau window to post-pivot iterations
+                    active_exclude |= set(targeted_since_pivot)
+                    targeted_since_pivot = []
+                else:
+                    return self._finish(run_id, decision, verdict, n)
 
             # --- REFACTORING ---
             token = self.checkpoint.snapshot()
-            brief = build_refactor_brief(verdict, goal)
-            diff_ref = self.refiner.refactor(tool_path, brief)
+            brief = build_refactor_brief(
+                verdict,
+                goal,
+                recurring_failures=recurring_fixtures,
+                exclude_dims=list(active_exclude) or None,
+            )
+            if brief.target_dimensions:
+                targeted_since_pivot.append(brief.target_dimensions[0])
+            diff_ref = self._refactor_with_retry(tool_path, brief)
+
+            # Cost accounting (U4): thread the refiner's reported per-refactor cost
+            # into the budget gate, protocol-bound (getattr tolerates refiners that
+            # don't implement it). A refiner that reports no cost cannot advance the
+            # token gate -- warn once if a token_budget was set against it.
+            cost = getattr(self.refiner, "last_token_cost", None)
+            if cost is not None:
+                tokens_spent += cost
+            elif self.budget.token_budget is not None and not warned_no_cost:
+                warned_no_cost = True
+                _log.warning(
+                    "token_budget=%s is set but the refiner reports no token cost; "
+                    "the token gate cannot fire -- relying on max_wall_seconds=%s.",
+                    self.budget.token_budget,
+                    self.budget.max_wall_seconds,
+                )
 
             new_verdict = self.judge.judge(tool_path)
             n += 1
-            self._record(run_id, n, new_verdict, diff_ref=diff_ref)
+            self._record(run_id, n, new_verdict, diff_ref=diff_ref, token_cost=cost)
 
             # Safety failure introduced by the refactor: roll back, halt, no ship.
             if not new_verdict.safety_ok:
@@ -140,7 +209,30 @@ class LoopController:
 
     # ----- helpers --------------------------------------------------------
 
-    def _record(self, run_id: int, n: int, verdict: Verdict, diff_ref: str | None) -> None:
+    def _refactor_with_retry(self, tool_path: str, brief) -> str | None:
+        """Run the refiner, retrying only a *transient infra* failure (U3).
+
+        Infra failure (timeout / non-zero exit / missing executable) is surfaced
+        by the refiner's ``last_infra_failure`` flag and retried with bounded
+        exponential backoff. A clean no-change result is NOT retried (it returns
+        immediately and the loop rolls back as usual). Safety is detected by the
+        judge *after* this returns, so a safety failure can never enter retry.
+        Retries do not increment the iteration count; wall time is bounded by the
+        wall-clock budget (U4).
+        """
+        attempt = 0
+        while True:
+            diff_ref = self.refiner.refactor(tool_path, brief)
+            if not getattr(self.refiner, "last_infra_failure", False):
+                return diff_ref
+            if attempt >= self.budget.max_tool_retries:
+                return diff_ref  # exhausted -> fall through to normal no-change handling
+            attempt += 1
+            self.sleeper(_TOOL_RETRY_BASE_SECONDS * (2 ** (attempt - 1)))
+
+    def _record(
+        self, run_id: int, n: int, verdict: Verdict, diff_ref: str | None, token_cost: int | None = None
+    ) -> None:
         self.store.record_iteration(
             run_id,
             n,
@@ -148,6 +240,7 @@ class LoopController:
             verdict.dims,
             safety_ok=verdict.safety_ok,
             failing_fixtures=verdict.failing_fixtures,
+            token_cost=token_cost,
             diff_ref=diff_ref,
             score=verdict.score,
         )
@@ -155,4 +248,11 @@ class LoopController:
     def _finish(self, run_id: int, decision: cv.Decision, verdict: Verdict, n: int) -> LoopOutcome:
         state = _TERMINAL[decision.kind]
         self.store.finish_run(run_id, state.value, verdict.grade)
-        return LoopOutcome(final_state=state, grade=verdict.grade, reason=decision.reason, iterations=n)
+        return LoopOutcome(
+            final_state=state,
+            grade=verdict.grade,
+            reason=decision.reason,
+            iterations=n,
+            score=verdict.score,
+            dims=dict(verdict.dims),
+        )

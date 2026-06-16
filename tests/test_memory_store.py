@@ -52,6 +52,17 @@ def test_plateau_false_when_fewer_than_patience(store):
     assert store.is_plateaued(run_id, patience=3) is False
 
 
+def test_is_plateaued_since_iteration_gives_postpivot_window_room(store):
+    run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+    for n, g in enumerate(["A", "A", "A", "B", "C", "B"], start=1):
+        store.record_iteration(run_id, n, g, {}, safety_ok=True)
+    # Full trajectory plateaus -- the post-window B/C/B never beat the early A's.
+    assert store.is_plateaued(run_id, patience=3) is True
+    # Scoped to post-pivot iterations (drop the first 3) -- too few to declare a
+    # plateau yet, so the freshly-pivoted strategy gets room to work.
+    assert store.is_plateaued(run_id, patience=3, since_iteration=3) is False
+
+
 def test_recurring_failures_join_across_runs(store):
     r1 = store.create_run("t1", "service", None, "2026-06-15T00:00:00Z")
     r2 = store.create_run("t2", "service", None, "2026-06-15T00:00:00Z")
@@ -59,6 +70,43 @@ def test_recurring_failures_join_across_runs(store):
     store.record_iteration(r2, 1, "C", {}, safety_ok=True, failing_fixtures=["pagination_drift"])
     recurring = store.recurring_failures(min_runs=2)
     assert recurring == [("pagination_drift", 2)]
+
+
+def test_recurring_failures_target_scoped_excludes_other_targets(store):
+    # Same target across two runs -> recurs for that target.
+    a1 = store.create_run("target-A", "service", None, "2026-06-15T00:00:00Z")
+    a2 = store.create_run("target-A", "service", None, "2026-06-15T00:00:00Z")
+    b1 = store.create_run("target-B", "service", None, "2026-06-15T00:00:00Z")
+    store.record_iteration(a1, 1, "C", {}, safety_ok=True, failing_fixtures=["fx_a"])
+    store.record_iteration(a2, 1, "C", {}, safety_ok=True, failing_fixtures=["fx_a"])
+    # target-B fails its own fixture twice -- must NOT leak into target-A's scope.
+    store.record_iteration(b1, 1, "C", {}, safety_ok=True, failing_fixtures=["fx_b"])
+    store.record_iteration(b1, 2, "C", {}, safety_ok=True, failing_fixtures=["fx_b"])
+
+    scoped = store.recurring_failures(target="target-A")
+    assert scoped == [("fx_a", 2)]
+    # fx_b recurs only within target-B, never surfaces under target-A.
+    assert all(fx != "fx_b" for fx, _ in scoped)
+
+
+def test_record_and_read_confirmation(store):
+    run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+    store.record_confirmation(
+        run_id, confirmed=True, reason="converged at grade A; confirm before shipping",
+        created="2026-06-16T00:00:00Z",
+    )
+    rows = store.confirmations(run_id)
+    assert len(rows) == 1
+    assert rows[0]["confirmed"] is True
+    assert "grade A" in rows[0]["reason"]
+
+
+def test_record_confirmation_rejection(store):
+    run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+    store.record_confirmation(run_id, confirmed=False, reason="rejected")
+    rows = store.confirmations(run_id)
+    assert len(rows) == 1
+    assert rows[0]["confirmed"] is False
 
 
 def test_finish_run_and_list(store):

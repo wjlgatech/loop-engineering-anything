@@ -48,5 +48,19 @@ CREATE TABLE IF NOT EXISTS schedule_state (
     last_run_id      INTEGER                         -- advisory resume anchor; nullable
 );
 
+-- Human-confirm gate audit trail (U5, R10). When the verification gate requires
+-- confirmation for a CONVERGED outcome, the human's verdict + the firing reason
+-- are recorded here for audit. This table is WRITE-ONLY with respect to
+-- shippability: nothing reads it back into the gate's `confirmed` input, so a
+-- recorded approval can never become an auto-ship (KTD5).
+CREATE TABLE IF NOT EXISTS confirmations (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id    INTEGER NOT NULL REFERENCES runs(id),
+    confirmed INTEGER NOT NULL,                       -- 0/1 the human's approve/reject
+    reason    TEXT,                                   -- why the gate fired (borderline dim/score)
+    created   TEXT                                    -- ISO-8601, supplied by caller; nullable
+);
+
 CREATE INDEX IF NOT EXISTS idx_iterations_run ON iterations(run_id, n);
 CREATE INDEX IF NOT EXISTS idx_learnings_run ON learnings(run_id);
+CREATE INDEX IF NOT EXISTS idx_confirmations_run ON confirmations(run_id);

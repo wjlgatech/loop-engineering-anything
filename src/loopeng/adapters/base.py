@@ -64,6 +64,10 @@ class RefactorBrief:
     goal: str
     target_dimensions: list  # lowest-scoring dimensions, ranked
     failing_fixtures: list
+    # Fixtures that recur across prior runs of this target but are NOT failing in
+    # the current verdict -- advisory context only, never ahead of live failures
+    # (U1). Fixtures that recur AND fail now are promoted within ``failing_fixtures``.
+    recurring_failures: list = field(default_factory=list)
 
 
 @runtime_checkable
@@ -73,7 +77,15 @@ class Refiner(Protocol):
     Returns a diff reference (path/sha) for the applied change, or ``None`` if
     nothing was applied. The brief content is passed as structured data; the
     refiner must never interpolate it into a shell command (security finding).
+
+    ``last_token_cost`` is the optional per-refactor token cost the controller
+    threads into the budget gate (U4). It is ``None`` when the refiner cannot
+    report cost (e.g. a free-tier LLM); the controller then falls back to the
+    wall-clock budget. Declared on the protocol so the controller reads it
+    protocol-bound rather than reaching into a concrete refiner class.
     """
+
+    last_token_cost: int | None
 
     def refactor(self, tool_path: str, brief: RefactorBrief) -> str | None: ...
 

@@ -13,7 +13,7 @@ reality, and refactors until the grade stops climbing — then tells you what it
 
 [![CI](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml/badge.svg)](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml)
 [![loop-anything-hub](https://img.shields.io/badge/loop--anything--hub-live-brightgreen)](https://wjlgatech.github.io/loop-engineering-anything/)
-[![Tests](https://img.shields.io/badge/tests-74%20passing-brightgreen)](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-286%20passing-brightgreen)](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
 [![Units](https://img.shields.io/badge/plan-6%2F8%20units-blue)](docs/plans/)
 [![License](https://img.shields.io/badge/license-MIT-green)](#-license)
@@ -131,6 +131,25 @@ One command, unattended. Wake up to a converged tool, a full grade trajectory, a
 | **🔌 Protocol-driven core** | The controller depends only on `Judge`/`Refiner`/`Compounder`/`Checkpoint` protocols — so loop dynamics are proven against recorded verdicts, no live tool required. |
 
 ---
+
+## 🧭 Where this differs from a generic agent loop
+
+The popular "agent loop" anatomy (state → reason → act → observe → reflect →
+terminate) describes one agent improving its own answer. This is an **outer**
+loop that improves a *generated tool* and is opinionated about three things on
+purpose — they are design choices, not missing features:
+
+- **Outer-loop sovereignty** — we referee the refiner's **output**, never its
+  inner tokens. The inner agent loop is a swappable vendor; we are the meta-loop
+  it plugs into.
+- **Single referee of record** — quality comes **only** from the independent
+  CLI-Judge verdict, never from the maker's self-report. That single authority is
+  the maker≠checker moat.
+- **Gated human confirm** — a converged result is a *claim* until a human
+  confirms; the gate is on by default and its verdict is recorded for audit but
+  never auto-ships.
+
+Full rationale, with the failure mode each choice accepts: [`docs/solutions/outer-loop-non-gaps.md`](docs/solutions/outer-loop-non-gaps.md).
 
 ## 🏛️ Architecture
 

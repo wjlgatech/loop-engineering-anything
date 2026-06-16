@@ -220,6 +220,32 @@ class MemoryStore:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    # ----- confirmations (human-confirm gate audit, U5) -------------------
+
+    def record_confirmation(
+        self, run_id: int, confirmed: bool, reason: str | None = None, created: str | None = None
+    ) -> int:
+        """Persist a human verdict at the verification gate (U5, KTD5).
+
+        Audit-only: this write is never read back into the gate's ``confirmed``
+        input, so a recorded approval cannot become an auto-ship. ``confirm_convergence``
+        remains the sole shippability authority.
+        """
+        with self._wlock:
+            cur = self._conn.execute(
+                "INSERT INTO confirmations (run_id, confirmed, reason, created) VALUES (?, ?, ?, ?)",
+                (run_id, 1 if confirmed else 0, reason, created),
+            )
+            self._conn.commit()
+            return int(cur.lastrowid)
+
+    def confirmations(self, run_id: int) -> list[dict]:
+        with self._wlock:
+            rows = self._conn.execute(
+                "SELECT * FROM confirmations WHERE run_id = ? ORDER BY id", (run_id,)
+            ).fetchall()
+        return [{**dict(r), "confirmed": bool(r["confirmed"])} for r in rows]
+
     # ----- scheduler state (U14) -----------------------------------------
 
     def upsert_schedule(
@@ -283,7 +309,9 @@ class MemoryStore:
         """
         return [it.score for it in self.iterations(run_id)]
 
-    def is_plateaued(self, run_id: int, patience: int, *, on_score: bool = False) -> bool:
+    def is_plateaued(
+        self, run_id: int, patience: int, *, on_score: bool = False, since_iteration: int = 0
+    ) -> bool:
         """True if the last ``patience`` iterations did not beat the best value
         achieved before that window. Needs more than ``patience`` iterations to
         evaluate -- fewer means not plateaued.
@@ -293,6 +321,12 @@ class MemoryStore:
         runs under a continuous score target, the persisted ``score`` column so a
         score-only domain plateaus on real reward instead of a constant projected
         grade rank (U10/KTD4). Falls back to grades if any score is unrecorded.
+
+        ``since_iteration`` drops that many leading iterations before the no-gain
+        test (U2). A plateau pivot sets it to the iteration count at pivot time so
+        the post-pivot strategy is judged over its own window -- the pre-pivot best
+        is intentionally excluded, giving the new strategy ``patience`` clean
+        iterations before it can stop the loop.
         """
         if on_score:
             scores = self.score_trajectory(run_id)
@@ -302,23 +336,39 @@ class MemoryStore:
                 values = [grade_rank(g) for g in self.grade_trajectory(run_id)]
         else:
             values = [grade_rank(g) for g in self.grade_trajectory(run_id)]
+        if since_iteration > 0:
+            values = values[since_iteration:]
         if patience < 1 or len(values) <= patience:
             return False
         best_before = max(values[:-patience])
         recent_best = max(values[-patience:])
         return recent_best <= best_before
 
-    def recurring_failures(self, min_runs: int = 2) -> list[tuple[str, int]]:
+    def recurring_failures(
+        self, min_runs: int = 2, *, target: str | None = None
+    ) -> list[tuple[str, int]]:
         """Fixtures that fail across at least ``min_runs`` distinct runs.
 
         Returns (fixture, distinct_run_count) sorted by frequency. Joins failing
-        fixtures across the full history -- a query a stateless run cannot answer.
+        fixtures across history -- a query a stateless run cannot answer.
+
+        ``target`` scopes the join to runs against one target (join through
+        ``runs.target``), so a target's cross-run history never leaks into an
+        unrelated target's brief (U1). The unscoped form (``target=None``) keeps
+        the original transcendent query for reporting across all runs.
         """
         counts: dict[str, set[int]] = {}
         with self._wlock:
-            rows = self._conn.execute(
-                "SELECT run_id, failing_fixtures_json FROM iterations"
-            ).fetchall()
+            if target is None:
+                rows = self._conn.execute(
+                    "SELECT run_id, failing_fixtures_json FROM iterations"
+                ).fetchall()
+            else:
+                rows = self._conn.execute(
+                    "SELECT i.run_id AS run_id, i.failing_fixtures_json AS failing_fixtures_json "
+                    "FROM iterations i JOIN runs r ON i.run_id = r.id WHERE r.target = ?",
+                    (target,),
+                ).fetchall()
         for row in rows:
             for fixture in json.loads(row["failing_fixtures_json"]):
                 counts.setdefault(fixture, set()).add(row["run_id"])

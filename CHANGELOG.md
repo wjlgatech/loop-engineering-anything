@@ -6,6 +6,107 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Loop-engineering gap-bridges, U6 — name the three deliberate non-gaps**
+  (same plan): documents outer-loop sovereignty, single referee of record, and
+  the gated human-confirm posture as design choices (each with the failure mode
+  it accepts and why), so contributors and agents don't "fix" them.
+  - **`docs/solutions/outer-loop-non-gaps.md`** (new) — the decision record.
+  - **`AGENTS.md`** — a boundaries entry naming the three; **`README.md`** — a
+    "Where this differs from a generic agent loop" subsection.
+- **Loop-engineering gap-bridges, U1 — cross-run recurring-failure memory in the
+  refactor brief** (plan `docs/plans/2026-06-16-005-feat-loop-engineering-gap-bridges-plan.md`):
+  the loop now starts each run knowing which fixtures defeated prior runs *of the
+  same target*, realizing the post's "memory" pillar at the loop-control level.
+  Why: `recurring_failures()` existed but was called only in tests; briefs were
+  built from the current verdict alone.
+  - **`src/loopeng/memory/store.py`**: `recurring_failures(min_runs=2, *, target=None)`
+    gains a target-scoped variant (join through `runs.target`) so one target's
+    history never leaks into an unrelated target's brief. The unscoped form is
+    unchanged (transcendent reporting).
+  - **`src/loopeng/loop/refactor_brief.py`** + **`adapters/base.py`**:
+    `build_refactor_brief(verdict, goal, recurring_failures=None)` intersects
+    history with the current verdict's failing set — only fixtures that recur
+    *and* fail now are re-prioritized; recurring-but-passing fixtures ride along
+    in a new advisory `RefactorBrief.recurring_failures` field. Live signal is
+    never demoted below stale history.
+  - **`src/loopeng/loop/controller.py`** fetches the target-scoped history once
+    per run and threads it into the brief; **`adapters/compound_engineering.py`**
+    surfaces it in the `/ce-work` prompt as lower-priority watch-for-regression
+    context.
+  - Tests: `tests/test_refactor_brief.py` (new), target-scoping in
+    `tests/test_memory_store.py`, brief-injection in `tests/test_loop_controller.py`.
+- **Loop-engineering gap-bridges, U4 — enforceable cost budget** (same plan):
+  fixes a latent bug where `tokens_spent` was initialized to `0` and never
+  updated, so the token budget gate always compared against `0` and never fired.
+  - **`src/loopeng/adapters/base.py`**: `Refiner` protocol gains an optional
+    `last_token_cost: int | None`; the controller reads it protocol-bound (never
+    reaching into a concrete refiner). `FallbackLLMRefiner` declares it `None`.
+  - **`src/loopeng/loop/controller.py`** threads each refactor's reported cost
+    into `tokens_spent` and `record_iteration(token_cost=...)`, captures a
+    monotonic start time, and passes elapsed seconds into `convergence.evaluate`.
+    Warns once when a `token_budget` is set against a refiner that reports no cost.
+  - **`src/loopeng/loop/convergence.py`**: `evaluate` gains a wall-clock terminal
+    predicate (time passed in, so it stays pure). **`config.py`** adds
+    `Budget.max_wall_seconds` (universal cost backstop) and rewrites the
+    `token_budget` docstring to state enforcement is conditional on cost reporting.
+  - Tests: wall-clock + token paths in `tests/test_convergence.py`; token
+    threading, no-cost warning, and wall-clock termination in
+    `tests/test_loop_controller.py`.
+- **Loop-engineering gap-bridges, U3 — infra-failure vs quality-regression
+  retry** (same plan): a transient tool failure (timeout / non-zero exit /
+  missing executable) is now retried with bounded backoff instead of being
+  mistaken for a quality regression; a clean no-change result and a post-judge
+  safety failure are never retried.
+  - **`src/loopeng/adapters/safety.py`**: `is_infra_failure(ProcResult)` classifier.
+  - **`src/loopeng/adapters/compound_engineering.py`**: `ClaudeCodeRefiner`
+    sets `last_infra_failure` (True only on infra failure, False on a clean
+    no-change result) — classification stays in the concrete refiner, not the
+    `Refiner` protocol.
+  - **`src/loopeng/loop/controller.py`**: `_refactor_with_retry` retries only the
+    infra class with exponential backoff (`Budget.max_tool_retries`, default 2),
+    via an injectable `sleeper`. Retries do not increment the iteration count;
+    wall time is bounded by `max_wall_seconds`. Safety is detected post-judge,
+    downstream of retry, so it is never retried.
+  - Tests: classifier + flag in `tests/test_compound_engineering.py`;
+    retry-recovers / bounded-exhaustion / safety-never-retried in
+    `tests/test_loop_controller.py`.
+- **Loop-engineering gap-bridges, U2 — plateau triggers a strategy pivot**
+  (same plan): on a plateau the loop now rotates to the next-lowest dimension
+  once (per `Budget.plateau_pivots`, default 1) before stopping, instead of
+  terminating immediately.
+  - **`src/loopeng/loop/convergence.py`**: `Decision` gains a structured
+    `reason_code` (`plateau` / `iteration_cap` / `token_cap` / `wall_cap`) so the
+    controller pivots only on a *sole* plateau — a cap stop always wins.
+  - **`src/loopeng/memory/store.py`**: `is_plateaued(since_iteration=...)` scopes
+    the no-gain test to post-pivot iterations, giving a freshly-pivoted strategy
+    a clean window.
+  - **`src/loopeng/loop/refactor_brief.py`**: `build_refactor_brief(exclude_dims=...)`
+    demotes already-tried dimensions to the back so the brief rotates.
+  - **`src/loopeng/loop/controller.py`**: tracks pivot state, intercepts the
+    plateau→STOPPED transition while pivots remain, excludes the hammered dims,
+    and resets the plateau window. `convergence.evaluate` stays a pure function.
+    **`config.py`** adds `Budget.plateau_pivots`.
+  - Tests: `since_iteration` in `tests/test_memory_store.py`, `exclude_dims` in
+    `tests/test_refactor_brief.py`, `reason_code` in `tests/test_convergence.py`,
+    pivot / cap-wins / `plateau_pivots=0` characterization in
+    `tests/test_loop_controller.py`.
+- **Loop-engineering gap-bridges, U5 — legible human-confirm gate + recorded
+  verdict** (same plan): when the verification gate requires confirmation, the
+  loop now surfaces *why* it fired and records the human's verdict for audit.
+  - **`src/loopeng/loop/integrity.py`**: `describe_gate_reason(grade, score, dims)`
+    composes a legible reason naming the converged grade/score and the lowest
+    dimension. **`controller.py`** `LoopOutcome` carries `score`/`dims` so the
+    runner composes the reason without re-judging.
+  - **`src/loopeng/memory/schema.sql`** + **`store.py`**: a new `confirmations`
+    table (`CREATE TABLE IF NOT EXISTS`) + `record_confirmation` / `confirmations`
+    reader. The table is write-only with respect to shippability — nothing reads
+    it back into the gate's `confirmed` input (KTD5).
+  - **`src/loopeng/autonomous/runner.py`**: `RunResult.gate_reason` surfaces the
+    firing reason; `_apply_gate` records the verdict only when confirmation was
+    owed. `confirm_convergence` stays the sole shippability authority.
+  - Tests: recording + reader in `tests/test_memory_store.py`; gate legibility,
+    approve/reject recording, CI-bypass-records-nothing, and write-only-does-not-
+    affect-shippability in `tests/test_maker_checker.py`.
 - **Loop-engine domain generalization, Phase B — U12: SimJudge referee +
   CMDP safety profile** (plan `docs/plans/2026-06-15-004-...`): the physical-AI-in-sim
   referee that runs a control policy in simulation over a *held-out* seed set

@@ -272,3 +272,52 @@ def test_runner_non_converged_never_shippable(store, tmp_path, monkeypatch):
     )
     assert result.outcome.final_state is LoopState.BLOCKED_SAFETY
     assert result.shippable is False
+
+
+# ----- U5: legible gate + recorded verdict (R10, KTD5) -------------------
+
+
+def test_describe_gate_reason_names_lowest_dimension():
+    from loopeng.loop.integrity import describe_gate_reason
+
+    reason = describe_gate_reason("A", 87.0, {"correctness": 90, "safety": 70})
+    assert "grade A" in reason
+    assert "safety" in reason  # the borderline (lowest) dimension
+    assert "confirm" in reason.lower()
+
+
+def test_runner_records_human_approval_and_surfaces_reason(store, tmp_path, monkeypatch):
+    monkeypatch.delenv("CI", raising=False)
+    result = _run_to_convergence(store, tmp_path, scheduled=False, confirmed=True)
+    assert result.shippable is True
+    assert result.gate_reason is not None and "grade A" in result.gate_reason
+    rows = store.confirmations(result.run_id)
+    assert len(rows) == 1
+    assert rows[0]["confirmed"] is True
+    assert rows[0]["reason"] == result.gate_reason
+
+
+def test_runner_records_rejection_and_stays_unshippable(store, tmp_path, monkeypatch):
+    monkeypatch.delenv("CI", raising=False)
+    result = _run_to_convergence(store, tmp_path, scheduled=False, confirmed=False)
+    assert result.shippable is False
+    rows = store.confirmations(result.run_id)
+    assert len(rows) == 1
+    assert rows[0]["confirmed"] is False  # the rejection is persisted for audit
+
+
+def test_ci_bypass_records_nothing_but_ships(store, tmp_path, monkeypatch):
+    monkeypatch.setenv("CI", "true")
+    result = _run_to_convergence(store, tmp_path, scheduled=False, confirmed=False)
+    assert result.shippable is True
+    assert result.gate_reason is None  # no confirmation owed -> nothing surfaced
+    assert store.confirmations(result.run_id) == []  # observational: no owed, no record
+
+
+def test_recording_is_write_only_does_not_affect_shippability(store, tmp_path, monkeypatch):
+    # A persisted approval from a prior run never makes a later rejection ship.
+    monkeypatch.delenv("CI", raising=False)
+    approved = _run_to_convergence(store, tmp_path, scheduled=False, confirmed=True)
+    assert approved.shippable is True
+    rejected = _run_to_convergence(store, tmp_path, scheduled=False, confirmed=False)
+    assert rejected.shippable is False  # confirm_convergence is the sole authority
