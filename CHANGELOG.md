@@ -6,6 +6,13 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Loop-engineering gap-bridges, U6 — name the three deliberate non-gaps**
+  (same plan): documents outer-loop sovereignty, single referee of record, and
+  the gated human-confirm posture as design choices (each with the failure mode
+  it accepts and why), so contributors and agents don't "fix" them.
+  - **`docs/solutions/outer-loop-non-gaps.md`** (new) — the decision record.
+  - **`AGENTS.md`** — a boundaries entry naming the three; **`README.md`** — a
+    "Where this differs from a generic agent loop" subsection.
 - **Loop-engineering gap-bridges, U1 — cross-run recurring-failure memory in the
   refactor brief** (plan `docs/plans/2026-06-16-005-feat-loop-engineering-gap-bridges-plan.md`):
   the loop now starts each run knowing which fixtures defeated prior runs *of the

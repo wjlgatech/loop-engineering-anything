@@ -132,6 +132,25 @@ One command, unattended. Wake up to a converged tool, a full grade trajectory, a
 
 ---
 
+## 🧭 Where this differs from a generic agent loop
+
+The popular "agent loop" anatomy (state → reason → act → observe → reflect →
+terminate) describes one agent improving its own answer. This is an **outer**
+loop that improves a *generated tool* and is opinionated about three things on
+purpose — they are design choices, not missing features:
+
+- **Outer-loop sovereignty** — we referee the refiner's **output**, never its
+  inner tokens. The inner agent loop is a swappable vendor; we are the meta-loop
+  it plugs into.
+- **Single referee of record** — quality comes **only** from the independent
+  CLI-Judge verdict, never from the maker's self-report. That single authority is
+  the maker≠checker moat.
+- **Gated human confirm** — a converged result is a *claim* until a human
+  confirms; the gate is on by default and its verdict is recorded for audit but
+  never auto-ships.
+
+Full rationale, with the failure mode each choice accepts: [`docs/solutions/outer-loop-non-gaps.md`](docs/solutions/outer-loop-non-gaps.md).
+
 ## 🏛️ Architecture
 
 ```mermaid

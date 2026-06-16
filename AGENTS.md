@@ -44,6 +44,18 @@ implementation plan.
   for **attended** runs; **scheduled** runs stay confirm-required regardless of
   `CI`, so a scheduler can't silently auto-ship.
 
+- **Three deliberate non-gaps vs the generic agent loop.** These are design
+  choices, not omissions — do not "fix" them. (1) **Outer-loop sovereignty:** we
+  govern the outer loop and referee the refiner's *output*, never its inner
+  tokens; the inner loop is a swappable vendor behind the `Refiner` protocol —
+  do not instrument it. (2) **Single referee of record:** quality comes only from
+  CLI-Judge's `Verdict` (KTD4); never add a second quality source (a refiner
+  self-report, an inner-confidence signal) — it would let a maker grade its own
+  work and collapse maker≠checker. (3) **Gated human confirm:** confirmation
+  gates *shipping*, not mid-loop iteration; the gate's verdict is recorded
+  write-only and never feeds back into shippability. Full rationale +
+  failure-mode-per-choice: `docs/solutions/outer-loop-non-gaps.md`.
+
 ## Proof pipeline (refine-only)
 
 `loop-anything demo proof <id>` adopts a published catalog CLI as a *baseline*,
