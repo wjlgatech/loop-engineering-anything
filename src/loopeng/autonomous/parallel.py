@@ -13,7 +13,11 @@ Two collision surfaces, two guards:
     ``GitCheckpoint`` snapshots and ``reset --hard`` rollbacks never collide --
     a safety rollback in worktree A cannot disturb worktree B's tree. Each
     worktree is removed (``git worktree remove --force``) on completion, success
-    or crash.
+    or crash. **``git worktree add``/``remove``/``prune`` are not concurrency-safe**
+    against a shared repo -- they race on ``.git/worktrees/`` metadata (a
+    ``failed to read .git/worktrees/<x>/commondir`` error). So worktree
+    *creation and teardown* are serialized through a lock; the slow part (each
+    loop's ``run``) still executes fully in parallel.
 
   - **Shared SQLite.** Every parallel loop records into one :class:`MemoryStore`.
     That store now serializes all writes through a single shared connection under
@@ -29,9 +33,16 @@ from __future__ import annotations
 
 import os
 import shutil
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Callable, Sequence
+
+# git worktree add/remove/prune mutate shared ``.git/worktrees/`` metadata and are
+# NOT safe to run concurrently against one repo; serialize them (the per-target
+# loop work still runs in parallel). Module-level so it guards across any
+# concurrent ``run_parallel`` calls sharing a repo.
+_WORKTREE_LOCK = threading.Lock()
 
 from ..adapters.safety import run_tool
 
@@ -131,16 +142,18 @@ def run_parallel(
 
     def _one(target: ParallelTarget, wt_path: str, branch: str) -> ParallelResult:
         try:
-            _add_worktree(top, wt_path, branch)
+            with _WORKTREE_LOCK:  # serialize git worktree metadata mutation (race fix)
+                _add_worktree(top, wt_path, branch)
         except Exception as exc:  # worktree could not be created
             return ParallelResult(target.key, wt_path, ok=False, error=str(exc))
         try:
-            value = target.run(wt_path)
+            value = target.run(wt_path)  # the slow part — runs fully in parallel
             return ParallelResult(target.key, wt_path, ok=True, value=value)
         except Exception as exc:  # crashed run: record, clean up, let siblings go
             return ParallelResult(target.key, wt_path, ok=False, error=str(exc))
         finally:
-            _remove_worktree(top, wt_path)
+            with _WORKTREE_LOCK:
+                _remove_worktree(top, wt_path)
 
     results: list[ParallelResult] = []
     with ThreadPoolExecutor(max_workers=max_parallel) as pool:
