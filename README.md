@@ -36,6 +36,20 @@ live catalog of these loops, auto-published from `demos/` on every push — each
 headlines the **loop outcome** (grade trajectory + convergence + report), which a
 plain CLI gallery can't.
 
+### ✅ Verified loops — real `F → A` runs
+
+Not aspiration — recorded runs, graded by the independent CLI-Judge referee and
+refined by a free-tier LLM (no Anthropic quota), recorded via `demo record` (the
+only path to a `live_verified` card):
+
+| Loop | What it automated | Outcome | Proof |
+| --- | --- | --- | --- |
+| **automate-your-job** | a team-lead's daily standup digest, graded against a captured day of real activity | `F → A` | [PROOF](demos/targets/standup/PROOF.md) |
+| **factcli** | a CLI brought up to the agent-native (non-interactive) contract | `F → A` | [PROOF](demos/targets/factcli/PROOF.md) |
+| **one-person-industrial-engine** | a 2-slice product **fleet** (API → dependent digest), both slices converged in dependency order with the upstream outcome routed downstream | `F → A` ×2 | [PROOF](demos/fleets/one-person-industrial-engine/PROOF.md) |
+
+### 🗺️ The broader menu — point the loop at any of these
+
 | Domain | What "improving itself" looks like |
 | --- | --- |
 | 🔀 **PR lifecycle** | a loop that drives a PR green — tests, review comments, conflicts — until it merges |
