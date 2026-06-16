@@ -81,11 +81,20 @@ class Refiner(Protocol):
     ``last_token_cost`` is the optional per-refactor token cost the controller
     threads into the budget gate (U4). It is ``None`` when the refiner cannot
     report cost (e.g. a free-tier LLM); the controller then falls back to the
-    wall-clock budget. Declared on the protocol so the controller reads it
-    protocol-bound rather than reaching into a concrete refiner class.
+    wall-clock budget.
+
+    ``last_infra_failure`` is ``True`` when the last ``refactor`` failed for
+    *infrastructure* reasons (timeout / non-zero exit / a fully-throttled
+    provider chain) rather than producing a clean no-change (U3). The controller
+    reads it to retry transient failures; a refiner that omits it would silently
+    forgo retries, so it is part of the contract.
+
+    Both are declared on the protocol so the controller reads them protocol-bound
+    rather than reaching into a concrete refiner class.
     """
 
     last_token_cost: int | None
+    last_infra_failure: bool
 
     def refactor(self, tool_path: str, brief: RefactorBrief) -> str | None: ...
 

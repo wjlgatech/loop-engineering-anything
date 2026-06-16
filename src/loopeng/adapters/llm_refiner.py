@@ -177,6 +177,10 @@ class FallbackLLMRefiner:
     # This refiner does not surface token cost; the controller falls back to the
     # wall-clock budget (U4). Declared to satisfy the Refiner protocol.
     last_token_cost: int | None = None
+    # True when the whole provider chain failed (throttled / unreachable) -- a
+    # transient INFRA failure the controller should retry (U3), not a clean
+    # no-change. Declared to satisfy the Refiner protocol.
+    last_infra_failure: bool = False
 
     def refactor(self, tool_path: str, brief: RefactorBrief) -> str | None:
         chain = self.chain if self.chain is not None else default_chain()
@@ -189,8 +193,11 @@ class FallbackLLMRefiner:
                 break
             except (urllib.error.URLError, urllib.error.HTTPError, KeyError, ValueError, OSError):
                 continue  # free tier throttled / unreachable -> next rung
+        # A fully-failed chain is a transient infra failure (retryable, U3); a
+        # chain that returned content is not, even if it parses to no edits.
+        self.last_infra_failure = content is None
         if content is None:
-            return None  # whole chain failed -> no change, loop will not advance
+            return None  # whole chain failed -> infra failure; controller retries
 
         _summary, edits = _parse_edits(content)
         applied = 0
