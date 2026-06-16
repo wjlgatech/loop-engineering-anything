@@ -43,8 +43,27 @@ loops toward one goal. Concretely, today `autonomous/parallel.py:run_parallel`
 is a flat fan-out (a list of independent targets, no dependency graph, no
 cross-item lifecycle beyond `ParallelResult.ok`), and `scheduler/heartbeat.py`
 fires due targets by cadence only. This plan adds the coordination layer on top —
-exactly the work plan-005 deferred as U8 (portfolio coordination), now expanded
-to the article's orchestration framing.
+expanding the *direction* of plan-005's deferred U8 (cross-target coordination)
+into a full orchestration layer. U8's specific grade-slope triage is subsumed by
+the coordinator's lifecycle + escalation; a dedicated scheduler triage is
+revisited only if needed.
+
+## Fleet item — definition
+
+A **fleet item** is one loop-able unit of work: a distinct target (an API or
+codebase) — or a sub-task scoped to a single target — with its own goal and its
+own referee. A *fleet run* is a set of items sharing one top-level goal, linked
+by a dependency graph.
+
+**A dependency edge in Phase A means advisory context, not code inheritance.**
+`run_parallel` checks each item out with `git worktree add -B <branch> HEAD`
+(`autonomous/parallel.py`), so sibling worktrees are independent branches off
+`HEAD` — a dependent worktree does **not** see an upstream item's committed code.
+Phase A propagates an upstream item's *outcome summary* into the dependent's
+brief (U3), not its diff: "D depends on A" means A's verdict informs D's brief
+and gates whether D runs, not that D inherits A's files. Code-level dependency (a
+dependent branching off an upstream's converged branch) is out of Phase A scope
+and noted for Phase B.
 
 ---
 
@@ -90,8 +109,11 @@ to the article's orchestration framing.
 ### Invariant constraints (carried from `AGENTS.md` + `docs/solutions/outer-loop-non-gaps.md`)
 
 - **Wrap-don't-fork at the fleet level too:** the coordinator depends only on
-  existing primitives + a new protocol; the per-target `LoopController` is
-  untouched.
+  existing primitives + a new protocol. The per-target `LoopController`'s
+  convergence *policy* is untouched; the only permitted controller change is one
+  additive, backward-compatible `upstream_context` parameter threaded into the
+  brief (U3) — wrap-don't-fork holds for the loop *dynamics*, not a frozen
+  signature (see KTD1).
 - **Quality only from CLI-Judge, per worker:** the fleet never overrides a
   worker's referee verdict.
 - **Safety unbypassable:** a `BLOCKED_SAFETY` worker is never auto-merged by the
@@ -108,8 +130,12 @@ to the article's orchestration framing.
 - KTD1. **The fleet coordinator is a new layer ABOVE the controller**, depending
   only on existing primitives (`autonomous/parallel.py:run_parallel`,
   `MemoryStore`, `RunResult`) and a new `Orchestrator` protocol. The per-target
-  `LoopController` and its convergence policy are not modified — wrap-don't-fork
+  `LoopController`'s convergence *policy* is not modified — wrap-don't-fork
   applies at the fleet level, mirroring how the controller wraps the four tools.
+  The one exception is the additive `upstream_context` seam U3 requires: a
+  backward-compatible optional parameter on `run_loop`/`run_refine_loop` threaded
+  into `build_refactor_brief`. It changes a signature, not the loop dynamics, and
+  defaults to today's behavior when absent.
 - KTD2. **Fleet state persists in new SQLite tables** (`fleet_runs`,
   `fleet_items`) created via `CREATE TABLE IF NOT EXISTS`, mirroring the
   `confirmations` (plan-005 U5) and `schedule_state` patterns. Existing tables
@@ -121,18 +147,25 @@ to the article's orchestration framing.
   mirroring the `loop.integrity` fail-closed preconditions.
 - KTD4. **Feedback routing is deterministic plumbing (code, not the LLM):** on
   item completion the coordinator appends a structured outcome summary to each
-  dependent's brief context. The brief already carries cross-run
-  `recurring_failures` (plan-005 U1); this extends the same channel with
-  upstream-item outcomes.
+  dependent's brief. This requires a *new* advisory field on `RefactorBrief`
+  (`upstream_outcomes`) reached through the additive `upstream_context` seam in
+  KTD1 — it is modeled on plan-005 U1's `recurring_failures` but is not the same
+  field: `recurring_failures` is store-derived inside the controller and carries
+  fixture strings, whereas `upstream_outcomes` is caller-injected and carries
+  structured cross-item outcomes.
 - KTD5. **Escalation reuses `confirm_convergence` as the per-item shippability
   authority.** The fleet auto-proceeds only on a clean converged-and-shippable
   item; `BLOCKED_SAFETY`, converged-but-gated, and stuck items route to a human
   escalation queue. The Phase B orchestrator brain is a distinct role from each
   worker's judge, so maker≠checker holds at the fleet level.
-- KTD6. **Identity boundary (named, not bridged):** fleet workers are *our*
-  self-improving target-loops (`run_loop` / `run_refine_loop`), not generic
-  coding agents. We coordinate loops; AO coordinates coding agents through an
-  issue→PR→CI IDE. That is a deliberate non-gap (see
+- KTD6. **Identity boundary — enforced, not just named.** This is the same
+  orchestration *pattern* the article describes, applied to a different worker
+  *substrate*: our self-improving target-loops (grading + refinement), not
+  code-gen agents. The boundary is enforced by the coordinator's runner contract
+  — it drives `run_loop` / `run_refine_loop` (which return a `RunResult` the fleet
+  understands), not an arbitrary agent callable — so "loop engine, not Agent IDE"
+  is a code constraint, not only a doc claim. We coordinate loops; AO coordinates
+  coding agents through an issue→PR→CI IDE (see
   `docs/solutions/outer-loop-non-gaps.md`).
 
 ---
@@ -152,15 +185,20 @@ flowchart TD
     WAVE -->|ready items| RP[run_parallel — worktree fan-out]
     RP --> W1[worker loop\nrun_loop in worktree]
     RP --> W2[worker loop\nrun_loop in worktree]
-    W1 --> OUT[item outcome\nverdict / recurring / blocked]
+    W1 --> OUT[item outcome\nRunResult: state / shippable / gate_reason]
     W2 --> OUT
-    OUT --> ROUTE[feedback routing\n→ dependents' briefs]
-    ROUTE --> WAVE
     OUT --> ESC{high-judgment fork?}
+    ESC -->|clean + shippable| UNLOCK[mark converged\n→ route outcome to dependents]
     ESC -->|blocked / gated / stuck| HUMAN([escalation queue])
-    ESC -->|clean + shippable| WAVE
-    WAVE -->|none left| DONE([fleet converged])
+    UNLOCK --> WAVE
+    WAVE -->|all converged| DONE([fleet converged])
+    WAVE -->|none ready, escalations open| PARK([parked — awaiting human, resumable])
 ```
+
+Routing runs on the `clean + shippable` edge — a converged item's outcome is
+written into its dependents' briefs as it unlocks them (KTD4). The two terminals
+are distinct: **DONE** (every item converged) and **PARK** (no item is ready and
+an escalation is still open — a durable, resumable state, never a hang).
 
 ### Fleet-item lifecycle
 
@@ -168,7 +206,9 @@ flowchart TD
 stateDiagram-v2
     [*] --> pending
     pending --> running: dependencies satisfied
-    running --> converged: clean + shippable verdict
+    pending --> blocked_on_dep: a dependency ended non-converged
+    running --> converged: clean AND shippable verdict
+    running --> escalated: converged but gated (confirmation owed)
     running --> stopped: plateau / budget (pivots exhausted)
     running --> blocked: BLOCKED_SAFETY
     converged --> [*]: outcome routed to dependents
@@ -177,6 +217,13 @@ stateDiagram-v2
     escalated --> running: human re-brief ("talk to a worker")
     escalated --> [*]: human closes
 ```
+
+Only a verdict that is both converged AND shippable (`confirm_convergence`
+satisfied) reaches `converged`; a converged-but-gated verdict goes straight to
+`escalated`, never to `converged`. When every escalated item is unresolved and no
+item is `running` or ready, the *fleet run* ends in a durable `awaiting_human`
+terminal (the PARK node above) — resolved later via the CLI (U5), not by blocking
+the run.
 
 ---
 
@@ -195,14 +242,17 @@ traceability and shape, specced at a lighter grain.
   tables), `src/loopeng/memory/store.py` (create/update/read methods), a new
   `src/loopeng/orchestration/fleet_state.py` (status enum + dataclasses),
   `tests/test_fleet_state.py` (new), `tests/test_memory_store.py`.
-- **Approach**: `fleet_runs(id, goal, status, started, finished)` and
+- **Approach**: `fleet_runs(id, goal, status, started, finished)` (run status
+  includes a terminal `awaiting_human` — the PARK state) and
   `fleet_items(id, fleet_id, key, status, depends_on_json, run_id, outcome_json)`,
   created via `CREATE TABLE IF NOT EXISTS` (KTD2). A `FleetItemStatus` enum
-  (pending / running / converged / stopped / blocked / escalated) with a small
-  transition guard (only legal transitions, mirroring the controller's
-  `LoopState`). Store methods: `create_fleet`, `add_fleet_item`,
+  (pending / running / converged / stopped / blocked / blocked_on_dep /
+  escalated) with a small transition guard (only legal transitions, mirroring the
+  controller's `LoopState`). Store methods: `create_fleet`, `add_fleet_item`,
   `set_item_status`, `record_item_outcome`, `fleet_items(fleet_id)`,
-  `escalations(fleet_id)`.
+  `escalations(fleet_id)`, `set_fleet_status`. A re-brief (U4) updates the
+  existing item row in place — `run_id` replaced, status reset to `running` — it
+  does not insert a second row.
 - **Patterns to follow**: the `confirmations` table + `record_confirmation` /
   `confirmations` reader (plan-005 U5); `schedule_state` + `ScheduleEntry`;
   `LoopState` enum in `loop/controller.py`.
@@ -222,13 +272,22 @@ traceability and shape, specced at a lighter grain.
 - **Files**: `src/loopeng/orchestration/coordinator.py` (new),
   `tests/test_fleet_coordinator.py` (new).
 - **Approach**: The coordinator takes a fleet (items + `depends_on` edges) and a
-  per-item runner callable. It computes ready items (all deps converged),
-  dispatches that wave through `autonomous/parallel.py:run_parallel` (reusing the
-  worktree isolation untouched), marks results via U1's status methods, then
-  recomputes the next ready wave until none remain. A dependency cycle is
-  detected and rejected **before any work starts** (fail-closed, KTD3). An item
-  whose dependency ended non-converged (stopped/blocked) does not run — it is
-  marked blocked-on-dependency and surfaced.
+  per-item runner callable. **The runner returns the full `RunResult`** (from
+  `autonomous/runner.py`) as `ParallelResult.value` — not `tick_parallel`'s int
+  run_id — so U1/U3/U4 read `final_state` / `shippable` / `gate_reason` directly
+  without a second store query. The runner also **re-bases the worker's
+  `workspace_root` (and `tool_path` for refine loops) onto the per-item worktree
+  path `run_parallel` hands it**, mirroring `Heartbeat.tick_parallel`'s
+  `replace(base_fire, workspace=worktree)` — this is what makes the "isolation
+  untouched" claim actually hold (the worker's generated tool + `GitCheckpoint`
+  live inside the per-item worktree). It computes ready items (all deps
+  converged), dispatches that wave through `autonomous/parallel.py:run_parallel`,
+  marks results via U1's status methods, then recomputes the next ready wave until
+  none remain. A dependency cycle is detected and rejected **before any work
+  starts** (fail-closed, KTD3). An item whose dependency ended non-converged
+  (stopped/blocked/escalated) does not run — it is marked `blocked_on_dep` and
+  surfaced. When no item is ready and escalations remain open, the fleet run ends
+  `awaiting_human` (PARK) rather than spinning.
 - **Execution note**: Characterization-first — pin today's flat `run_parallel`
   behavior (independent targets, no ordering) before layering wave sequencing, so
   the fan-out contract is demonstrably unchanged.
@@ -236,14 +295,16 @@ traceability and shape, specced at a lighter grain.
   if i.pending and all(dep.converged)]`; dispatch `run_parallel(ready)`; stop
   when no pending item is ready (either all done, or the rest are blocked on
   non-converged deps).
-- **Patterns to follow**: `Heartbeat.tick_parallel` building `ParallelTarget`s and
-  calling `run_parallel`; the integrity fail-closed precondition shape in
-  `loop/integrity.py`.
+- **Patterns to follow**: `Heartbeat.tick_parallel` building `ParallelTarget`s,
+  re-basing the workspace onto the worktree, and calling `run_parallel` (but
+  return the `RunResult`, not the int run_id `tick_parallel` returns); the
+  integrity fail-closed precondition shape in `loop/integrity.py`.
 - **Test scenarios**:
   - Happy path: a diamond DAG (A → B, A → C, B&C → D) runs A first, then B and C in one wave, then D.
   - Edge: a cycle (A→B→A) is rejected before any worker runs (no worktree created).
-  - Error: when B ends `stopped`, D (depending on B) does not run and is marked blocked-on-dependency, while independent items still complete.
-  - Integration: the wave actually dispatches through `run_parallel` with one worktree per ready item, bounded by `max_parallel`.
+  - Error: when B ends `stopped`, D (depending on B) does not run and is marked `blocked_on_dep`, while independent items still complete.
+  - Edge: when no item is ready and an escalation is open, the fleet run ends `awaiting_human`, not an infinite wave loop.
+  - Integration: the per-item runner returns a `RunResult` and the worker's `GitCheckpoint` operates inside the per-item worktree (isolation holds); the wave dispatches through `run_parallel` bounded by `max_parallel`.
 - **Verification**: items execute in topological waves; cycles fail closed; a non-converged dependency cleanly blocks its dependents without aborting siblings.
 
 ### U3. Automatic feedback routing between fleet items
@@ -254,17 +315,30 @@ traceability and shape, specced at a lighter grain.
 - **Dependencies**: U1, U2.
 - **Files**: `src/loopeng/orchestration/routing.py` (new),
   `src/loopeng/orchestration/coordinator.py` (call the router between waves),
-  `tests/test_fleet_routing.py` (new).
-- **Approach**: On item completion, compose a structured `UpstreamOutcome`
-  (grade/score summary, failing + recurring fixtures, blocked/stuck reason) and
-  attach it to each dependent's brief context so the dependent's worker loop
-  starts informed. This reuses the brief's existing advisory channel — plan-005
-  U1 added `RefactorBrief.recurring_failures`; routing supplies upstream-item
-  outcomes through the same per-worker brief seam, deterministically (no LLM).
-- **Patterns to follow**: `loop/refactor_brief.py` (the brief is the per-worker
-  context seam); plan-005 U1's advisory `recurring_failures` field.
+  `src/loopeng/adapters/base.py` (new advisory `RefactorBrief.upstream_outcomes`
+  field), `src/loopeng/loop/controller.py` (thread `upstream_context` into
+  `build_refactor_brief`), `src/loopeng/loop/refactor_brief.py` (accept it),
+  `src/loopeng/autonomous/runner.py` (additive `upstream_context` param on
+  `run_loop` / `run_refine_loop`), `tests/test_fleet_routing.py` (new),
+  `tests/test_refactor_brief.py`.
+- **Approach**: **The brief-injection seam does not exist today and must be
+  built** — `RefactorBrief` is constructed inside `LoopController.run` from
+  store-derived `recurring_failures`, and `run_loop`/`LoopController` take no
+  inbound context. Add the seam (KTD1's one permitted additive change): an
+  optional `upstream_context` parameter on `run_loop`/`run_refine_loop`, threaded
+  through `LoopController` into `build_refactor_brief`, landing in a new advisory
+  `RefactorBrief.upstream_outcomes` field (modeled on `recurring_failures` but
+  caller-injected and carrying structured outcomes, not fixture strings). On item
+  completion the router composes a structured `UpstreamOutcome` (grade/score
+  summary, failing fixtures, blocked/stuck reason) per dependent and passes it via
+  this parameter when the coordinator dispatches that dependent — deterministic,
+  no LLM. Absent the parameter, behavior is identical to today.
+- **Patterns to follow**: plan-005 U1's `recurring_failures` field on
+  `RefactorBrief` and its threading in `loop/controller.py` (the closest existing
+  shape — extend it with a caller-injected sibling).
 - **Test scenarios**:
-  - Happy path: item A converges; D's worker is invoked with A's outcome present in its brief context.
+  - Happy path: item A converges; D's worker is invoked with A's `UpstreamOutcome` present in `RefactorBrief.upstream_outcomes` (assert end-to-end: the refiner actually receives it, not just that the object was composed).
+  - Edge: `run_loop` called without `upstream_context` produces a brief byte-identical to today (additive, backward-compatible).
   - Edge: an item with no dependents routes nothing (no error).
   - Edge: a blocked upstream routes its blocked reason to dependents (so they can be held/escalated, not run blind).
   - Integration: routing is deterministic — the same upstream outcome yields the same dependent brief context, no model call.
@@ -284,10 +358,16 @@ traceability and shape, specced at a lighter grain.
   silently; a `BLOCKED_SAFETY` item, a converged-but-gated item, or a worker still
   stopped after its pivots are exhausted is added to the escalation queue (U1
   status `escalated`) with a legible reason (reuse `describe_gate_reason` from
-  plan-005 U5). A human action re-briefs one item (append a human note to its
-  brief context and re-run that single worker) without re-running the fleet —
-  the "talk to a worker" affordance. The fleet never auto-merges a blocked or
-  unconfirmed item (KTD5).
+  plan-005 U5). Classification reads the `RunResult` returned by U2's runner —
+  `final_state` / `shippable` / `gate_reason` — so escalation needs no separate
+  `confirm_convergence` call. A human action re-briefs one item via the U3
+  `upstream_context` seam (append a human note, re-run that single worker,
+  updating the existing item row in place — `run_id` replaced, status → `running`)
+  without re-running the fleet — the "talk to a worker" affordance. The fleet
+  never auto-merges a blocked or unconfirmed item (KTD5). **Known Phase A
+  staleness:** a re-brief re-runs one worker, but dependents that already ran
+  against its prior output are not auto-re-routed — surfaced in the report, not
+  silently corrected.
 - **Patterns to follow**: `loop/integrity.py:confirm_convergence` /
   `gate_requires_confirmation` / `describe_gate_reason`; `autonomous/runner.py`
   `_apply_gate` (plan-005 U5).
@@ -305,13 +385,17 @@ traceability and shape, specced at a lighter grain.
 - **Requirements**: R5.
 - **Dependencies**: U1, U2, U3, U4.
 - **Files**: `src/loopeng/cli.py` (new `fleet` command group),
-  `src/loopeng/autonomous/report.py` (fleet research report), `tests/test_fleet_cli.py` (new).
+  `src/loopeng/orchestration/fleet_report.py` (new — aggregates per-item single-run
+  reports), `tests/test_fleet_cli.py` (new).
 - **Approach**: `loop-anything fleet run <spec> --goal ...` (spec = a list of
   items + dependencies; in Phase A supplied explicitly — Phase B generates it),
   `fleet status <fleet_id>`, `fleet report <fleet_id> [--json]`, and
-  `fleet escalations <fleet_id>`. The report extends the existing per-run research
-  report to the fleet: per-item grade trajectory + lifecycle + the escalation
-  list. Reuse the existing CLI patterns (`run`, `status`, `report`, `schedule`).
+  `fleet escalations <fleet_id>`. The fleet report **aggregates** per-item
+  single-run reports (each item's `run_id` → existing `autonomous/report.py`
+  per-run report) + lifecycle + the escalation list. It lives in a new
+  `orchestration/fleet_report.py` so `autonomous/report.py` stays the untouched
+  per-run building block (no coupling of the single-run module to fleet types).
+  Reuse the existing CLI patterns (`run`, `status`, `report`, `schedule`).
 - **Patterns to follow**: existing `loop-anything` Click command groups in
   `src/loopeng/cli.py` (`run`/`status`/`report`/`schedule`); `autonomous/report.py`.
 - **Test scenarios**:
@@ -383,6 +467,18 @@ traceability and shape, specced at a lighter grain.
 U1–U6: the deterministic coordination plumbing (lifecycle, dependency-ordered
 waves, feedback routing, escalation, CLI/report) + the boundary docs.
 
+**Phase A standalone value (honest framing).** Decomposition is Phase B, so
+Phase A requires a **hand-authored** fleet spec (items + dependency edges +
+per-item briefs). Phase A is worth shipping before Phase B for two concrete
+users: (1) **us, dogfooding** — driving a known-ordering multi-step improvement
+(e.g. a staged refactor across known sub-targets) with ordering + outcome routing
++ lifecycle + an escalation queue that flat `run_parallel` lacks; (2) **a power
+user** with an already-decomposed goal who wants coordination without the LLM
+decomposition. Phase A is also the infrastructure Phase B is validated against.
+Where the goal is *not* pre-decomposed, flat `run_parallel` remains the simpler
+tool until Phase B lands — the plan does not claim Phase A replaces it for that
+case.
+
 ### Deferred to Follow-Up Work (Phase B, in this plan)
 
 - U7 orchestrator brain (decomposition via wrapped compound-engineering).
@@ -404,19 +500,30 @@ waves, feedback routing, escalation, CLI/report) + the boundary docs.
 
 ## Risks & Dependencies
 
-- **Worktree pressure at fleet scale.** Many concurrent items = many `git
-  worktree add`/`remove` operations; CI already shows an intermittent
-  concurrent-worktree race (`test_parallel_worktrees.py`). Mitigation: the
-  coordinator reuses the bounded `run_parallel` (`max_parallel`) untouched and
-  adds no new concurrency primitive; waves cap simultaneous worktrees.
+- **Worktree pressure + new concurrency exposure.** Wave sequencing issues
+  repeated `run_parallel` calls over a shared `worktrees_root` and interleaves
+  coordinator writes to the same `MemoryStore` with worker writes — *more* total
+  worktree churn than a single fan-out, not "no new concurrency risk." CI already
+  shows an intermittent concurrent-worktree race (`test_parallel_worktrees.py`).
+  Mitigation (precise): waves run **sequentially** so no two `run_parallel` calls
+  overlap; store writes are serialized by the existing shared-connection lock;
+  `max_parallel` caps simultaneous worktrees per wave. A U2 test covers
+  back-to-back waves reusing `worktrees_root` with no leaked worktrees.
+- **A converged upstream may be wrong-for-the-dependent.** A referee certifies an
+  item against *its own* goal, not a dependent's integration needs; Phase A
+  routing can forward a GREEN that is a poor foundation, undetected. Mitigation:
+  named limitation — Phase A dependency is advisory context only (not code
+  inheritance), the dependent surfaces the gap via its own grade, and Phase B's
+  U8 intent-checker is where cross-item fitness is judged.
 - **Dependency-graph correctness.** A bad graph could deadlock or run work out of
   order. Mitigation: cycle detection fails closed before any work (KTD3); a
-  non-converged dependency blocks dependents explicitly rather than running them
-  blind.
+  non-converged dependency marks dependents `blocked_on_dep` rather than running
+  them blind; an all-escalated/no-ready state ends the run `awaiting_human`, never
+  an infinite loop.
 - **Escalation must never become an auto-ship bypass.** Mitigation: escalation
-  reuses `confirm_convergence` as the sole shippability authority (KTD5); a
-  blocked/unconfirmed item is never auto-merged — same R10 guarantee as plan-005
-  U5, lifted to the fleet.
+  classification reads the worker's `RunResult` and `confirm_convergence` stays
+  the sole shippability authority (KTD5); a blocked/unconfirmed item is never
+  auto-merged — same R10 guarantee as plan-005 U5, lifted to the fleet.
 - **Identity drift toward an Agent IDE.** Mitigation: KTD6 + U6 name the boundary;
   the non-goal is explicit.
 - **Cross-cutting docs-sync.** Each behavior-altering unit (U1–U5) carries a

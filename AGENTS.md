@@ -55,6 +55,15 @@ implementation plan.
   gates *shipping*, not mid-loop iteration; the gate's verdict is recorded
   write-only and never feeds back into shippability. Full rationale +
   failure-mode-per-choice: `docs/solutions/outer-loop-non-gaps.md`.
+- **Fleet orchestration is a loop engine, not an Agent IDE (plan-006).** The
+  `orchestration/` layer coordinates our own self-improving target-loops
+  (`run_loop`/`run_refine_loop`), not generic coding agents — the runner contract
+  enforces it. We forgo a GitHub-native reaction system on purpose; cross-item
+  feedback is the referee verdict + routed outcomes, and a Phase-A dependency is
+  advisory context, not code inheritance. Fleet-level invariants hold: quality
+  only from the per-worker referee, `BLOCKED_SAFETY` escalated never auto-merged,
+  `confirm_convergence` the sole shippability authority. Rationale:
+  `docs/solutions/fleet-orchestration-boundary.md`.
 
 ## Proof pipeline (refine-only)
 
@@ -92,6 +101,7 @@ protocol, so the refine engine is selectable:
 | `src/loopeng/loop/` | controller, convergence, brief, compound, `GitCheckpoint` (U6); `integrity.py` — maker≠checker / referee-immutability / held-out-disjoint assertions + human-confirm verification gate, all fail-closed (plan-004 U17, R6/R10, KTD6) |
 | `src/loopeng/autonomous/` | research report + autonomous runner; `run_refine_loop` (refine-only, proof pipeline U2); runs the U17 integrity preflight + gates `CONVERGED` via `RunResult.shippable` (`scheduled`/`confirmed`); `parallel.py` — worktree fan-out (`run_parallel`): one git worktree per target, bounded by `max_parallel`, crash-isolated, auto-cleaned (plan-004 U16, R9) |
 | `src/loopeng/scheduler/` | `Heartbeat` cadence engine — durable `schedule_state`, due-calc, failure isolation, resume anchor; runner-agnostic (injected, KTD7). `tick` (sequential) + `tick_parallel` (fans due targets through `autonomous/parallel.py` into isolated worktrees, plan-004 U16). `loop-anything schedule add/list/remove/tick` (plan-004 U14, R7) |
+| `src/loopeng/orchestration/` | fleet orchestration layer (plan-006) — coordinates *many* self-improving loops under one goal ABOVE the per-target controller. `coordinator.run_fleet` runs items in topological waves over `autonomous/parallel.run_parallel` (cycles fail closed; non-converged deps block dependents; escalations PARK the fleet `awaiting_human`); `routing.py` pulls deps' outcomes into a dependent's brief via the U3 `upstream_context` seam; `escalation.py` routes only blocked/gated/stuck items to a human + `rebrief_item`; `spec.py`/`fleet_report.py` back the `loop-anything fleet` CLI. Depends only on `run_parallel` + `RunResult` + the store — the `LoopController` is untouched (KTD1). `memory/fleet_state.py` holds the lifecycle enums + transition guard. |
 | `src/loopeng/demos/` | demo manifest/registry + result fixtures (validated; SSRF/traversal/secret guards) |
 | `src/loopeng/showcase/` | self-contained HTML catalog generator (context-aware escaping) |
 | `demos/` · `docs/recipes/` | community demo manifests + fixtures; aspirational loop recipes |

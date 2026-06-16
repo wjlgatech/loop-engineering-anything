@@ -61,6 +61,31 @@ CREATE TABLE IF NOT EXISTS confirmations (
     created   TEXT                                    -- ISO-8601, supplied by caller; nullable
 );
 
+-- Fleet orchestration (plan-006 U1). A fleet run coordinates multiple loop items
+-- under one goal; each item has a lifecycle status and a dependency list. Items
+-- reference the per-target run they spawned (run_id) so the fleet report can
+-- aggregate per-item single-run reports. New tables via CREATE TABLE IF NOT
+-- EXISTS appear on the next open of an existing DB (no _migrate needed).
+CREATE TABLE IF NOT EXISTS fleet_runs (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    goal     TEXT,
+    status   TEXT NOT NULL DEFAULT 'running',  -- running|converged|awaiting_human|stopped
+    started  TEXT NOT NULL,                    -- ISO-8601, supplied by caller
+    finished TEXT                              -- ISO-8601; nullable
+);
+
+CREATE TABLE IF NOT EXISTS fleet_items (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    fleet_id        INTEGER NOT NULL REFERENCES fleet_runs(id),
+    key             TEXT NOT NULL,             -- stable item key (also the worktree slug)
+    status          TEXT NOT NULL DEFAULT 'pending',
+    depends_on_json TEXT NOT NULL DEFAULT '[]',  -- list of upstream item keys
+    run_id          INTEGER,                   -- the per-target run this item spawned; nullable
+    outcome_json    TEXT,                      -- routed outcome summary; nullable
+    UNIQUE (fleet_id, key)
+);
+
 CREATE INDEX IF NOT EXISTS idx_iterations_run ON iterations(run_id, n);
 CREATE INDEX IF NOT EXISTS idx_learnings_run ON learnings(run_id);
 CREATE INDEX IF NOT EXISTS idx_confirmations_run ON confirmations(run_id);
+CREATE INDEX IF NOT EXISTS idx_fleet_items_fleet ON fleet_items(fleet_id);

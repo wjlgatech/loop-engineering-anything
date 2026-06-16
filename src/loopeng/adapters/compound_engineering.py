@@ -77,6 +77,15 @@ class ClaudeCodeRefiner:
                 f"\nFixtures that recur across prior runs of this target "
                 f"(watch for regressions, lower priority than the failing fixtures above): {recurring}."
             )
+        upstream = getattr(brief, "upstream_outcomes", []) or []
+        if upstream:
+            lines = "; ".join(
+                f"{u.get('item', '?')}: {u.get('final_state', '?')} (grade {u.get('grade', '?')})"
+                for u in upstream
+            )
+            prompt += (
+                f"\nUpstream fleet items this work depends on (context only): {lines}."
+            )
         return prompt
 
     def refactor(self, tool_path: str, brief: RefactorBrief) -> str | None:

@@ -138,6 +138,94 @@ def report_cmd(run_id: int, as_json: bool) -> None:
     click.echo(render_report(store, run_id, as_json=as_json))
 
 
+@main.group("fleet")
+def fleet_grp() -> None:
+    """Coordinate a fleet of self-improving loops (plan-006)."""
+
+
+@fleet_grp.command("run")
+@click.argument("spec_path")
+@click.option("--goal", default=None, help="Top-level goal for the fleet.")
+def fleet_run_cmd(spec_path: str, goal: str | None) -> None:
+    """Parse a fleet SPEC (JSON) and materialize the fleet run."""
+    import json
+    from datetime import datetime, timezone
+
+    from .memory.store import MemoryStore
+    from .orchestration.spec import FleetSpecError, materialize_fleet, parse_fleet_spec
+
+    with open(spec_path, encoding="utf-8") as fh:
+        data = json.load(fh)
+    try:
+        items = parse_fleet_spec(data)
+    except FleetSpecError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    store = MemoryStore.default()
+    started = datetime.now(timezone.utc).isoformat()
+    fleet_id = materialize_fleet(store, goal or data.get("goal"), items, started)
+    click.echo(f"Fleet #{fleet_id} created with {len(items)} items.")
+    # Live per-item execution drives run_loop per item, which needs the factory
+    # adapters (same gate as `run`). The coordinator (run_fleet) is exercised in
+    # tests; inspect a materialized fleet with `fleet status` / `fleet report`.
+    click.echo(
+        "Live per-item execution requires the factory adapters (see `run`). "
+        "Inspect this fleet with `fleet status` / `fleet report`."
+    )
+
+
+@fleet_grp.command("status")
+@click.argument("fleet_id", type=int)
+def fleet_status_cmd(fleet_id: int) -> None:
+    """Show a fleet run's items and their lifecycle status."""
+    from .memory.store import MemoryStore
+
+    store = MemoryStore.default()
+    fleet = store.get_fleet(fleet_id)
+    if fleet is None:
+        click.echo(f"No fleet #{fleet_id}.")
+        return
+    click.echo(f"Fleet #{fleet_id}  status={fleet.status.value}  goal={fleet.goal or '-'}")
+    for i in store.fleet_items(fleet_id):
+        dep = f"  deps={','.join(i.depends_on)}" if i.depends_on else ""
+        click.echo(f"  - {i.key:<16} {i.status.value}{dep}")
+
+
+@fleet_grp.command("report")
+@click.argument("fleet_id", type=int)
+@click.option("--json", "as_json", is_flag=True, help="Emit machine-readable JSON.")
+def fleet_report_cmd(fleet_id: int, as_json: bool) -> None:
+    """Aggregated fleet report: per-item lifecycle, grades, escalations."""
+    from .memory.store import MemoryStore
+    from .orchestration.fleet_report import build_fleet_report, render_fleet_report
+
+    store = MemoryStore.default()
+    report = build_fleet_report(store, fleet_id)
+    if report is None:
+        click.echo(f"No fleet #{fleet_id}.")
+        return
+    click.echo(render_fleet_report(report, as_json=as_json))
+
+
+@fleet_grp.command("escalations")
+@click.argument("fleet_id", type=int)
+def fleet_escalations_cmd(fleet_id: int) -> None:
+    """List the items awaiting a human, with their reasons."""
+    from .memory.store import MemoryStore
+
+    store = MemoryStore.default()
+    if store.get_fleet(fleet_id) is None:
+        click.echo(f"No fleet #{fleet_id}.")
+        return
+    esc = store.escalations(fleet_id)
+    if not esc:
+        click.echo("No escalations.")
+        return
+    for i in esc:
+        reason = (i.outcome or {}).get("gate_reason") or (i.outcome or {}).get("reason") or "-"
+        click.echo(f"  - {i.key}: {reason}")
+
+
 @main.command("showcase")
 @click.option("--out", default="showcase.html", show_default=True, help="Output HTML path.")
 @click.option(

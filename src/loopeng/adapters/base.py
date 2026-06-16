@@ -66,8 +66,13 @@ class RefactorBrief:
     failing_fixtures: list
     # Fixtures that recur across prior runs of this target but are NOT failing in
     # the current verdict -- advisory context only, never ahead of live failures
-    # (U1). Fixtures that recur AND fail now are promoted within ``failing_fixtures``.
+    # (plan-005 U1). Fixtures that recur AND fail now are promoted within ``failing_fixtures``.
     recurring_failures: list = field(default_factory=list)
+    # Outcomes of upstream fleet items this item depends on -- caller-injected
+    # advisory context (plan-006 U3). Distinct from ``recurring_failures``: that is
+    # store-derived fixture strings; this is structured cross-item outcome dicts
+    # routed by the fleet coordinator. Empty for a non-fleet (single-target) run.
+    upstream_outcomes: list = field(default_factory=list)
 
 
 @runtime_checkable

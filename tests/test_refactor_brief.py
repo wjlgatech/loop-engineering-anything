@@ -68,3 +68,16 @@ def test_exclude_dims_none_keeps_lowest_first_ranking():
     v = _verdict(dims={"a": 10, "b": 20, "c": 30})
     brief = build_refactor_brief(v, "goal")
     assert brief.target_dimensions == ["a", "b", "c"]
+
+
+def test_upstream_outcomes_carried_on_brief():
+    # plan-006 U3: caller-injected upstream fleet outcomes ride on the brief.
+    v = _verdict(failing=["x"])
+    brief = build_refactor_brief(v, "g", upstream_outcomes=[{"item": "A", "grade": "A"}])
+    assert brief.upstream_outcomes == [{"item": "A", "grade": "A"}]
+
+
+def test_no_upstream_outcomes_defaults_empty():
+    v = _verdict(failing=["x"])
+    brief = build_refactor_brief(v, "g")
+    assert brief.upstream_outcomes == []

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from loopeng.memory.fleet_state import FleetItemStatus, FleetRunStatus, FleetTransitionError
 from loopeng.memory.store import MemoryStore, grade_rank
 
 
@@ -125,3 +126,51 @@ def test_learnings_recorded(store):
     learns = store.learnings(run_id)
     assert len(learns) == 1
     assert learns[0]["summary"] == "fixed pagination drift"
+
+
+# ----- fleet orchestration (plan-006 U1) -----
+
+
+def test_fleet_create_items_and_status_roundtrip(store):
+    fid = store.create_fleet("improve everything", "2026-06-16T00:00:00Z")
+    a = store.add_fleet_item(fid, "a")
+    store.add_fleet_item(fid, "b", depends_on=["a"])
+    store.set_item_status(a, "running", run_id=101)
+    store.set_item_status(a, FleetItemStatus.CONVERGED)
+    items = store.fleet_items(fid)
+    assert [i.key for i in items] == ["a", "b"]
+    assert items[0].status is FleetItemStatus.CONVERGED
+    assert items[0].run_id == 101
+    assert items[1].depends_on == ["a"]
+    assert store.get_fleet(fid).status is FleetRunStatus.RUNNING
+
+
+def test_fleet_illegal_transition_rejected_by_store(store):
+    fid = store.create_fleet(None, "2026-06-16T00:00:00Z")
+    a = store.add_fleet_item(fid, "a")
+    store.set_item_status(a, "running")
+    store.set_item_status(a, "converged")
+    with pytest.raises(FleetTransitionError):
+        store.set_item_status(a, "running")  # converged -> running is illegal
+
+
+def test_fleet_outcome_and_escalations(store):
+    fid = store.create_fleet(None, "2026-06-16T00:00:00Z")
+    a = store.add_fleet_item(fid, "a")
+    b = store.add_fleet_item(fid, "b")
+    for s in ("running", "blocked", "escalated"):
+        store.set_item_status(a, s)
+    store.record_item_outcome(a, {"grade": "C", "blocked_reason": "safety"})
+    store.set_item_status(b, "running")
+    store.set_item_status(b, "converged")
+    esc = store.escalations(fid)
+    assert [i.key for i in esc] == ["a"]  # only the escalated item
+    assert store.fleet_items(fid)[0].outcome["blocked_reason"] == "safety"
+
+
+def test_fleet_status_set_to_awaiting_human(store):
+    fid = store.create_fleet(None, "2026-06-16T00:00:00Z")
+    store.set_fleet_status(fid, "awaiting_human", finished="2026-06-16T01:00:00Z")
+    f = store.get_fleet(fid)
+    assert f.status is FleetRunStatus.AWAITING_HUMAN
+    assert f.finished == "2026-06-16T01:00:00Z"

@@ -120,10 +120,14 @@ def run_loop(
     maker_write_paths=(),
     dev_seeds=None,
     heldout_seeds=None,
+    upstream_context=None,
 ) -> RunResult:
     """Drive one unattended loop. Raises before any work starts if preflight,
     the credential gate, or the maker/checker integrity contract (U17) fails;
     returns a ``RunResult`` otherwise.
+
+    ``upstream_context`` (plan-006 U3) carries upstream fleet-item outcomes routed
+    into this run's briefs; ``None`` for a standalone run (identical to before).
 
     ``scheduled`` marks an unattended/scheduler-driven run: its CONVERGED result
     defaults to confirm-required regardless of CI (anti-surrender). ``confirmed``
@@ -180,6 +184,7 @@ def run_loop(
         checkpoint=checkpoint,
         store=store,
         budget=budget,
+        upstream_context=upstream_context,
     )
     outcome = controller.run(run_id, gen.tool_path, goal)
     when = datetime.now(timezone.utc).isoformat()
@@ -210,6 +215,7 @@ def run_refine_loop(
     maker_write_paths=(),
     dev_seeds=None,
     heldout_seeds=None,
+    upstream_context=None,
 ) -> RunResult:
     """Drive the loop on an **already-present** tool (proof pipeline, U2).
 
@@ -267,6 +273,7 @@ def run_refine_loop(
         checkpoint=checkpoint,
         store=store,
         budget=budget,
+        upstream_context=upstream_context,
     )
     outcome = controller.run(run_id, tool_path, goal)
     # Stamp wall-clock end for the proof pack (elapsed = finished - started).

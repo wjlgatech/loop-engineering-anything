@@ -29,7 +29,80 @@ All notable changes to this project are documented here, following
   attribute is now declared on the `Refiner` protocol alongside `last_token_cost`
   so the retry contract is complete. Tests in `tests/test_llm_refiner.py`.
 
+### Changed
+- **Fleet coordinator cleanup (post-code-review, non-behavioral)**: extracted a
+  shared `apply_item_result` so the coordinator's wave loop and
+  `escalation.rebrief_item` map a result identically (recording the outcome
+  *before* flipping status to converged, closing the converged-without-outcome
+  window); the coordinator now reads `fleet_items` once per wave and passes that
+  snapshot to `gather_upstream_outcomes` (no per-item re-read); added a test
+  asserting the `schema.sql` status DEFAULTs match the `FleetItemStatus` /
+  `FleetRunStatus` enum values.
+
 ### Added
+- **Fleet orchestration layer, Phase A — U6: boundary docs** (same plan):
+  **`docs/solutions/fleet-orchestration-boundary.md`** (new) names the
+  loop-engine-not-Agent-IDE boundary vs. Agent Orchestrator (same orchestration
+  pattern, different worker substrate; enforced by the runner contract), the
+  failure mode it accepts, and the fleet-level invariants. `AGENTS.md` gains an
+  `orchestration/` layout row + a boundary entry; `README.md` gains a "Fleets"
+  subsection.
+- **Fleet orchestration layer, Phase A — U1: lifecycle state + persistence**
+  (plan `docs/plans/2026-06-16-006-feat-fleet-orchestration-layer-plan.md`): the
+  foundation for coordinating multiple self-improving loops under one goal.
+  - **`src/loopeng/memory/fleet_state.py`** (new): `FleetItemStatus` /
+    `FleetRunStatus` enums + a fail-closed legal-transition guard
+    (`assert_item_transition`) mirroring the controller's `LoopState`, plus
+    `FleetItem` / `FleetRun` dataclasses. Pure data, no IO — lives in `memory/`
+    so the store enforces the guard without a layering cycle.
+  - **`src/loopeng/memory/schema.sql`** + **`store.py`**: new `fleet_runs` /
+    `fleet_items` tables (`CREATE TABLE IF NOT EXISTS`) + `create_fleet`,
+    `set_fleet_status`, `add_fleet_item`, `set_item_status` (guard-enforced),
+    `record_item_outcome`, `fleet_items`, `escalations`, `get_fleet`.
+  - Tests: `tests/test_fleet_state.py` (new) + fleet persistence in
+    `tests/test_memory_store.py`.
+- **Fleet orchestration layer, Phase A — U2: dependency-ordered coordinator**
+  (same plan): **`src/loopeng/orchestration/coordinator.py`** (new) runs fleet
+  items in topological waves over the existing `run_parallel` fan-out — ready
+  items dispatched together, dependents unlocked as upstreams converge. Cycles
+  and dangling edges fail closed before any worktree is created (Kahn's
+  algorithm); a non-converged dependency marks dependents `blocked_on_dep`; an
+  all-escalated/no-ready state ends the fleet `awaiting_human` (resumable, never a
+  hang). Thin `classify` (U4) and `route` (U3) seams are pre-wired. Tests:
+  `tests/test_fleet_coordinator.py` (new) — flat fan-out characterization,
+  diamond-DAG ordering, cycle rejection, blocked-on-dep, fleet PARK.
+- **Fleet orchestration layer, Phase A — U3: automatic feedback routing**
+  (same plan): a completed item's outcome is routed into its dependents' briefs,
+  deterministically (no LLM). Built the brief-injection seam the doc-review flagged
+  as missing: an additive, backward-compatible `upstream_context` parameter on
+  `run_loop` / `run_refine_loop` → `LoopController` → a new advisory
+  `RefactorBrief.upstream_outcomes` field (distinct from `recurring_failures`:
+  caller-injected structured cross-item outcomes vs. store-derived fixture
+  strings). The `ClaudeCodeRefiner` prompt surfaces it. The coordinator *pulls*
+  each item's dependencies' recorded outcomes before dispatch
+  (`src/loopeng/orchestration/routing.py`, new). Absent the parameter, behavior is
+  identical to before. Tests: `tests/test_fleet_routing.py` (new), brief field in
+  `tests/test_refactor_brief.py`, controller threading in
+  `tests/test_loop_controller.py`, end-to-end in `tests/test_fleet_coordinator.py`.
+- **Fleet orchestration layer, Phase A — U4: human-efficiency escalation**
+  (same plan): **`src/loopeng/orchestration/escalation.py`** (new). Only
+  high-judgment forks reach a human — `classify_with_escalation` sends a
+  `BLOCKED_SAFETY`, converged-but-gated, or stuck item to the escalation queue
+  while a clean converged-and-shippable item auto-proceeds; the fleet never
+  auto-merges a blocked/unconfirmed item (`RunResult.shippable` is the sole
+  authority, R10 lifted to the fleet). `rebrief_item` re-runs a single escalated
+  worker with a human note added to its brief context, updating the existing item
+  row in place. Tests: `tests/test_fleet_escalation.py` (new).
+- **Fleet orchestration layer, Phase A — U5: fleet CLI + report** (same plan):
+  a `loop-anything fleet` command group (`run` / `status` / `report` /
+  `escalations`). **`src/loopeng/orchestration/spec.py`** (new) parses + validates
+  a hand-authored fleet spec (rejects dangling deps before any row is created) and
+  materializes the fleet; **`src/loopeng/orchestration/fleet_report.py`** (new)
+  aggregates per-item lifecycle/grade/escalations (keeping `autonomous/report.py`
+  the untouched per-run building block). `fleet run` materializes the fleet and
+  is honest that live per-item execution needs the factory adapters (same gate as
+  `run`); the coordinator is exercised in tests. Tests: `tests/test_fleet_cli.py`
+  (new).
 - **Loop-engineering gap-bridges, U6 — name the three deliberate non-gaps**
   (same plan): documents outer-loop sovereignty, single referee of record, and
   the gated human-confirm posture as design choices (each with the failure mode

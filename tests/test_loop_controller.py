@@ -465,3 +465,36 @@ def test_cap_wins_over_plateau_no_pivot(store):
     # No pivot fired -> never rotated off the lowest dimension.
     leads = [b.target_dimensions[0] for b in refiner.briefs]
     assert all(lead == "safety" for lead in leads)
+
+
+def test_upstream_context_threads_into_brief(store):
+    # plan-006 U3: a LoopController given upstream_context surfaces it on the brief;
+    # absent, the brief carries none (backward compatible).
+    judge = ScriptedJudge([v("C"), v("A")])
+    refiner = CapturingRefiner()
+    ctrl = LoopController(
+        judge=judge,
+        refiner=refiner,
+        compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(),
+        store=store,
+        budget=Budget(target_grade="A"),
+        upstream_context=[{"item": "A", "grade": "A", "final_state": "converged"}],
+    )
+    run_id = store.create_run("t", "service", "improve", "2026-06-15T00:00:00Z")
+    ctrl.run(run_id, "tool/")
+    assert refiner.briefs[0].upstream_outcomes == [
+        {"item": "A", "grade": "A", "final_state": "converged"}
+    ]
+
+
+def test_no_upstream_context_brief_has_empty_upstream(store):
+    judge = ScriptedJudge([v("C"), v("A")])
+    refiner = CapturingRefiner()
+    ctrl = LoopController(
+        judge=judge, refiner=refiner, compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(), store=store, budget=Budget(target_grade="A"),
+    )
+    run_id = store.create_run("t", "service", "improve", "2026-06-15T00:00:00Z")
+    ctrl.run(run_id, "tool/")
+    assert refiner.briefs[0].upstream_outcomes == []
