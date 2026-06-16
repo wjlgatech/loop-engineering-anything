@@ -13,7 +13,7 @@ reality, and refactors until the grade stops climbing — then tells you what it
 
 [![CI](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml/badge.svg)](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml)
 [![loop-anything-hub](https://img.shields.io/badge/loop--anything--hub-live-brightgreen)](https://wjlgatech.github.io/loop-engineering-anything/)
-[![Tests](https://img.shields.io/badge/tests-74%20passing-brightgreen)](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-286%20passing-brightgreen)](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
 [![Units](https://img.shields.io/badge/plan-6%2F8%20units-blue)](docs/plans/)
 [![License](https://img.shields.io/badge/license-MIT-green)](#-license)
