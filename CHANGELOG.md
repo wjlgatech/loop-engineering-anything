@@ -95,6 +95,27 @@ All notable changes to this project are documented here, following
     `tick`. `tick` reports the targets due now (live execution rides the same
     injected runner as the autonomous loop, gated like `run`).
   - Tests: `tests/test_scheduler.py` (new).
+- **Loop-engine generalization, Phase C — U15 (connector/actuator layer)** (same
+  plan): gives loops a surface to *act* on external systems behind the
+  install/credential isolation boundary — the prerequisite for the org/individual
+  rungs (R8). _Why:_ a self-improving loop must be able to take real-world actions
+  without becoming a path for a generated/refined tool to exfiltrate ambient
+  credentials or reach a shell.
+  - **`Connector` protocol + isolation boundary** (`src/loopeng/connectors/base.py`,
+    new): declared `capabilities` + a structured `act(payload)` surface (payloads
+    are dicts, **never shell-interpolated**). `install_connector` mirrors the
+    catalog adopter's KTD8 discipline — installs into a throwaway `--target`
+    **outside the repo worktree**, **full 40-char SHA pin** (tags/branches
+    rejected), `run_tool` (`shell=False`, args list), and a credential gate that
+    fails fast by **name** only (`check_credentials`, never a value).
+  - **`minimal_env` allowlist** (`src/loopeng/adapters/safety.py`): a *strict
+    allowlist* env builder (only `PATH`/`HOME`/... + explicitly passed names),
+    complementing the existing `run_tool(env=)` param and `adopt.pruned_env`
+    denylist — so a connector child inherits zero ambient secrets by default.
+  - **Reference connector** (`src/loopeng/connectors/reference_connector.py`, new):
+    a structured-payload "file report" actuator demonstrating the surface; tests
+    round-trip the payload in-process (no network, KTD9 skip-not-fail).
+  - Tests: `tests/test_connectors.py` (new, 14 cases).
 - **Catalog-to-proof pipeline, Phase A** (plan
   `docs/plans/2026-06-15-003-feat-catalog-proof-pipeline-plan.md`): turns real
   clianything.cc / printingpress.dev CLIs into verified before/after loop proofs

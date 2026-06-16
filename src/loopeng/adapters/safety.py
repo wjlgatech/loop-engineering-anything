@@ -37,6 +37,35 @@ def within_workspace(path: str, root: str) -> bool:
     return rp == rr or rp.startswith(rr + os.sep)
 
 
+# Infrastructure vars a child process needs even under the strict allowlist.
+_MINIMAL_ENV_NAMES = ("PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "TERM")
+
+
+def minimal_env(extra: dict[str, str] | None = None) -> dict[str, str]:
+    """Build a strict *allowlisted* environment for an isolated subprocess.
+
+    Unlike ``adopt.pruned_env`` (a denylist that drops secret-looking names but
+    keeps everything else), this is an allowlist: it starts empty and admits only
+    a minimal infrastructure set (``PATH``/``HOME``/...) inherited from the parent,
+    plus any names explicitly passed in ``extra``. Everything ambient -- including
+    ``ANTHROPIC_API_KEY`` and every other credential -- is dropped by default, so a
+    connector's install/run child never inherits secrets it was not handed.
+
+    ``extra`` values are used verbatim (e.g. a credential read from the parent
+    environment by the caller and passed through by name). ``PATH`` always exists
+    so the child can find executables even if absent from the parent env (KTD8).
+    """
+    out: dict[str, str] = {}
+    for name in _MINIMAL_ENV_NAMES:
+        value = os.environ.get(name)
+        if value is not None:
+            out[name] = value
+    if extra:
+        out.update(extra)
+    out.setdefault("PATH", os.defpath)
+    return out
+
+
 @dataclass(frozen=True)
 class ProcResult:
     returncode: int
