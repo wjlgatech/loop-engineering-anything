@@ -62,7 +62,7 @@ protocol, so the refine engine is selectable:
 | `src/loopeng/preflight.py` | dependency detection (per-mechanism); `missing_for_refine` (no factory) |
 | `src/loopeng/router.py` | target → lane classification (U3) |
 | `src/loopeng/domains/` | domain SDK: the `Domain` plugin protocol — binds Factory\|adopt-baseline + Judge per target so a target can be anything without controller branches (plan-004 U9/U11, KTD1) |
-| `src/loopeng/memory/` | SQLite run history + trend/plateau/recurring queries (U2); `runs.finished` wall-clock; `iterations.score` continuous signal (plan-004 U9) |
+| `src/loopeng/memory/` | SQLite run history + trend/plateau/recurring queries (U2); `runs.finished` wall-clock; `iterations.score` continuous signal + score-aware `is_plateaued(on_score=)` (plan-004 U9/U10) |
 | `src/loopeng/adapters/` | contracts, `safety.py` (subprocess/jail/env-prune), factory + judge shells (U4/U5), `compound_engineering.py` (`/ce-work` refiner), `llm_refiner.py` (claude-free fallback-chain refiner) |
 | `src/loopeng/adopt.py` | catalog tool adopter — venv-isolated, env-pruned, full-SHA-pinned (proof pipeline U1, KTD7) |
 | `src/loopeng/proof.py` | `ProofPack` builder + `StoreBackedCompounder` (proof pipeline U3) |
@@ -101,7 +101,10 @@ and sync the docs the change touches (README, this file, the plan's tables).
 2. **Grade stability** — RESOLVED empirically: the installed CLI-Judge is
    deterministic (variance probe spread 0.0), so single-run grades are safe.
    `loop-anything judge-variance` re-checks any target; `Budget.min_score_gain`
-   absorbs jitter if a future judge is noisy.
+   absorbs jitter if a future judge is noisy. A continuous-score domain (set
+   `Budget.target_score`) converges on the score after the unbypassable safety
+   gate and plateaus on `score` (`is_plateaued(on_score=True)`); a stochastic
+   referee MUST set `min_score_gain` from the variance probe (plan-004 U10).
 
 The judge adapter is pinned to the real `report.json` (`safety_blocker`, `D1..D5`
 dims, `--out`) and verified against an installed `cli-judge`. Remaining live work:

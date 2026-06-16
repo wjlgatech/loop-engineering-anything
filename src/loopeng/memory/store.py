@@ -177,15 +177,36 @@ class MemoryStore:
         """Ordered list of grades across the run's iterations (R6 trend)."""
         return [it.grade for it in self.iterations(run_id)]
 
-    def is_plateaued(self, run_id: int, patience: int) -> bool:
-        """True if the last ``patience`` iterations did not beat the best grade
+    def score_trajectory(self, run_id: int) -> list[float | None]:
+        """Ordered list of continuous scores across the run's iterations (U10).
+
+        Entries are ``None`` for legacy rows written before the score column.
+        """
+        return [it.score for it in self.iterations(run_id)]
+
+    def is_plateaued(self, run_id: int, patience: int, *, on_score: bool = False) -> bool:
+        """True if the last ``patience`` iterations did not beat the best value
         achieved before that window. Needs more than ``patience`` iterations to
-        evaluate -- fewer means not plateaued."""
-        grades = [grade_rank(g) for g in self.grade_trajectory(run_id)]
-        if patience < 1 or len(grades) <= patience:
+        evaluate -- fewer means not plateaued.
+
+        ``on_score`` selects the trajectory used for the no-gain test: by default
+        the letter-grade ladder (unchanged software behavior, R2); when a domain
+        runs under a continuous score target, the persisted ``score`` column so a
+        score-only domain plateaus on real reward instead of a constant projected
+        grade rank (U10/KTD4). Falls back to grades if any score is unrecorded.
+        """
+        if on_score:
+            scores = self.score_trajectory(run_id)
+            if scores and all(s is not None for s in scores):
+                values: list[float] = scores  # type: ignore[assignment]
+            else:
+                values = [grade_rank(g) for g in self.grade_trajectory(run_id)]
+        else:
+            values = [grade_rank(g) for g in self.grade_trajectory(run_id)]
+        if patience < 1 or len(values) <= patience:
             return False
-        best_before = max(grades[:-patience])
-        recent_best = max(grades[-patience:])
+        best_before = max(values[:-patience])
+        recent_best = max(values[-patience:])
         return recent_best <= best_before
 
     def recurring_failures(self, min_runs: int = 2) -> list[tuple[str, int]]:

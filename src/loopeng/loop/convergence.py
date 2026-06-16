@@ -5,6 +5,7 @@ the loop continues or stops, and why. Multi-signal by design so the loop cannot
 oscillate or degrade indefinitely (the "flying turd" guard):
 
   safety failure  -> blocked_safety (terminal, unbypassable; KTD5/R3)
+  score >= target -> converged   [when budget.target_score is set; else letter path]
   grade >= target -> converged
   iteration cap   -> stopped (budget: max iterations)
   token cap       -> stopped (budget: token)   [only when a token budget is set]
@@ -40,11 +41,19 @@ def evaluate(
     plateaued: bool,
     tokens_spent: int = 0,
 ) -> Decision:
-    # Safety is the first and unbypassable check (KTD5, R3).
+    # Safety is the first and unbypassable check (KTD5, R3). The score/letter
+    # convergence predicates are reached ONLY past this gate (R6 — a high score
+    # can never bypass a safety failure).
     if not verdict.safety_ok:
         return Decision(BLOCKED_SAFETY, "safety gate failed (grade capped); not shippable")
 
-    if grade_rank(verdict.grade) >= grade_rank(budget.target_grade):
+    # Convergence predicate: a continuous score target takes precedence when set
+    # (the letter ladder is skipped entirely); otherwise the letter path is
+    # unchanged (R2/R3, structural ordering per KTD4).
+    if budget.target_score is not None:
+        if verdict.score >= budget.target_score:
+            return Decision(CONVERGED, f"reached target score {budget.target_score}")
+    elif grade_rank(verdict.grade) >= grade_rank(budget.target_grade):
         return Decision(CONVERGED, f"reached target grade {budget.target_grade}")
 
     if iterations_done >= budget.max_iterations:
@@ -62,11 +71,17 @@ def evaluate(
 def is_improvement(old: Verdict, new: Verdict, budget: Budget) -> bool:
     """Whether ``new`` is a real improvement over ``old`` (P0 #2, noise-aware).
 
-    A strictly better letter grade always counts. A same-letter result counts
-    only when the continuous score rises by more than ``budget.min_score_gain``
-    -- the noise band that keeps a jittery judge from registering phantom gains.
-    A worse letter grade is never an improvement.
+    Under a **score target** the decision is purely on the score delta vs the
+    noise band -- so a real score gain or regression *inside one letter band* is
+    not masked by the coarse letter (R3, KTD4 doc-review finding).
+
+    Under the **letter ladder** (no score target): a strictly better letter
+    grade always counts; a same-letter result counts only when the score rises
+    by more than ``budget.min_score_gain`` (the noise band that keeps a jittery
+    judge from registering phantom gains); a worse letter grade never counts.
     """
+    if budget.target_score is not None:
+        return (new.score - old.score) > budget.min_score_gain
     old_r, new_r = grade_rank(old.grade), grade_rank(new.grade)
     if new_r > old_r:
         return True

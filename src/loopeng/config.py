@@ -87,6 +87,11 @@ class Budget:
     """
 
     target_grade: str = "A"
+    # Continuous score target for domains whose referee emits a score, not a
+    # letter (a stochastic sim referee, R3). When set, convergence and
+    # acceptance decide on the score (after the unbypassable safety gate, and
+    # in place of the letter ladder); when None, the letter path is unchanged.
+    target_score: float | None = None
     max_iterations: int = 10
     plateau_patience: int = 3  # stop after N iterations with no grade gain
     token_budget: int | None = None  # advisory until a measurement source exists

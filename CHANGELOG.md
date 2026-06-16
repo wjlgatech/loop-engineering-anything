@@ -29,6 +29,31 @@ All notable changes to this project are documented here, following
     back-compatible).
   - Tests: `tests/test_contracts_generalization.py`,
     `tests/test_domain_protocol.py` (R1/R2/R11 — software loop unregressed).
+- **Loop-engine domain generalization, Phase A — U10** (same plan):
+  score-based convergence + per-domain variance band, so a domain can converge
+  on a continuous **score target** with noise handling (R3/R6).
+  - **`Budget.target_score: float | None`** (`config.py`): when set, convergence
+    and acceptance decide on the score; when `None`, the letter path is
+    unchanged.
+  - **`convergence.evaluate`** (`loop/convergence.py`): the unbypassable
+    `safety_ok=False → BLOCKED_SAFETY` check stays first; then a score target
+    converges on `score >= target_score` and **skips the letter ladder
+    entirely**; otherwise the existing `grade_rank` path runs unchanged
+    (structural ordering, KTD4).
+  - **`convergence.is_improvement`**: under a score target, keep/rollback is
+    decided on the **score delta vs `min_score_gain`** (not the letter), so a
+    real gain/regression inside one letter band is not masked.
+  - **Score-aware plateau** (`memory/store.py`): new `score_trajectory`;
+    `is_plateaued(..., on_score=True)` ranks the persisted `score` column (falls
+    back to grades if any score is unrecorded). The controller passes
+    `on_score` only when a score target is set, so the software letter-plateau
+    behavior is byte-identical (R2). The "flying turd" guard is otherwise
+    untouched.
+  - **Variance probe** (`adapters/judge.py`): `probe_grade_variance` documented
+    as the multi-seed measurement a stochastic score referee needs — it must run
+    with `min_score_gain ≥ recommended_min_score_gain` (> 0).
+  - Tests: `tests/test_score_convergence.py` (new) + `tests/test_convergence.py`
+    regression pins stay green.
 - **Catalog-to-proof pipeline, Phase A** (plan
   `docs/plans/2026-06-15-003-feat-catalog-proof-pipeline-plan.md`): turns real
   clianything.cc / printingpress.dev CLIs into verified before/after loop proofs
