@@ -68,6 +68,7 @@ protocol, so the refine engine is selectable:
 | `src/loopeng/proof.py` | `ProofPack` builder + `StoreBackedCompounder` (proof pipeline U3) |
 | `src/loopeng/loop/` | controller, convergence, brief, compound, `GitCheckpoint` (U6) |
 | `src/loopeng/autonomous/` | research report + autonomous runner; `run_refine_loop` (refine-only, proof pipeline U2) |
+| `src/loopeng/scheduler/` | `Heartbeat` cadence engine — durable `schedule_state`, due-calc, failure isolation, resume anchor; runner-agnostic (injected, KTD7). `loop-anything schedule add/list/remove/tick` (plan-004 U14, R7) |
 | `src/loopeng/demos/` | demo manifest/registry + result fixtures (validated; SSRF/traversal/secret guards) |
 | `src/loopeng/showcase/` | self-contained HTML catalog generator (context-aware escaping) |
 | `demos/` · `docs/recipes/` | community demo manifests + fixtures; aspirational loop recipes |

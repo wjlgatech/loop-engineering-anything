@@ -38,6 +38,19 @@ class Run:
 
 
 @dataclass
+class ScheduleEntry:
+    """A durably-registered scheduled target (U14, R7)."""
+
+    target: str
+    goal: str | None
+    domain: str | None
+    lane: str | None
+    interval_seconds: float
+    last_fired: float | None
+    last_run_id: int | None  # advisory resume anchor (not an enforced FK)
+
+
+@dataclass
 class Iteration:
     id: int
     run_id: int
@@ -171,6 +184,52 @@ class MemoryStore:
         ).fetchall()
         return [dict(r) for r in rows]
 
+    # ----- scheduler state (U14) -----------------------------------------
+
+    def upsert_schedule(
+        self,
+        target: str,
+        *,
+        interval_seconds: float,
+        goal: str | None = None,
+        domain: str | None = None,
+        lane: str | None = None,
+    ) -> None:
+        """Register or update a scheduled target's cadence, preserving its
+        ``last_fired``/``last_run_id`` resume anchor across re-registration."""
+        updated = self._conn.execute(
+            """UPDATE schedule_state
+               SET goal = ?, domain = ?, lane = ?, interval_seconds = ?
+               WHERE target = ?""",
+            (goal, domain, lane, interval_seconds, target),
+        )
+        if updated.rowcount == 0:
+            self._conn.execute(
+                """INSERT INTO schedule_state
+                   (target, goal, domain, lane, interval_seconds, last_fired, last_run_id)
+                   VALUES (?, ?, ?, ?, ?, NULL, NULL)""",
+                (target, goal, domain, lane, interval_seconds),
+            )
+        self._conn.commit()
+
+    def schedules(self) -> list[ScheduleEntry]:
+        rows = self._conn.execute(
+            "SELECT * FROM schedule_state ORDER BY target"
+        ).fetchall()
+        return [self._row_to_schedule(r) for r in rows]
+
+    def remove_schedule(self, target: str) -> bool:
+        cur = self._conn.execute("DELETE FROM schedule_state WHERE target = ?", (target,))
+        self._conn.commit()
+        return cur.rowcount > 0
+
+    def mark_scheduled_fired(self, target: str, last_fired: float, last_run_id: int | None) -> None:
+        self._conn.execute(
+            "UPDATE schedule_state SET last_fired = ?, last_run_id = ? WHERE target = ?",
+            (last_fired, last_run_id, target),
+        )
+        self._conn.commit()
+
     # ----- transcendent queries ------------------------------------------
 
     def grade_trajectory(self, run_id: int) -> list[str]:
@@ -238,6 +297,18 @@ class MemoryStore:
             final_grade=row["final_grade"],
             started=row["started"],
             finished=row["finished"],
+        )
+
+    @staticmethod
+    def _row_to_schedule(row: sqlite3.Row) -> ScheduleEntry:
+        return ScheduleEntry(
+            target=row["target"],
+            goal=row["goal"],
+            domain=row["domain"],
+            lane=row["lane"],
+            interval_seconds=row["interval_seconds"],
+            last_fired=row["last_fired"],
+            last_run_id=row["last_run_id"],
         )
 
     @staticmethod
