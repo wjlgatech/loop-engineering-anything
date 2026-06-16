@@ -44,6 +44,16 @@ All notable changes to this project are documented here, following
     `record_item_outcome`, `fleet_items`, `escalations`, `get_fleet`.
   - Tests: `tests/test_fleet_state.py` (new) + fleet persistence in
     `tests/test_memory_store.py`.
+- **Fleet orchestration layer, Phase A — U2: dependency-ordered coordinator**
+  (same plan): **`src/loopeng/orchestration/coordinator.py`** (new) runs fleet
+  items in topological waves over the existing `run_parallel` fan-out — ready
+  items dispatched together, dependents unlocked as upstreams converge. Cycles
+  and dangling edges fail closed before any worktree is created (Kahn's
+  algorithm); a non-converged dependency marks dependents `blocked_on_dep`; an
+  all-escalated/no-ready state ends the fleet `awaiting_human` (resumable, never a
+  hang). Thin `classify` (U4) and `route` (U3) seams are pre-wired. Tests:
+  `tests/test_fleet_coordinator.py` (new) — flat fan-out characterization,
+  diamond-DAG ordering, cycle rejection, blocked-on-dep, fleet PARK.
 - **Loop-engineering gap-bridges, U6 — name the three deliberate non-gaps**
   (same plan): documents outer-loop sovereignty, single referee of record, and
   the gated human-confirm posture as design choices (each with the failure mode
