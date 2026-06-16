@@ -15,6 +15,12 @@ All notable changes to this project are documented here, following
   parallel. Stress-verified 12/12 green (previously intermittent).
 
 ### Added
+- **`factcli` is now a `live_verified` hub card** — the self-contained reference
+  proof target (PR #21) gained a demo manifest (`demos/factcli.yaml`) and a real
+  recorded run: the loop refactored it **F → A** (Gemini refiner, real cli-judge,
+  no Anthropic), recorded via `demo record` (KTD2). The hub now shows **two**
+  verified-run cards (15 demos / 6 recipes); `factcli` joins the graduated cohort
+  in `tests/test_starter_demos.py`.
 - **`automate-your-job` graduated from recipe → live `live_verified` demo** — the
   first recipe to become a real, recorded run. A team-lead's repetitive task
   (turn a captured day of activity into a standup digest) was handed to the loop:
