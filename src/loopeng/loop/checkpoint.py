@@ -8,6 +8,13 @@ mechanism it depends on -- the doc-review flagged the U6->U8 upward dependency
 restores via ``reset --hard``. The tool must live in its own git repo (or a
 subdir initialized as one) -- the runner initializes it. ``NoopCheckpoint`` is
 for tests and single-pass (no-rollback) runs.
+
+Worktree-aware (U16, R9): ``repo_dir`` may be a *git worktree* checked out from a
+shared repository. Because every ``git`` call is scoped to that path with
+``git -C``, snapshot/commit/reset operate only on the worktree's own checked-out
+branch and working tree. Two parallel loops in two worktrees therefore checkpoint
+and roll back independently -- a ``reset --hard`` in worktree A never touches
+worktree B's tree (they share object history, not a working tree or HEAD).
 """
 
 from __future__ import annotations

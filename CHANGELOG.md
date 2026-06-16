@@ -116,6 +116,42 @@ All notable changes to this project are documented here, following
     a structured-payload "file report" actuator demonstrating the surface; tests
     round-trip the payload in-process (no network, KTD9 skip-not-fail).
   - Tests: `tests/test_connectors.py` (new, 14 cases).
+- **Loop-engine generalization, Phase C — U16 (worktree parallelism)** (same
+  plan): run multiple loops/targets concurrently in isolated git worktrees
+  without file or git collisions (R9).
+  - **`run_parallel` fan-out** (`src/loopeng/autonomous/parallel.py`, new):
+    single responsibility — concurrency lives here, cadence stays in
+    `heartbeat.py`. Each target runs in its **own git worktree** (`git worktree
+    add` on a per-target branch from `HEAD`) under a worktrees root, so
+    per-iteration `GitCheckpoint` snapshot/`reset --hard` rollbacks are isolated
+    (a safety rollback in one worktree never touches another). Concurrency is
+    **bounded** by `max_parallel` via a `ThreadPoolExecutor` (excess targets
+    queue); a crashed run is captured as a failed `ParallelResult` and does not
+    abort its siblings; every worktree is removed (`worktree remove --force` +
+    `prune`) on completion, success or crash. Duplicate keys and a zero cap are
+    rejected.
+  - **Concurrency-safe `MemoryStore`** (`memory/store.py`): the store was
+    single-writer; parallel writers on separate connections would hit `database
+    is locked`. Decision implemented concretely — **serialize every write
+    through a single shared connection guarded by a re-entrant lock, in WAL
+    mode**: `check_same_thread=False` (so one connection is shared across worker
+    threads), an `RLock` wrapping every statement+commit (and reads, so a row is
+    never read mid-write), plus `busy_timeout`. N parallel loops record
+    independently without corruption.
+  - **Scheduler fan-out hook** (`scheduler/heartbeat.py`): new `tick_parallel`
+    fires every due target through `run_parallel`, rebasing each `ScheduledFire`
+    onto its per-target worktree; successful fires record the run id as the
+    resume anchor, failures are stamped (no anchor) and isolated — same cadence
+    semantics as the sequential `tick`. The sequential `tick` is unchanged.
+  - **Worktree-aware `GitCheckpoint`** (`loop/checkpoint.py`): documented that
+    because every `git` call is `git -C`-scoped, snapshot/restore operate only
+    on the given worktree's branch and working tree — making it safe for
+    parallel runs (no code change needed; the path scoping already provided it).
+  - Tests: `tests/test_parallel_worktrees.py` (new) — real temp git repo + temp
+    DB, hermetic: independent checkpoint/rollback across two worktrees, A's
+    rollback leaving B untouched, the concurrency cap honored, a crashed run
+    recorded + cleaned up while siblings continue, concurrent SQLite writes not
+    corrupting, and the `heartbeat.tick_parallel` integration.
 - **Catalog-to-proof pipeline, Phase A** (plan
   `docs/plans/2026-06-15-003-feat-catalog-proof-pipeline-plan.md`): turns real
   clianything.cc / printingpress.dev CLIs into verified before/after loop proofs
