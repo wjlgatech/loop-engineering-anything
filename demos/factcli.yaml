@@ -1,0 +1,10 @@
+id: factcli
+title: factcli — self-contained agent-native CLI
+domain: Self-contained proof
+target: a tiny CLI graded on the D2 non-interactive contract (version / project new / fs ls)
+lane: codebase
+goal: refactor a deliberately-buggy CLI until it passes the cli-judge D2 contract — the
+  self-contained reference loop that needs no external catalog tool or Go toolchain
+kind: demo
+contributor: wjlgatech
+result_ref: factcli.json
