@@ -6,6 +6,16 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Two agency-themed loop recipes in the hub** — from an external AI-agency
+  brainstorm, kept only the ideas that actually map to a loop engine (the rest
+  were consumer/psych products, off-identity): `demos/automate-your-job.yaml` +
+  `docs/recipes/automate-your-job.md` (point the loop at your own repetitive
+  role and own the automation — literally what the engine does, graded against
+  your real task payloads) and `demos/one-person-industrial-engine.yaml` +
+  `docs/recipes/one-person-industrial-engine.md` (a coordinated fleet of loops,
+  one per product slice — depends on the plan-006 fleet layer). Shipped honestly
+  as **recipes** (not fake demos), so they appear in the hub's recipes lane
+  badged not-runnable-yet. Hub now lists 7 recipes; 20 manifests validate.
 - **First real end-to-end live proof (F → A) — the refine frontier, validated.**
   A self-contained proof target (`demos/targets/factcli/`) + CLI-Judge adapter
   (`demos/adapters/factcli.py`) + a three-task D2 suite (`demos/suites/proof.yaml`),
