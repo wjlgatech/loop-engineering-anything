@@ -55,3 +55,16 @@ def test_live_failures_never_demoted_below_history():
     brief = build_refactor_brief(v, "goal", recurring_failures=["old_1", "old_2"])
     assert brief.failing_fixtures == ["live_a", "live_b"]
     assert brief.recurring_failures == ["old_1", "old_2"]
+
+
+def test_exclude_dims_demotes_to_back_for_rotation():
+    # ranked lowest-first would be a, b, c; excluding "a" rotates the lead to b.
+    v = _verdict(dims={"a": 10, "b": 20, "c": 30})
+    brief = build_refactor_brief(v, "goal", exclude_dims=["a"])
+    assert brief.target_dimensions == ["b", "c", "a"]
+
+
+def test_exclude_dims_none_keeps_lowest_first_ranking():
+    v = _verdict(dims={"a": 10, "b": 20, "c": 30})
+    brief = build_refactor_brief(v, "goal")
+    assert brief.target_dimensions == ["a", "b", "c"]

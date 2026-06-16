@@ -405,3 +405,63 @@ def test_safety_failure_is_never_retried(store):
 
     assert outcome.final_state is LoopState.BLOCKED_SAFETY
     assert refiner.calls == 1  # the safety failure (post-judge) triggered no retry
+
+
+def test_plateau_pivots_zero_stops_immediately(store):
+    # Characterization of the original behavior: plateau -> STOPPED, no pivot.
+    judge = ScriptedJudge([v("C")])
+    ctrl, refiner, compounder, _ = _controller(
+        store, judge, Budget(plateau_patience=2, max_iterations=99, plateau_pivots=0)
+    )
+    run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+
+    outcome = ctrl.run(run_id, "tool/")
+
+    assert outcome.final_state is LoopState.STOPPED
+    assert "plateau" in outcome.reason
+    assert refiner.calls == 2  # plateau detected at iteration 3, no pivot
+
+
+def test_plateau_triggers_one_pivot_then_stops(store):
+    judge = ScriptedJudge([v("C")])
+    refiner = CapturingRefiner()
+    ctrl = LoopController(
+        judge=judge,
+        refiner=refiner,
+        compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(),
+        store=store,
+        budget=Budget(plateau_patience=2, max_iterations=99, plateau_pivots=1),
+    )
+    run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+
+    outcome = ctrl.run(run_id, "tool/")
+
+    assert outcome.final_state is LoopState.STOPPED
+    assert "plateau" in outcome.reason
+    # The pivot rotates the lead dimension: pre-pivot briefs lead with the lowest
+    # dim ("safety"=20), post-pivot briefs rotate to the next-lowest ("correctness").
+    leads = [b.target_dimensions[0] for b in refiner.briefs]
+    assert "safety" in leads and "correctness" in leads
+
+
+def test_cap_wins_over_plateau_no_pivot(store):
+    judge = ScriptedJudge([v("C")])
+    refiner = CapturingRefiner()
+    ctrl = LoopController(
+        judge=judge,
+        refiner=refiner,
+        compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(),
+        store=store,
+        budget=Budget(plateau_patience=2, max_iterations=3, plateau_pivots=1),
+    )
+    run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+
+    outcome = ctrl.run(run_id, "tool/")
+
+    assert outcome.final_state is LoopState.STOPPED
+    assert "max iterations" in outcome.reason  # cap reason, not plateau
+    # No pivot fired -> never rotated off the lowest dimension.
+    leads = [b.target_dimensions[0] for b in refiner.briefs]
+    assert all(lead == "safety" for lead in leads)

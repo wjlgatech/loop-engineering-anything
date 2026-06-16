@@ -52,6 +52,17 @@ def test_plateau_false_when_fewer_than_patience(store):
     assert store.is_plateaued(run_id, patience=3) is False
 
 
+def test_is_plateaued_since_iteration_gives_postpivot_window_room(store):
+    run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+    for n, g in enumerate(["A", "A", "A", "B", "C", "B"], start=1):
+        store.record_iteration(run_id, n, g, {}, safety_ok=True)
+    # Full trajectory plateaus -- the post-window B/C/B never beat the early A's.
+    assert store.is_plateaued(run_id, patience=3) is True
+    # Scoped to post-pivot iterations (drop the first 3) -- too few to declare a
+    # plateau yet, so the freshly-pivoted strategy gets room to work.
+    assert store.is_plateaued(run_id, patience=3, since_iteration=3) is False
+
+
 def test_recurring_failures_join_across_runs(store):
     r1 = store.create_run("t1", "service", None, "2026-06-15T00:00:00Z")
     r2 = store.create_run("t2", "service", None, "2026-06-15T00:00:00Z")

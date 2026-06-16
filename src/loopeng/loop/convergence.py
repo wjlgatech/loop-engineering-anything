@@ -30,11 +30,21 @@ CONVERGED = "converged"
 BLOCKED_SAFETY = "blocked_safety"
 STOPPED = "stopped"
 
+# Structured stop reasons (U2). A single ``STOPPED`` kind covers plateau and every
+# budget cap; the ``reason_code`` lets the controller tell them apart without
+# parsing the human-readable ``reason`` string -- the pivot fires ONLY on a sole
+# ``PLATEAU`` (caps take precedence and never pivot).
+PLATEAU = "plateau"
+ITERATION_CAP = "iteration_cap"
+TOKEN_CAP = "token_cap"
+WALL_CAP = "wall_cap"
+
 
 @dataclass(frozen=True)
 class Decision:
     kind: str  # one of CONTINUE / CONVERGED / BLOCKED_SAFETY / STOPPED
     reason: str
+    reason_code: str = ""  # machine-readable stop reason (U2); set on STOPPED
 
 
 def evaluate(
@@ -62,16 +72,24 @@ def evaluate(
         return Decision(CONVERGED, f"reached target grade {budget.target_grade}")
 
     if iterations_done >= budget.max_iterations:
-        return Decision(STOPPED, f"budget: max iterations ({budget.max_iterations}) reached")
+        return Decision(
+            STOPPED, f"budget: max iterations ({budget.max_iterations}) reached", reason_code=ITERATION_CAP
+        )
 
     if budget.token_budget is not None and tokens_spent >= budget.token_budget:
-        return Decision(STOPPED, f"budget: token budget ({budget.token_budget}) exhausted")
+        return Decision(
+            STOPPED, f"budget: token budget ({budget.token_budget}) exhausted", reason_code=TOKEN_CAP
+        )
 
     if budget.max_wall_seconds is not None and elapsed_seconds >= budget.max_wall_seconds:
-        return Decision(STOPPED, f"budget: wall-clock ({budget.max_wall_seconds}s) exceeded")
+        return Decision(
+            STOPPED, f"budget: wall-clock ({budget.max_wall_seconds}s) exceeded", reason_code=WALL_CAP
+        )
 
     if plateaued:
-        return Decision(STOPPED, f"plateau: no gain over {budget.plateau_patience} iterations")
+        return Decision(
+            STOPPED, f"plateau: no gain over {budget.plateau_patience} iterations", reason_code=PLATEAU
+        )
 
     return Decision(CONTINUE, "below target with budget remaining")
 

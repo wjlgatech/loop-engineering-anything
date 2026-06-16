@@ -94,6 +94,10 @@ class Budget:
     target_score: float | None = None
     max_iterations: int = 10
     plateau_patience: int = 3  # stop after N iterations with no grade gain
+    # On plateau, attempt this many strategy pivots (rotate to the next-lowest
+    # dimension, reset the plateau window) before stopping (U2). 0 = original
+    # behavior (plateau stops immediately).
+    plateau_pivots: int = 1
     # Token budget, enforced ONLY for refiners that report cost (U4). The
     # controller threads each refactor's ``last_token_cost`` into a running total
     # and stops the loop once it crosses this budget. A refiner that reports no

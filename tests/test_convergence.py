@@ -74,6 +74,14 @@ def test_plateau_stops():
     d = cv.evaluate(v("C"), Budget(), iterations_done=5, plateaued=True)
     assert d.kind == cv.STOPPED
     assert "plateau" in d.reason
+    assert d.reason_code == cv.PLATEAU
+
+
+def test_iteration_cap_reason_code_wins_over_plateau():
+    # Both fire; the iteration cap is checked first, so its code wins (no pivot).
+    d = cv.evaluate(v("C"), Budget(max_iterations=3), iterations_done=3, plateaued=True)
+    assert d.kind == cv.STOPPED
+    assert d.reason_code == cv.ITERATION_CAP
 
 
 # --- is_improvement (P0 #2 noise-aware acceptance) ---

@@ -107,11 +107,21 @@ class LoopController:
             else []
         )
 
+        # Plateau-pivot state (U2): on a sole plateau, rotate to the next-lowest
+        # dimension once (per pivot budget) before stopping. ``pivot_offset`` resets
+        # the plateau window; ``active_exclude`` demotes the hammered dims;
+        # ``targeted_since_pivot`` records the lead dims tried since the last pivot.
+        pivots_used = 0
+        pivot_offset = 0
+        active_exclude: set[str] = set()
+        targeted_since_pivot: list[str] = []
+
         while True:
             plateaued = self.store.is_plateaued(
                 run_id,
                 self.budget.plateau_patience,
                 on_score=self.budget.target_score is not None,
+                since_iteration=pivot_offset,
             )
             decision = cv.evaluate(
                 verdict,
@@ -122,11 +132,26 @@ class LoopController:
                 elapsed_seconds=time.monotonic() - start,
             )
             if decision.kind != cv.CONTINUE:
-                return self._finish(run_id, decision, verdict, n)
+                # Pivot ONLY on a sole plateau with budget remaining -- a cap stop
+                # (iteration/token/wall) always wins and never pivots.
+                if decision.reason_code == cv.PLATEAU and pivots_used < self.budget.plateau_pivots:
+                    pivots_used += 1
+                    pivot_offset = n  # reset the plateau window to post-pivot iterations
+                    active_exclude |= set(targeted_since_pivot)
+                    targeted_since_pivot = []
+                else:
+                    return self._finish(run_id, decision, verdict, n)
 
             # --- REFACTORING ---
             token = self.checkpoint.snapshot()
-            brief = build_refactor_brief(verdict, goal, recurring_failures=recurring_fixtures)
+            brief = build_refactor_brief(
+                verdict,
+                goal,
+                recurring_failures=recurring_fixtures,
+                exclude_dims=list(active_exclude) or None,
+            )
+            if brief.target_dimensions:
+                targeted_since_pivot.append(brief.target_dimensions[0])
             diff_ref = self._refactor_with_retry(tool_path, brief)
 
             # Cost accounting (U4): thread the refiner's reported per-refactor cost

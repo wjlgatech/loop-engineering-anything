@@ -13,9 +13,16 @@ def build_refactor_brief(
     verdict: Verdict,
     goal: str = "",
     recurring_failures: list | None = None,
+    exclude_dims: list | None = None,
 ) -> RefactorBrief:
     # Rank dimensions lowest-score-first; those are where the grade is bleeding.
     ranked = [name for name, _ in sorted(verdict.dims.items(), key=lambda kv: kv[1])]
+    # Plateau pivot (U2): demote already-tried dimensions to the back so the brief
+    # rotates to the next-lowest. Excluded dims are kept (not dropped) so the
+    # refiner still sees them, just deprioritized.
+    if exclude_dims:
+        excluded = set(exclude_dims)
+        ranked = [d for d in ranked if d not in excluded] + [d for d in ranked if d in excluded]
     objective = goal or (
         f"Raise the grade from {verdict.grade} by fixing the lowest-scoring "
         f"dimensions first."

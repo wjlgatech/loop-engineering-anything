@@ -63,6 +63,26 @@ All notable changes to this project are documented here, following
   - Tests: classifier + flag in `tests/test_compound_engineering.py`;
     retry-recovers / bounded-exhaustion / safety-never-retried in
     `tests/test_loop_controller.py`.
+- **Loop-engineering gap-bridges, U2 — plateau triggers a strategy pivot**
+  (same plan): on a plateau the loop now rotates to the next-lowest dimension
+  once (per `Budget.plateau_pivots`, default 1) before stopping, instead of
+  terminating immediately.
+  - **`src/loopeng/loop/convergence.py`**: `Decision` gains a structured
+    `reason_code` (`plateau` / `iteration_cap` / `token_cap` / `wall_cap`) so the
+    controller pivots only on a *sole* plateau — a cap stop always wins.
+  - **`src/loopeng/memory/store.py`**: `is_plateaued(since_iteration=...)` scopes
+    the no-gain test to post-pivot iterations, giving a freshly-pivoted strategy
+    a clean window.
+  - **`src/loopeng/loop/refactor_brief.py`**: `build_refactor_brief(exclude_dims=...)`
+    demotes already-tried dimensions to the back so the brief rotates.
+  - **`src/loopeng/loop/controller.py`**: tracks pivot state, intercepts the
+    plateau→STOPPED transition while pivots remain, excludes the hammered dims,
+    and resets the plateau window. `convergence.evaluate` stays a pure function.
+    **`config.py`** adds `Budget.plateau_pivots`.
+  - Tests: `since_iteration` in `tests/test_memory_store.py`, `exclude_dims` in
+    `tests/test_refactor_brief.py`, `reason_code` in `tests/test_convergence.py`,
+    pivot / cap-wins / `plateau_pivots=0` characterization in
+    `tests/test_loop_controller.py`.
 - **Loop-engine domain generalization, Phase B — U12: SimJudge referee +
   CMDP safety profile** (plan `docs/plans/2026-06-15-004-...`): the physical-AI-in-sim
   referee that runs a control policy in simulation over a *held-out* seed set

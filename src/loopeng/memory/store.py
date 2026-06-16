@@ -283,7 +283,9 @@ class MemoryStore:
         """
         return [it.score for it in self.iterations(run_id)]
 
-    def is_plateaued(self, run_id: int, patience: int, *, on_score: bool = False) -> bool:
+    def is_plateaued(
+        self, run_id: int, patience: int, *, on_score: bool = False, since_iteration: int = 0
+    ) -> bool:
         """True if the last ``patience`` iterations did not beat the best value
         achieved before that window. Needs more than ``patience`` iterations to
         evaluate -- fewer means not plateaued.
@@ -293,6 +295,12 @@ class MemoryStore:
         runs under a continuous score target, the persisted ``score`` column so a
         score-only domain plateaus on real reward instead of a constant projected
         grade rank (U10/KTD4). Falls back to grades if any score is unrecorded.
+
+        ``since_iteration`` drops that many leading iterations before the no-gain
+        test (U2). A plateau pivot sets it to the iteration count at pivot time so
+        the post-pivot strategy is judged over its own window -- the pre-pivot best
+        is intentionally excluded, giving the new strategy ``patience`` clean
+        iterations before it can stop the loop.
         """
         if on_score:
             scores = self.score_trajectory(run_id)
@@ -302,6 +310,8 @@ class MemoryStore:
                 values = [grade_rank(g) for g in self.grade_trajectory(run_id)]
         else:
             values = [grade_rank(g) for g in self.grade_trajectory(run_id)]
+        if since_iteration > 0:
+            values = values[since_iteration:]
         if patience < 1 or len(values) <= patience:
             return False
         best_before = max(values[:-patience])
