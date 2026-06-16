@@ -5,6 +5,15 @@ All notable changes to this project are documented here, following
 
 ## [Unreleased]
 
+### Fixed
+- **Flaky `test_concurrent_sqlite_writes_do_not_corrupt` (concurrent git-worktree
+  race).** `git worktree add`/`remove`/`prune` mutate shared `.git/worktrees/`
+  metadata and are not concurrency-safe against one repo — racing fan-out
+  intermittently failed CI with `failed to read .git/worktrees/<x>/commondir`.
+  `autonomous/parallel.py` now serializes worktree *creation/teardown* through a
+  module lock (`_WORKTREE_LOCK`) while each loop's `run` still executes fully in
+  parallel. Stress-verified 12/12 green (previously intermittent).
+
 ### Added
 - **`automate-your-job` graduated from recipe → live `live_verified` demo** — the
   first recipe to become a real, recorded run. A team-lead's repetitive task
