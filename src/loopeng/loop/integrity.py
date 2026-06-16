@@ -173,6 +173,19 @@ def gate_requires_confirmation(
     return True
 
 
+def describe_gate_reason(grade: str, score: float, dims: dict | None = None) -> str:
+    """Compose a legible reason a CONVERGED outcome still needs human confirmation
+    (U5). Names the converged grade/score and the lowest-scoring dimension, so the
+    human makes an informed decision rather than rubber-stamping. Pure string
+    composition -- it never affects shippability (KTD5)."""
+    parts = [f"converged at grade {grade} (score {score})"]
+    if dims:
+        lowest_dim, lowest_val = min(dims.items(), key=lambda kv: kv[1])
+        parts.append(f"lowest dimension {lowest_dim!r}={lowest_val}")
+    parts.append("confirm before shipping")
+    return "; ".join(parts)
+
+
 def confirm_convergence(
     gate: VerificationGate,
     *,

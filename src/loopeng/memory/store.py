@@ -220,6 +220,32 @@ class MemoryStore:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    # ----- confirmations (human-confirm gate audit, U5) -------------------
+
+    def record_confirmation(
+        self, run_id: int, confirmed: bool, reason: str | None = None, created: str | None = None
+    ) -> int:
+        """Persist a human verdict at the verification gate (U5, KTD5).
+
+        Audit-only: this write is never read back into the gate's ``confirmed``
+        input, so a recorded approval cannot become an auto-ship. ``confirm_convergence``
+        remains the sole shippability authority.
+        """
+        with self._wlock:
+            cur = self._conn.execute(
+                "INSERT INTO confirmations (run_id, confirmed, reason, created) VALUES (?, ?, ?, ?)",
+                (run_id, 1 if confirmed else 0, reason, created),
+            )
+            self._conn.commit()
+            return int(cur.lastrowid)
+
+    def confirmations(self, run_id: int) -> list[dict]:
+        with self._wlock:
+            rows = self._conn.execute(
+                "SELECT * FROM confirmations WHERE run_id = ? ORDER BY id", (run_id,)
+            ).fetchall()
+        return [{**dict(r), "confirmed": bool(r["confirmed"])} for r in rows]
+
     # ----- scheduler state (U14) -----------------------------------------
 
     def upsert_schedule(

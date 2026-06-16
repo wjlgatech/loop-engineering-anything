@@ -83,6 +83,23 @@ All notable changes to this project are documented here, following
     `tests/test_refactor_brief.py`, `reason_code` in `tests/test_convergence.py`,
     pivot / cap-wins / `plateau_pivots=0` characterization in
     `tests/test_loop_controller.py`.
+- **Loop-engineering gap-bridges, U5 — legible human-confirm gate + recorded
+  verdict** (same plan): when the verification gate requires confirmation, the
+  loop now surfaces *why* it fired and records the human's verdict for audit.
+  - **`src/loopeng/loop/integrity.py`**: `describe_gate_reason(grade, score, dims)`
+    composes a legible reason naming the converged grade/score and the lowest
+    dimension. **`controller.py`** `LoopOutcome` carries `score`/`dims` so the
+    runner composes the reason without re-judging.
+  - **`src/loopeng/memory/schema.sql`** + **`store.py`**: a new `confirmations`
+    table (`CREATE TABLE IF NOT EXISTS`) + `record_confirmation` / `confirmations`
+    reader. The table is write-only with respect to shippability — nothing reads
+    it back into the gate's `confirmed` input (KTD5).
+  - **`src/loopeng/autonomous/runner.py`**: `RunResult.gate_reason` surfaces the
+    firing reason; `_apply_gate` records the verdict only when confirmation was
+    owed. `confirm_convergence` stays the sole shippability authority.
+  - Tests: recording + reader in `tests/test_memory_store.py`; gate legibility,
+    approve/reject recording, CI-bypass-records-nothing, and write-only-does-not-
+    affect-shippability in `tests/test_maker_checker.py`.
 - **Loop-engine domain generalization, Phase B — U12: SimJudge referee +
   CMDP safety profile** (plan `docs/plans/2026-06-15-004-...`): the physical-AI-in-sim
   referee that runs a control policy in simulation over a *held-out* seed set

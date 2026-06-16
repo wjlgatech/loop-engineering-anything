@@ -27,7 +27,12 @@ from ..adapters.safety import run_tool, validate_target, within_workspace
 from ..config import Budget, Config, Lane
 from ..loop.checkpoint import GitCheckpoint
 from ..loop.controller import LoopController, LoopOutcome, LoopState
-from ..loop.integrity import assert_loop_integrity, confirm_convergence
+from ..loop.integrity import (
+    assert_loop_integrity,
+    confirm_convergence,
+    describe_gate_reason,
+    gate_requires_confirmation,
+)
 from ..memory.store import MemoryStore
 from ..preflight import missing_for_lane, missing_for_refine
 from ..router import route
@@ -42,14 +47,38 @@ class RunResult:
     # "converged, but 'done' is still a claim until confirmed". For any
     # non-converged outcome this is ``False`` (nothing to ship).
     shippable: bool = False
+    # Legible firing reason when the gate required confirmation (U5): the
+    # borderline grade/score/dimension an out-of-band caller surfaces to the
+    # human. ``None`` when no confirmation was owed (gate off / CI bypass / not
+    # converged).
+    gate_reason: str | None = None
 
 
-def _gate_shippable(outcome: LoopOutcome, config: Config, *, scheduled: bool, confirmed: bool) -> bool:
-    """Apply the human-confirm gate to a finished outcome. Only a CONVERGED
-    result can be shippable; the gate decides whether confirmation is still owed."""
+def _apply_gate(
+    outcome: LoopOutcome,
+    config: Config,
+    store: MemoryStore,
+    run_id: int,
+    *,
+    scheduled: bool,
+    confirmed: bool,
+    when: str,
+) -> tuple[bool, str | None]:
+    """Apply the human-confirm gate to a finished outcome (U5/U17, R10).
+
+    Only a CONVERGED result can be shippable; ``confirm_convergence`` is the sole
+    shippability authority. When confirmation is actually owed, compose a legible
+    firing reason and record the human verdict to the store for audit -- the
+    recording is write-only and never feeds back into shippability (KTD5)."""
     if outcome.final_state is not LoopState.CONVERGED:
-        return False
-    return confirm_convergence(config.gate, scheduled=scheduled, confirmed=confirmed)
+        return False, None
+    shippable = confirm_convergence(config.gate, scheduled=scheduled, confirmed=confirmed)
+    owed = gate_requires_confirmation(config.gate, scheduled=scheduled)
+    if not owed:
+        return shippable, None
+    reason = describe_gate_reason(outcome.grade, outcome.score, outcome.dims)
+    store.record_confirmation(run_id, confirmed=confirmed, reason=reason, created=when)
+    return shippable, reason
 
 
 def _default_factories() -> dict[str, Factory]:
@@ -153,8 +182,11 @@ def run_loop(
         budget=budget,
     )
     outcome = controller.run(run_id, gen.tool_path, goal)
-    shippable = _gate_shippable(outcome, config, scheduled=scheduled, confirmed=confirmed)
-    return RunResult(run_id, outcome, shippable=shippable)
+    when = datetime.now(timezone.utc).isoformat()
+    shippable, gate_reason = _apply_gate(
+        outcome, config, store, run_id, scheduled=scheduled, confirmed=confirmed, when=when
+    )
+    return RunResult(run_id, outcome, shippable=shippable, gate_reason=gate_reason)
 
 
 def run_refine_loop(
@@ -240,6 +272,9 @@ def run_refine_loop(
     # Stamp wall-clock end for the proof pack (elapsed = finished - started).
     # finish_run already set status; record_finished adds the timestamp the
     # controller doesn't own.
-    store.record_finished(run_id, datetime.now(timezone.utc).isoformat())
-    shippable = _gate_shippable(outcome, config, scheduled=scheduled, confirmed=confirmed)
-    return RunResult(run_id, outcome, shippable=shippable)
+    when = datetime.now(timezone.utc).isoformat()
+    store.record_finished(run_id, when)
+    shippable, gate_reason = _apply_gate(
+        outcome, config, store, run_id, scheduled=scheduled, confirmed=confirmed, when=when
+    )
+    return RunResult(run_id, outcome, shippable=shippable, gate_reason=gate_reason)

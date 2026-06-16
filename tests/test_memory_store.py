@@ -89,6 +89,26 @@ def test_recurring_failures_target_scoped_excludes_other_targets(store):
     assert all(fx != "fx_b" for fx, _ in scoped)
 
 
+def test_record_and_read_confirmation(store):
+    run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+    store.record_confirmation(
+        run_id, confirmed=True, reason="converged at grade A; confirm before shipping",
+        created="2026-06-16T00:00:00Z",
+    )
+    rows = store.confirmations(run_id)
+    assert len(rows) == 1
+    assert rows[0]["confirmed"] is True
+    assert "grade A" in rows[0]["reason"]
+
+
+def test_record_confirmation_rejection(store):
+    run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+    store.record_confirmation(run_id, confirmed=False, reason="rejected")
+    rows = store.confirmations(run_id)
+    assert len(rows) == 1
+    assert rows[0]["confirmed"] is False
+
+
 def test_finish_run_and_list(store):
     run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
     store.finish_run(run_id, "converged", "A")

@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
 from ..adapters.base import Checkpoint, Compounder, Judge, Refiner, Verdict
@@ -61,6 +61,10 @@ class LoopOutcome:
     grade: str
     reason: str
     iterations: int
+    # Final verdict signal, carried so the verification gate can compose a legible
+    # firing reason (which dimension/score was borderline) without re-judging (U5).
+    score: float = 0.0
+    dims: dict = field(default_factory=dict)
 
 
 class LoopController:
@@ -244,4 +248,11 @@ class LoopController:
     def _finish(self, run_id: int, decision: cv.Decision, verdict: Verdict, n: int) -> LoopOutcome:
         state = _TERMINAL[decision.kind]
         self.store.finish_run(run_id, state.value, verdict.grade)
-        return LoopOutcome(final_state=state, grade=verdict.grade, reason=decision.reason, iterations=n)
+        return LoopOutcome(
+            final_state=state,
+            grade=verdict.grade,
+            reason=decision.reason,
+            iterations=n,
+            score=verdict.score,
+            dims=dict(verdict.dims),
+        )
