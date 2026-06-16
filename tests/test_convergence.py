@@ -45,6 +45,31 @@ def test_token_budget_ignored_when_none():
     assert d.kind == cv.CONTINUE
 
 
+def test_wall_clock_budget_stops_when_set():
+    d = cv.evaluate(
+        v("C"), Budget(max_wall_seconds=60.0), iterations_done=2, plateaued=False, elapsed_seconds=60.0
+    )
+    assert d.kind == cv.STOPPED
+    assert "wall-clock" in d.reason
+
+
+def test_wall_clock_budget_ignored_when_none():
+    d = cv.evaluate(v("C"), Budget(), iterations_done=2, plateaued=False, elapsed_seconds=10**6)
+    assert d.kind == cv.CONTINUE
+
+
+def test_wall_clock_stops_even_with_iterations_remaining():
+    d = cv.evaluate(
+        v("C"),
+        Budget(max_iterations=99, max_wall_seconds=30.0),
+        iterations_done=2,
+        plateaued=False,
+        elapsed_seconds=31.0,
+    )
+    assert d.kind == cv.STOPPED
+    assert "wall-clock" in d.reason
+
+
 def test_plateau_stops():
     d = cv.evaluate(v("C"), Budget(), iterations_done=5, plateaued=True)
     assert d.kind == cv.STOPPED

@@ -18,6 +18,8 @@ Invariants enforced here:
 
 from __future__ import annotations
 
+import logging
+import time
 from dataclasses import dataclass
 from enum import Enum
 
@@ -26,6 +28,8 @@ from ..config import Budget
 from ..memory.store import MemoryStore
 from . import convergence as cv
 from .refactor_brief import build_refactor_brief
+
+_log = logging.getLogger(__name__)
 
 
 class LoopState(str, Enum):
@@ -83,6 +87,8 @@ class LoopController:
         self._record(run_id, n, verdict, diff_ref=None)
         tokens_spent = 0
         accepted = 0  # count of kept improvements, for compression cadence
+        start = time.monotonic()  # controller owns the clock; evaluate stays pure (U4)
+        warned_no_cost = False  # one-time warning when token_budget set but cost unreported
 
         # Cross-run history (U1): fixtures that have failed across prior runs of
         # THIS target. Scoped to the target so an unrelated target's history never
@@ -106,6 +112,7 @@ class LoopController:
                 iterations_done=n,
                 plateaued=plateaued,
                 tokens_spent=tokens_spent,
+                elapsed_seconds=time.monotonic() - start,
             )
             if decision.kind != cv.CONTINUE:
                 return self._finish(run_id, decision, verdict, n)
@@ -115,9 +122,25 @@ class LoopController:
             brief = build_refactor_brief(verdict, goal, recurring_failures=recurring_fixtures)
             diff_ref = self.refiner.refactor(tool_path, brief)
 
+            # Cost accounting (U4): thread the refiner's reported per-refactor cost
+            # into the budget gate, protocol-bound (getattr tolerates refiners that
+            # don't implement it). A refiner that reports no cost cannot advance the
+            # token gate -- warn once if a token_budget was set against it.
+            cost = getattr(self.refiner, "last_token_cost", None)
+            if cost is not None:
+                tokens_spent += cost
+            elif self.budget.token_budget is not None and not warned_no_cost:
+                warned_no_cost = True
+                _log.warning(
+                    "token_budget=%s is set but the refiner reports no token cost; "
+                    "the token gate cannot fire -- relying on max_wall_seconds=%s.",
+                    self.budget.token_budget,
+                    self.budget.max_wall_seconds,
+                )
+
             new_verdict = self.judge.judge(tool_path)
             n += 1
-            self._record(run_id, n, new_verdict, diff_ref=diff_ref)
+            self._record(run_id, n, new_verdict, diff_ref=diff_ref, token_cost=cost)
 
             # Safety failure introduced by the refactor: roll back, halt, no ship.
             if not new_verdict.safety_ok:
@@ -150,7 +173,9 @@ class LoopController:
 
     # ----- helpers --------------------------------------------------------
 
-    def _record(self, run_id: int, n: int, verdict: Verdict, diff_ref: str | None) -> None:
+    def _record(
+        self, run_id: int, n: int, verdict: Verdict, diff_ref: str | None, token_cost: int | None = None
+    ) -> None:
         self.store.record_iteration(
             run_id,
             n,
@@ -158,6 +183,7 @@ class LoopController:
             verdict.dims,
             safety_ok=verdict.safety_ok,
             failing_fixtures=verdict.failing_fixtures,
+            token_cost=token_cost,
             diff_ref=diff_ref,
             score=verdict.score,
         )

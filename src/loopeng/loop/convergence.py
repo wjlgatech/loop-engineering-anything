@@ -9,8 +9,12 @@ oscillate or degrade indefinitely (the "flying turd" guard):
   grade >= target -> converged
   iteration cap   -> stopped (budget: max iterations)
   token cap       -> stopped (budget: token)   [only when a token budget is set]
+  wall-clock cap  -> stopped (budget: wall)    [only when a wall budget is set]
   plateau         -> stopped (plateau)
   otherwise       -> continue
+
+Time is passed in (``elapsed_seconds``) rather than read here, so ``evaluate``
+stays a pure, side-effect-free decision function (the controller owns the clock).
 """
 
 from __future__ import annotations
@@ -40,6 +44,7 @@ def evaluate(
     iterations_done: int,
     plateaued: bool,
     tokens_spent: int = 0,
+    elapsed_seconds: float = 0.0,
 ) -> Decision:
     # Safety is the first and unbypassable check (KTD5, R3). The score/letter
     # convergence predicates are reached ONLY past this gate (R6 — a high score
@@ -61,6 +66,9 @@ def evaluate(
 
     if budget.token_budget is not None and tokens_spent >= budget.token_budget:
         return Decision(STOPPED, f"budget: token budget ({budget.token_budget}) exhausted")
+
+    if budget.max_wall_seconds is not None and elapsed_seconds >= budget.max_wall_seconds:
+        return Decision(STOPPED, f"budget: wall-clock ({budget.max_wall_seconds}s) exceeded")
 
     if plateaued:
         return Decision(STOPPED, f"plateau: no gain over {budget.plateau_patience} iterations")

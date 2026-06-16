@@ -242,3 +242,78 @@ def test_recurring_failures_injected_into_brief(store):
     # recurring AND currently-failing -> promoted to the front; live-only stays.
     assert brief.failing_fixtures[0] == "pagination_drift"
     assert "live_only" in brief.failing_fixtures
+
+
+import logging  # noqa: E402
+
+
+class CostReportingRefiner:
+    """A refiner that reports a fixed per-refactor token cost (U4)."""
+
+    def __init__(self, cost):
+        self.last_token_cost = cost
+        self.calls = 0
+
+    def refactor(self, tool_path, brief):
+        self.calls += 1
+        return f"diff-{self.calls}"
+
+
+def test_token_budget_enforced_with_cost_reporting_refiner(store):
+    # Never converges; each refactor reports 600 tokens; budget 1000 -> stops on cost.
+    judge = ScriptedJudge([v("C")])
+    refiner = CostReportingRefiner(cost=600)
+    ctrl = LoopController(
+        judge=judge,
+        refiner=refiner,
+        compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(),
+        store=store,
+        budget=Budget(target_grade="A", token_budget=1000, max_iterations=99, plateau_patience=99),
+    )
+    run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+
+    outcome = ctrl.run(run_id, "tool/")
+
+    # Regression guard: tokens_spent now reflects reported cost, so the gate fires
+    # (previously it compared against a constant 0 and never tripped).
+    assert outcome.final_state is LoopState.STOPPED
+    assert "token" in outcome.reason
+
+
+def test_token_budget_warns_when_refiner_reports_no_cost(store, caplog):
+    judge = ScriptedJudge([v("C")])
+    refiner = FakeRefiner()  # no last_token_cost attribute
+    ctrl = LoopController(
+        judge=judge,
+        refiner=refiner,
+        compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(),
+        store=store,
+        budget=Budget(target_grade="A", token_budget=1000, max_iterations=2, plateau_patience=99),
+    )
+    run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+
+    with caplog.at_level(logging.WARNING):
+        outcome = ctrl.run(run_id, "tool/")
+
+    assert outcome.final_state is LoopState.STOPPED  # falls through to max_iterations
+    assert any("token gate cannot fire" in r.getMessage() for r in caplog.records)
+
+
+def test_wall_clock_budget_terminates_run(store):
+    judge = ScriptedJudge([v("C")])
+    ctrl = LoopController(
+        judge=judge,
+        refiner=FakeRefiner(),
+        compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(),
+        store=store,
+        budget=Budget(target_grade="A", max_wall_seconds=0.0, max_iterations=99, plateau_patience=99),
+    )
+    run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+
+    outcome = ctrl.run(run_id, "tool/")
+
+    assert outcome.final_state is LoopState.STOPPED
+    assert "wall-clock" in outcome.reason

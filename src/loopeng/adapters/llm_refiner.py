@@ -174,6 +174,9 @@ class FallbackLLMRefiner:
     chain: list[Provider] | None = None
     timeout: float = 5 * 60
     last_provider: str | None = None
+    # This refiner does not surface token cost; the controller falls back to the
+    # wall-clock budget (U4). Declared to satisfy the Refiner protocol.
+    last_token_cost: int | None = None
 
     def refactor(self, tool_path: str, brief: RefactorBrief) -> str | None:
         chain = self.chain if self.chain is not None else default_chain()

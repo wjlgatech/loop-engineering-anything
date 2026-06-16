@@ -28,6 +28,23 @@ All notable changes to this project are documented here, following
     context.
   - Tests: `tests/test_refactor_brief.py` (new), target-scoping in
     `tests/test_memory_store.py`, brief-injection in `tests/test_loop_controller.py`.
+- **Loop-engineering gap-bridges, U4 — enforceable cost budget** (same plan):
+  fixes a latent bug where `tokens_spent` was initialized to `0` and never
+  updated, so the token budget gate always compared against `0` and never fired.
+  - **`src/loopeng/adapters/base.py`**: `Refiner` protocol gains an optional
+    `last_token_cost: int | None`; the controller reads it protocol-bound (never
+    reaching into a concrete refiner). `FallbackLLMRefiner` declares it `None`.
+  - **`src/loopeng/loop/controller.py`** threads each refactor's reported cost
+    into `tokens_spent` and `record_iteration(token_cost=...)`, captures a
+    monotonic start time, and passes elapsed seconds into `convergence.evaluate`.
+    Warns once when a `token_budget` is set against a refiner that reports no cost.
+  - **`src/loopeng/loop/convergence.py`**: `evaluate` gains a wall-clock terminal
+    predicate (time passed in, so it stays pure). **`config.py`** adds
+    `Budget.max_wall_seconds` (universal cost backstop) and rewrites the
+    `token_budget` docstring to state enforcement is conditional on cost reporting.
+  - Tests: wall-clock + token paths in `tests/test_convergence.py`; token
+    threading, no-cost warning, and wall-clock termination in
+    `tests/test_loop_controller.py`.
 - **Loop-engine domain generalization, Phase B — U12: SimJudge referee +
   CMDP safety profile** (plan `docs/plans/2026-06-15-004-...`): the physical-AI-in-sim
   referee that runs a control policy in simulation over a *held-out* seed set

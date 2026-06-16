@@ -77,7 +77,15 @@ class Refiner(Protocol):
     Returns a diff reference (path/sha) for the applied change, or ``None`` if
     nothing was applied. The brief content is passed as structured data; the
     refiner must never interpolate it into a shell command (security finding).
+
+    ``last_token_cost`` is the optional per-refactor token cost the controller
+    threads into the budget gate (U4). It is ``None`` when the refiner cannot
+    report cost (e.g. a free-tier LLM); the controller then falls back to the
+    wall-clock budget. Declared on the protocol so the controller reads it
+    protocol-bound rather than reaching into a concrete refiner class.
     """
+
+    last_token_cost: int | None
 
     def refactor(self, tool_path: str, brief: RefactorBrief) -> str | None: ...
 

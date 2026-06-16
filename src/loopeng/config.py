@@ -94,7 +94,18 @@ class Budget:
     target_score: float | None = None
     max_iterations: int = 10
     plateau_patience: int = 3  # stop after N iterations with no grade gain
-    token_budget: int | None = None  # advisory until a measurement source exists
+    # Token budget, enforced ONLY for refiners that report cost (U4). The
+    # controller threads each refactor's ``last_token_cost`` into a running total
+    # and stops the loop once it crosses this budget. A refiner that reports no
+    # cost (``last_token_cost is None``) cannot advance this gate -- the loop logs
+    # a one-time warning if a token_budget is set against such a refiner and
+    # relies on ``max_wall_seconds`` as the universal backstop. ``None`` disables
+    # the token gate entirely.
+    token_budget: int | None = None
+    # Wall-clock budget in seconds (U4) -- the universal cost backstop, parallel
+    # to ``max_iterations``. Enforced for every refiner regardless of whether it
+    # reports token cost. ``None`` disables it.
+    max_wall_seconds: float | None = None
     compression_interval: int = 5  # run History Compression every N accepted fixes (U7)
     # Noise band for grade stability (P0 #2). A same-letter iteration only counts
     # as an improvement when the continuous score rises by more than this margin,
