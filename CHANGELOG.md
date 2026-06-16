@@ -15,6 +15,15 @@ All notable changes to this project are documented here, following
   parallel. Stress-verified 12/12 green (previously intermittent).
 
 ### Added
+- **`one-person-industrial-engine` graduated recipe → live fleet demo** — the first
+  real end-to-end **fleet** run, exercising the plan-006 coordinator together with
+  the loop. A 2-slice fleet (`product-api` → dependent `daily-digest`) ran in
+  dependency order over `run_fleet`; each slice's own loop (real cli-judge + free
+  Gemini refiner, no Anthropic) converged **F → A**, and the dependent slice
+  received the upstream slice's outcome via deterministic feedback routing. Fleet
+  status converged. Recorded the headline slice via `demo record` (KTD2); full
+  evidence in `demos/fleets/one-person-industrial-engine/PROOF.md` + `fleet-report.txt`.
+  Hub now shows three verified cards (16 demos / 5 recipes); recipe doc retired.
 - **`factcli` is now a `live_verified` hub card** — the self-contained reference
   proof target (PR #21) gained a demo manifest (`demos/factcli.yaml`) and a real
   recorded run: the loop refactored it **F → A** (Gemini refiner, real cli-judge,
