@@ -30,6 +30,13 @@ All notable changes to this project are documented here, following
   so the retry contract is complete. Tests in `tests/test_llm_refiner.py`.
 
 ### Added
+- **Fleet orchestration layer, Phase A — U6: boundary docs** (same plan):
+  **`docs/solutions/fleet-orchestration-boundary.md`** (new) names the
+  loop-engine-not-Agent-IDE boundary vs. Agent Orchestrator (same orchestration
+  pattern, different worker substrate; enforced by the runner contract), the
+  failure mode it accepts, and the fleet-level invariants. `AGENTS.md` gains an
+  `orchestration/` layout row + a boundary entry; `README.md` gains a "Fleets"
+  subsection.
 - **Fleet orchestration layer, Phase A — U1: lifecycle state + persistence**
   (plan `docs/plans/2026-06-16-006-feat-fleet-orchestration-layer-plan.md`): the
   foundation for coordinating multiple self-improving loops under one goal.

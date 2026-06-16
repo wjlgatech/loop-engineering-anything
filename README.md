@@ -13,7 +13,7 @@ reality, and refactors until the grade stops climbing — then tells you what it
 
 [![CI](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml/badge.svg)](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml)
 [![loop-anything-hub](https://img.shields.io/badge/loop--anything--hub-live-brightgreen)](https://wjlgatech.github.io/loop-engineering-anything/)
-[![Tests](https://img.shields.io/badge/tests-286%20passing-brightgreen)](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-315%20passing-brightgreen)](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
 [![Units](https://img.shields.io/badge/plan-6%2F8%20units-blue)](docs/plans/)
 [![License](https://img.shields.io/badge/license-MIT-green)](#-license)
@@ -194,6 +194,33 @@ purpose — they are design choices, not missing features:
   never auto-ships.
 
 Full rationale, with the failure mode each choice accepts: [`docs/solutions/outer-loop-non-gaps.md`](docs/solutions/outer-loop-non-gaps.md).
+
+---
+
+## 🛰️ Fleets — coordinate many loops under one goal
+
+A single loop improves one target. A **fleet** coordinates *many* self-improving
+loops toward one goal — the orchestration layer above the loop:
+
+- **Dependency-ordered** — items run in topological waves over the worktree
+  fan-out; a cycle fails closed before any work starts.
+- **Feedback-routed** — when an item converges, its outcome is routed into its
+  dependents' briefs automatically (no human forwarding).
+- **Human-efficient** — only high-judgment forks (a safety block, a gated result,
+  a stuck worker) reach a human; everything else proceeds. You can re-brief a
+  single worker without re-running the fleet.
+
+```bash
+loop-anything fleet run fleet.json --goal "ship the feature across these targets"
+loop-anything fleet status <fleet_id>
+loop-anything fleet report <fleet_id>
+loop-anything fleet escalations <fleet_id>
+```
+
+This is a loop **engine** coordinating our own loops — not an issue→PR→CI Agent
+IDE. The coordinator is exercised in tests; live per-item execution rides on the
+same factory frontier as a single `run`. Boundary + rationale:
+[`docs/solutions/fleet-orchestration-boundary.md`](docs/solutions/fleet-orchestration-boundary.md).
 
 ## 🏛️ Architecture
 
