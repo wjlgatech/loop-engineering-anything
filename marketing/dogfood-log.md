@@ -76,3 +76,35 @@ Entry template:
   2. For the long-form, test whether opening with the "bug hiding in every
      AI-built tool" frame outperforms a straight "what it does" lede.
   3. Roll the winning hook back into `linkedin-launch.md` as the new default.
+
+---
+
+## 003 — 2026-06-16 — hub promotion: README applications-to-top + 3 application posts
+
+- **Hypothesis:** Surfacing the *breadth of applications* (10 loop domains) at the
+  top of the README — plus per-application posts that paint one vivid picture each
+  — converts "interesting engine" into "I could build X with this," driving hub
+  visits and demo/recipe contributions better than a generic launch post.
+- **Changes vs. 002:** New content shape — *application/use-case* posts (not
+  product-overview posts). Each leads with an "imagine a loop that…" frame for one
+  domain, applies the loop mechanism in that domain's terms, and ends with a
+  contribute invite (one PR adds the recipe). Produced three:
+  `app-pr-lifecycle`, `app-clinical-trials`, `app-smart-grid` (dev / science /
+  infra spread). README: moved the loop-anything-hub showcase to the top as a
+  10-row applications grid with an explicit "← your application here" invite.
+- **Grade (checklist §4):** Pass. Honesty held: domains are framed as
+  roadmap/invitations ("the recipe is mapped, the verified loop is open"), not
+  shipped — matches the `illustrative until a live run` badge.
+- **Result:** _not yet posted — fill in per-application engagement + any inbound
+  contributor interest / demo PRs._
+- **Learned (from building it):**
+  - Use-case posts need a domain-specific *referee* detail to feel real (real
+    trial criteria / real telemetry / CI+review) — the generic "graded against
+    reality" line lands harder when bound to the domain's actual signal.
+  - The "← your application here" row in the README grid turns a catalog into an
+    open invitation in one line.
+- **Next test:**
+  1. Post the three a few days apart; see which domain pulls the most contributor
+     interest, and write the next 3 (legal, quant, supply chain…) toward that pull.
+  2. Track whether any post yields a demo/recipe PR — the real conversion metric
+     for application posts (vs. reactions for product posts).
