@@ -6,6 +6,30 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Loop-engine domain generalization, Phase B — U12: SimJudge referee +
+  CMDP safety profile** (plan `docs/plans/2026-06-15-004-...`): the physical-AI-in-sim
+  referee that runs a control policy in simulation over a *held-out* seed set
+  and returns a normalized `Verdict` (R4/R5/R6/R12). Why: this is the third
+  domain that proves the loop spine is substrate-agnostic — a non-software
+  artifact graded by a real referee with a real safety gate.
+  - **`src/loopeng/domains/physical_ai/sim_judge.py`** (new): `SimJudge.judge(policy_path)`
+    averages per-seed reward → `score`, bands it to a non-null `grade` letter
+    (KTD1), and derives `safety_ok` from accumulated CMDP cost. **Held-out seeds
+    are derived at judge-time from a secret PRG seed** held only in the judge's
+    environment (KTD6/R6) and exclude the maker's `dev_seeds`, so the maker
+    cannot read or overfit the eval set. NaN reward → safe failure (grade `F`,
+    `safety_ok=False`, recorded honestly); empty rollout set → `ValueError`,
+    never a fabricated score. `load_simulator()` is a gated dependency
+    (skip-not-fail via `SimulatorUnavailable`); the live MuJoCo binding lands in U13.
+  - **`src/loopeng/domains/physical_ai/safety_profile.py`** (new): centralized
+    `derive_safety_ok(cost, threshold)` (one function, KTD2) — a trip on *any*
+    CMDP channel (joint-limit/velocity/torque/collision) or a NaN cost fails
+    closed. All reporting is bound to "sim performance only" (R12) — no transfer
+    or real-world correctness claim.
+  - **`tests/test_sim_judge.py`** (new, 13 tests) exercises the referee against
+    *recorded* rollouts (no live sim in the default suite): safety trips,
+    held-out/dev-seed disjointness, mean-reward scoring + variance, NaN/empty
+    edges, and judge determinism.
 - **Loop-engine domain generalization, Phase C — U17: maker/checker contract +
   anti-cognitive-surrender gates** (plan `docs/plans/2026-06-15-004-...`): make
   "maker ≠ checker" an *enforced* precondition and add the verification gate
