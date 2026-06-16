@@ -9,8 +9,9 @@ Design seams kept thin so later units extend without re-touching this file:
   - ``classify`` maps a worker ``RunResult`` to the item's post-run status.
     The default here is a plain final-state map; U4 swaps in the escalation
     classifier (clean+shippable -> converged, else escalated).
-  - ``route`` is an optional hook fired after each item completes; U3 supplies
-    feedback routing (upstream outcome -> dependents' briefs).
+  - feedback routing (U3) is a *pull*: before dispatching an item the coordinator
+    gathers its dependencies' recorded outcomes and hands them to the runner as
+    ``upstream_outcomes``, which the runner threads into the worker's brief.
 
 Wrap-don't-fork (KTD1): this layer depends only on ``run_parallel``, the store,
 and ``RunResult`` — the per-target ``LoopController`` is untouched.
@@ -26,6 +27,7 @@ from ..autonomous.runner import RunResult
 from ..loop.controller import LoopState
 from ..memory.fleet_state import FleetItem, FleetItemStatus, FleetRunStatus
 from ..memory.store import MemoryStore
+from .routing import gather_upstream_outcomes
 
 # A status a dependency can end in that is NOT converged -> dependents can't run.
 _FAILED_DEP = {
@@ -95,20 +97,22 @@ def _assert_acyclic(items: dict[str, FleetItem]) -> None:
 def run_fleet(
     store: MemoryStore,
     fleet_id: int,
-    runner: Callable[[FleetItem, str], RunResult],
+    runner: Callable[[FleetItem, str, list[dict]], RunResult],
     *,
     repo_dir: str,
     worktrees_root: str,
     max_parallel: int = 2,
     classify: Callable[[RunResult], FleetItemStatus] = default_classify,
-    route: Callable[[FleetItem, RunResult, dict[str, FleetItem]], None] | None = None,
 ) -> FleetRunStatus:
     """Drive a fleet's items in dependency order over ``run_parallel``.
 
-    ``runner(item, worktree_path) -> RunResult`` runs one item's loop inside the
-    per-item worktree (it is responsible for re-basing the worker's workspace_root
-    onto ``worktree_path``, mirroring ``Heartbeat.tick_parallel``). Returns the
-    terminal fleet-run status (converged / awaiting_human / stopped).
+    ``runner(item, worktree_path, upstream_outcomes) -> RunResult`` runs one
+    item's loop inside the per-item worktree. It is responsible for re-basing the
+    worker's workspace_root onto ``worktree_path`` (mirroring
+    ``Heartbeat.tick_parallel``) and passing ``upstream_outcomes`` to the worker
+    as ``upstream_context`` (U3). The coordinator gathers those outcomes from the
+    item's converged dependencies before dispatch (deterministic pull, no LLM).
+    Returns the terminal fleet-run status (converged / awaiting_human / stopped).
     """
     items = {i.key: i for i in store.fleet_items(fleet_id)}
     _assert_acyclic(items)  # fail closed before any worktree is created
@@ -139,8 +143,12 @@ def run_fleet(
             store.set_item_status(i.id, FleetItemStatus.RUNNING)
 
         def _make_run(item: FleetItem) -> Callable[[str], RunResult]:
+            # Pull this item's dependencies' recorded outcomes (U3) once, before
+            # dispatch, and hand them to the runner as upstream context.
+            upstream = gather_upstream_outcomes(store, fleet_id, item)
+
             def _run(worktree: str) -> RunResult:
-                return runner(item, worktree)
+                return runner(item, worktree, upstream)
 
             return _run
 
@@ -160,9 +168,8 @@ def run_fleet(
                 continue
             result = res.value
             store.set_item_status(item.id, classify(result), run_id=result.run_id)
+            # Record the outcome now so dependents pulled in a later wave see it (U3).
             store.record_item_outcome(item.id, outcome_summary(result))
-            if route is not None:
-                route(item, result, {i.key: i for i in store.fleet_items(fleet_id)})
 
     # Finalize the fleet run status.
     final = store.fleet_items(fleet_id)

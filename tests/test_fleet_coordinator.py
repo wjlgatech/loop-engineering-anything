@@ -51,7 +51,7 @@ def _order_runner(order, lock, results):
     """A runner that records run order (thread-safe) and returns a scripted result."""
     counter = {"n": 0}
 
-    def runner(item, worktree):
+    def runner(item, worktree, upstream):
         with lock:
             order.append(item.key)
             counter["n"] += 1
@@ -142,3 +142,21 @@ def test_escalated_item_parks_the_fleet(store, repo, tmp_path):
     )
     assert status is FleetRunStatus.AWAITING_HUMAN
     assert store.fleet_items(fid)[0].status is FleetItemStatus.ESCALATED
+
+
+def test_dependent_runner_receives_upstream_outcome(store, repo, tmp_path):
+    # End-to-end U3: B depends on A; B's runner is handed A's recorded outcome.
+    fid = store.create_fleet(None, "2026-06-16T00:00:00Z")
+    store.add_fleet_item(fid, "A")
+    store.add_fleet_item(fid, "B", depends_on=["A"])
+    captured, lock = {}, threading.Lock()
+
+    def runner(item, worktree, upstream):
+        with lock:
+            captured[item.key] = upstream
+        return _result(1 if item.key == "A" else 2)
+
+    run_fleet(store, fid, runner, repo_dir=str(repo), worktrees_root=str(tmp_path / "wts"))
+    assert captured["A"] == []  # root has no upstream
+    assert captured["B"] and captured["B"][0]["item"] == "A"
+    assert captured["B"][0]["final_state"] == "converged"

@@ -54,6 +54,19 @@ All notable changes to this project are documented here, following
   hang). Thin `classify` (U4) and `route` (U3) seams are pre-wired. Tests:
   `tests/test_fleet_coordinator.py` (new) — flat fan-out characterization,
   diamond-DAG ordering, cycle rejection, blocked-on-dep, fleet PARK.
+- **Fleet orchestration layer, Phase A — U3: automatic feedback routing**
+  (same plan): a completed item's outcome is routed into its dependents' briefs,
+  deterministically (no LLM). Built the brief-injection seam the doc-review flagged
+  as missing: an additive, backward-compatible `upstream_context` parameter on
+  `run_loop` / `run_refine_loop` → `LoopController` → a new advisory
+  `RefactorBrief.upstream_outcomes` field (distinct from `recurring_failures`:
+  caller-injected structured cross-item outcomes vs. store-derived fixture
+  strings). The `ClaudeCodeRefiner` prompt surfaces it. The coordinator *pulls*
+  each item's dependencies' recorded outcomes before dispatch
+  (`src/loopeng/orchestration/routing.py`, new). Absent the parameter, behavior is
+  identical to before. Tests: `tests/test_fleet_routing.py` (new), brief field in
+  `tests/test_refactor_brief.py`, controller threading in
+  `tests/test_loop_controller.py`, end-to-end in `tests/test_fleet_coordinator.py`.
 - **Loop-engineering gap-bridges, U6 — name the three deliberate non-gaps**
   (same plan): documents outer-loop sovereignty, single referee of record, and
   the gated human-confirm posture as design choices (each with the failure mode

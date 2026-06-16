@@ -79,6 +79,7 @@ class LoopController:
         budget: Budget | None = None,
         compressor=None,
         sleeper=time.sleep,
+        upstream_context=None,
     ):
         self.judge = judge
         self.refiner = refiner
@@ -88,8 +89,11 @@ class LoopController:
         self.budget = budget or Budget()
         # Optional History Compression Engine (U7); None = no compression pass.
         self.compressor = compressor
-        # Injectable so tests can drive retry backoff without real sleeps (U3).
+        # Injectable so tests can drive retry backoff without real sleeps (plan-005 U3).
         self.sleeper = sleeper
+        # Upstream fleet-item outcomes routed into this run's briefs (plan-006 U3).
+        # Empty/None for a non-fleet single-target run -> identical to prior behavior.
+        self.upstream_context = list(upstream_context or [])
 
     def run(self, run_id: int, tool_path: str, goal: str = "") -> LoopOutcome:
         # Initial grade.
@@ -153,6 +157,7 @@ class LoopController:
                 goal,
                 recurring_failures=recurring_fixtures,
                 exclude_dims=list(active_exclude) or None,
+                upstream_outcomes=self.upstream_context,
             )
             if brief.target_dimensions:
                 targeted_since_pivot.append(brief.target_dimensions[0])

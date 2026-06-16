@@ -14,6 +14,7 @@ def build_refactor_brief(
     goal: str = "",
     recurring_failures: list | None = None,
     exclude_dims: list | None = None,
+    upstream_outcomes: list | None = None,
 ) -> RefactorBrief:
     # Rank dimensions lowest-score-first; those are where the grade is bleeding.
     ranked = [name for name, _ in sorted(verdict.dims.items(), key=lambda kv: kv[1])]
@@ -45,4 +46,5 @@ def build_refactor_brief(
         target_dimensions=ranked,
         failing_fixtures=live,
         recurring_failures=advisory,
+        upstream_outcomes=list(upstream_outcomes or []),  # fleet routing (plan-006 U3)
     )
