@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 
 from .base import RefactorBrief
-from .safety import run_tool
+from .safety import is_infra_failure, run_tool
 
 DEFAULT_TIMEOUT = 30 * 60  # seconds
 # `claude -p --output-format json` emits a result envelope carrying token usage.
@@ -57,6 +57,11 @@ class ClaudeCodeRefiner:
         self.timeout = timeout
         self.extra_args = tuple(extra_args)
         self.last_token_cost: int | None = None
+        # Set by ``refactor`` (U3): True when the last invocation failed for infra
+        # reasons (timeout / non-zero exit / missing executable). The controller
+        # reads this to retry transient failures without confusing them with a
+        # clean no-change result or a quality regression.
+        self.last_infra_failure: bool = False
 
     def _build_prompt(self, brief: RefactorBrief) -> str:
         dims = ", ".join(brief.target_dimensions) or "the lowest-scoring dimensions"
@@ -82,6 +87,7 @@ class ClaudeCodeRefiner:
         )
         # Best-effort token accounting for the proof pack; None if unavailable.
         self.last_token_cost = parse_token_cost(res.stdout)
+        self.last_infra_failure = is_infra_failure(res)
         if not res.ok:
             return None
         # Reference the applied change by its diff summary; None when nothing changed.

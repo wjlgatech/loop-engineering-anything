@@ -106,6 +106,11 @@ class Budget:
     # to ``max_iterations``. Enforced for every refiner regardless of whether it
     # reports token cost. ``None`` disables it.
     max_wall_seconds: float | None = None
+    # Bounded retries for a transient (infra) refiner failure before the loop
+    # falls through to its normal no-change/rollback path (U3). Only the infra
+    # class is retried; a clean no-change result or a post-judge safety failure
+    # is never retried. Retry wall time is counted by ``max_wall_seconds``.
+    max_tool_retries: int = 2
     compression_interval: int = 5  # run History Compression every N accepted fixes (U7)
     # Noise band for grade stability (P0 #2). A same-letter iteration only counts
     # as an improvement when the continuous score rises by more than this margin,

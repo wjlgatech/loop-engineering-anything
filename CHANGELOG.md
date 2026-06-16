@@ -45,6 +45,24 @@ All notable changes to this project are documented here, following
   - Tests: wall-clock + token paths in `tests/test_convergence.py`; token
     threading, no-cost warning, and wall-clock termination in
     `tests/test_loop_controller.py`.
+- **Loop-engineering gap-bridges, U3 — infra-failure vs quality-regression
+  retry** (same plan): a transient tool failure (timeout / non-zero exit /
+  missing executable) is now retried with bounded backoff instead of being
+  mistaken for a quality regression; a clean no-change result and a post-judge
+  safety failure are never retried.
+  - **`src/loopeng/adapters/safety.py`**: `is_infra_failure(ProcResult)` classifier.
+  - **`src/loopeng/adapters/compound_engineering.py`**: `ClaudeCodeRefiner`
+    sets `last_infra_failure` (True only on infra failure, False on a clean
+    no-change result) — classification stays in the concrete refiner, not the
+    `Refiner` protocol.
+  - **`src/loopeng/loop/controller.py`**: `_refactor_with_retry` retries only the
+    infra class with exponential backoff (`Budget.max_tool_retries`, default 2),
+    via an injectable `sleeper`. Retries do not increment the iteration count;
+    wall time is bounded by `max_wall_seconds`. Safety is detected post-judge,
+    downstream of retry, so it is never retried.
+  - Tests: classifier + flag in `tests/test_compound_engineering.py`;
+    retry-recovers / bounded-exhaustion / safety-never-retried in
+    `tests/test_loop_controller.py`.
 - **Loop-engine domain generalization, Phase B — U12: SimJudge referee +
   CMDP safety profile** (plan `docs/plans/2026-06-15-004-...`): the physical-AI-in-sim
   referee that runs a control policy in simulation over a *held-out* seed set

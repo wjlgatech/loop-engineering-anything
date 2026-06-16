@@ -31,6 +31,10 @@ from .refactor_brief import build_refactor_brief
 
 _log = logging.getLogger(__name__)
 
+# Base backoff for transient (infra) refiner-failure retries (U3); doubles per
+# attempt. The wall-clock budget (U4) bounds total retry time.
+_TOOL_RETRY_BASE_SECONDS = 2.0
+
 
 class LoopState(str, Enum):
     ROUTING = "routing"
@@ -70,6 +74,7 @@ class LoopController:
         store: MemoryStore,
         budget: Budget | None = None,
         compressor=None,
+        sleeper=time.sleep,
     ):
         self.judge = judge
         self.refiner = refiner
@@ -79,6 +84,8 @@ class LoopController:
         self.budget = budget or Budget()
         # Optional History Compression Engine (U7); None = no compression pass.
         self.compressor = compressor
+        # Injectable so tests can drive retry backoff without real sleeps (U3).
+        self.sleeper = sleeper
 
     def run(self, run_id: int, tool_path: str, goal: str = "") -> LoopOutcome:
         # Initial grade.
@@ -120,7 +127,7 @@ class LoopController:
             # --- REFACTORING ---
             token = self.checkpoint.snapshot()
             brief = build_refactor_brief(verdict, goal, recurring_failures=recurring_fixtures)
-            diff_ref = self.refiner.refactor(tool_path, brief)
+            diff_ref = self._refactor_with_retry(tool_path, brief)
 
             # Cost accounting (U4): thread the refiner's reported per-refactor cost
             # into the budget gate, protocol-bound (getattr tolerates refiners that
@@ -172,6 +179,27 @@ class LoopController:
                 self.checkpoint.restore(token)
 
     # ----- helpers --------------------------------------------------------
+
+    def _refactor_with_retry(self, tool_path: str, brief) -> str | None:
+        """Run the refiner, retrying only a *transient infra* failure (U3).
+
+        Infra failure (timeout / non-zero exit / missing executable) is surfaced
+        by the refiner's ``last_infra_failure`` flag and retried with bounded
+        exponential backoff. A clean no-change result is NOT retried (it returns
+        immediately and the loop rolls back as usual). Safety is detected by the
+        judge *after* this returns, so a safety failure can never enter retry.
+        Retries do not increment the iteration count; wall time is bounded by the
+        wall-clock budget (U4).
+        """
+        attempt = 0
+        while True:
+            diff_ref = self.refiner.refactor(tool_path, brief)
+            if not getattr(self.refiner, "last_infra_failure", False):
+                return diff_ref
+            if attempt >= self.budget.max_tool_retries:
+                return diff_ref  # exhausted -> fall through to normal no-change handling
+            attempt += 1
+            self.sleeper(_TOOL_RETRY_BASE_SECONDS * (2 ** (attempt - 1)))
 
     def _record(
         self, run_id: int, n: int, verdict: Verdict, diff_ref: str | None, token_cost: int | None = None

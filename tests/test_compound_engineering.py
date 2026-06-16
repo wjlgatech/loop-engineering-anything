@@ -30,7 +30,10 @@ def test_refiner_returns_diff_summary_on_success(monkeypatch):
 
 def test_refiner_returns_none_on_failure(monkeypatch):
     monkeypatch.setattr(ce, "run_tool", lambda args, **kw: ProcResult(1, "", "boom"))
-    assert ce.ClaudeCodeRefiner().refactor("tool/", _brief()) is None
+    r = ce.ClaudeCodeRefiner()
+    assert r.refactor("tool/", _brief()) is None
+    # Non-zero exit is an INFRA failure -> retryable (U3).
+    assert r.last_infra_failure is True
 
 
 def test_refiner_returns_none_when_no_changes(monkeypatch):
@@ -38,7 +41,19 @@ def test_refiner_returns_none_when_no_changes(monkeypatch):
         return ProcResult(0, "" if args[0] == "git" else "done", "")
 
     monkeypatch.setattr(ce, "run_tool", fake_run)
-    assert ce.ClaudeCodeRefiner().refactor("tool/", _brief()) is None
+    r = ce.ClaudeCodeRefiner()
+    assert r.refactor("tool/", _brief()) is None
+    # A clean run that produced no diff is NOT an infra failure -> never retried.
+    assert r.last_infra_failure is False
+
+
+def test_is_infra_failure_classifies_proc_results():
+    from loopeng.adapters.safety import is_infra_failure
+
+    assert is_infra_failure(ProcResult(0, "ok", "")) is False
+    assert is_infra_failure(ProcResult(1, "", "boom")) is True  # non-zero exit
+    assert is_infra_failure(ProcResult(-1, "", "timed out", timed_out=True)) is True  # timeout
+    assert is_infra_failure(ProcResult(127, "", "not found")) is True  # missing exe
 
 
 def test_parse_token_cost_sums_usage():

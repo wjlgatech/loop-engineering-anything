@@ -78,6 +78,15 @@ class ProcResult:
         return self.returncode == 0 and not self.timed_out
 
 
+def is_infra_failure(res: ProcResult) -> bool:
+    """True when a tool invocation failed for *infrastructure* reasons -- a
+    timeout, a non-zero exit, or a missing executable -- as opposed to running
+    cleanly but producing no change (U3). The loop retries this class with
+    backoff; a clean no-change result is never retried.
+    """
+    return not res.ok
+
+
 def run_tool(
     args: list[str],
     *,

@@ -317,3 +317,91 @@ def test_wall_clock_budget_terminates_run(store):
 
     assert outcome.final_state is LoopState.STOPPED
     assert "wall-clock" in outcome.reason
+
+
+class FlakyRefiner:
+    """Fails infra-style for the first ``fail_times`` calls, then succeeds (U3)."""
+
+    def __init__(self, fail_times):
+        self.fail_times = fail_times
+        self.calls = 0
+        self.last_infra_failure = False
+        self.last_token_cost = None
+
+    def refactor(self, tool_path, brief):
+        self.calls += 1
+        if self.calls <= self.fail_times:
+            self.last_infra_failure = True
+            return None
+        self.last_infra_failure = False
+        return f"diff-{self.calls}"
+
+
+def _noop_sleep(_seconds):
+    return None
+
+
+def test_infra_failure_is_retried_and_recovers(store):
+    # One transient failure then success within one logical iteration.
+    judge = ScriptedJudge([v("C"), v("A")])
+    refiner = FlakyRefiner(fail_times=1)
+    ctrl = LoopController(
+        judge=judge,
+        refiner=refiner,
+        compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(),
+        store=store,
+        budget=Budget(target_grade="A", max_tool_retries=2),
+        sleeper=_noop_sleep,
+    )
+    run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+
+    outcome = ctrl.run(run_id, "tool/")
+
+    assert outcome.final_state is LoopState.CONVERGED
+    assert refiner.calls == 2  # 1 infra fail + 1 success, single iteration
+    # Only one logical iteration past the initial judge -> n == 2.
+    assert outcome.iterations == 2
+
+
+def test_infra_retries_are_bounded(store):
+    # Always fails infra-style; retries are capped so total calls are bounded.
+    judge = ScriptedJudge([v("C")])
+    refiner = FlakyRefiner(fail_times=99)
+    ctrl = LoopController(
+        judge=judge,
+        refiner=refiner,
+        compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(),
+        store=store,
+        budget=Budget(target_grade="A", max_tool_retries=2, max_iterations=2, plateau_patience=99),
+        sleeper=_noop_sleep,
+    )
+    run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+
+    outcome = ctrl.run(run_id, "tool/")
+
+    assert outcome.final_state is LoopState.STOPPED
+    # One iteration's refactor = 1 initial call + max_tool_retries (2) = 3 calls.
+    assert refiner.calls == 3
+
+
+def test_safety_failure_is_never_retried(store):
+    # Refiner always succeeds; the judge returns an unsafe verdict post-refactor.
+    judge = ScriptedJudge([v("C"), v("C", safety_ok=False)])
+    refiner = FlakyRefiner(fail_times=0)
+    ctrl = LoopController(
+        judge=judge,
+        refiner=refiner,
+        compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(),
+        store=store,
+        budget=Budget(target_grade="A", max_tool_retries=2),
+        sleeper=_noop_sleep,
+    )
+    run_id = store.create_run("t", "service", None, "2026-06-15T00:00:00Z")
+
+    outcome = ctrl.run(run_id, "tool/")
+
+    assert outcome.final_state is LoopState.BLOCKED_SAFETY
+    assert refiner.calls == 1  # the safety failure (post-judge) triggered no retry
