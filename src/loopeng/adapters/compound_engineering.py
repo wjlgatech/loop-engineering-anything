@@ -152,10 +152,13 @@ class ClaudeCodeRefiner:
         # Parse the JSON envelope once for both token cost and fork cards (KTD1).
         envelope = _safe_loads(res.stdout)
         self.last_token_cost = _token_cost_from(envelope)
-        self.last_fork_cards = _fork_cards_from(envelope)
         self.last_infra_failure = is_infra_failure(res)
         if not res.ok:
+            # A failed attempt's output is not a trustworthy emission -- don't let a
+            # prior/partial fork-card list leak into the controller's processing.
+            self.last_fork_cards = []
             return None
+        self.last_fork_cards = _fork_cards_from(envelope)
         # Reference the applied change by its diff summary; None when nothing changed.
         diff = run_tool(["git", "-C", tool_path, "diff", "--shortstat"], timeout=60)
         summary = diff.stdout.strip()

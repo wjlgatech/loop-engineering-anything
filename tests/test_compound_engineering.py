@@ -134,6 +134,17 @@ def test_refactor_sets_last_fork_cards_from_single_parse(monkeypatch):
     assert r.last_fork_cards[0].id == "f1"
 
 
+def test_refactor_clears_fork_cards_on_failure(monkeypatch):
+    # A failed (non-zero) attempt with parseable fork_cards must not leak them.
+    monkeypatch.setattr(
+        ce, "run_tool", lambda args, **kw: ProcResult(1, _ENVELOPE_WITH_CARDS, "boom")
+    )
+    r = ce.ClaudeCodeRefiner()
+    assert r.refactor("tool/", _brief()) is None
+    assert r.last_fork_cards == []
+    assert r.last_infra_failure is True
+
+
 def test_refactor_no_cards_yields_empty_list(monkeypatch):
     def fake_run(args, **kw):
         if args[0] == "claude":

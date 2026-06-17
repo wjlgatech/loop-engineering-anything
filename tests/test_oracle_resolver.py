@@ -92,3 +92,13 @@ def test_no_grounding_never_reverses_even_with_an_option():
     res = Resolver(oracle).resolve(_card(chosen_default="a"))
     assert res.decision == ESCALATE
     assert not res.is_reversal
+
+
+def test_grounded_with_no_chosen_default_keeps_not_reverses():
+    # No committed default -> nothing to reverse; adopt the grounded option.
+    oracle = FakeOracle(OracleVerdict("b", ["kernel.yaml:9"]))
+    res = Resolver(oracle).resolve(_card(chosen_default=None))
+    assert res.decision == KEEP_DEFAULT
+    assert res.chosen_option_id == "b"
+    assert res.basis == ["kernel.yaml:9"]
+    assert not res.is_reversal

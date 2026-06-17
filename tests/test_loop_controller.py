@@ -568,6 +568,26 @@ def test_grounded_reversal_rolls_back_even_on_improvement(store):
     assert checkpoint.restores >= 1  # the forced reversal fired
 
 
+def test_safety_wins_over_fork_reversal_but_card_still_recorded(store):
+    """On an iteration that both resolves to REVERSE and fails safety, safety is
+    terminal (BLOCKED_SAFETY), the compounder never fires, and the card is still
+    recorded on the halt iteration."""
+    run_id = store.create_run("t", "service", None, "2026-06-17T00:00:00Z")
+    judge = ScriptedJudge([v("C"), v("A", safety_ok=False)])
+    refiner = ForkEmittingRefiner([_fc(chosen_default="a")])
+    resolver = Resolver(FakeGroundedOracle("b"))  # would reverse
+    checkpoint = FakeCheckpoint()
+    compounder = RecordingCompounder()
+    ctrl = LoopController(
+        judge=judge, refiner=refiner, compounder=compounder, checkpoint=checkpoint,
+        store=store, budget=Budget(max_iterations=2), resolver=resolver,
+    )
+    outcome = ctrl.run(run_id, "tool/")
+    assert outcome.final_state is LoopState.BLOCKED_SAFETY
+    assert compounder.entries == []  # never compounds on a safety halt
+    assert len(store.fork_cards(run_id)) == 1  # recorded even on the halt iteration
+
+
 def test_no_grounding_never_reverses_but_records_and_flags(store):
     run_id = store.create_run("t", "service", None, "2026-06-17T00:00:00Z")
     judge = ScriptedJudge([v("C"), v("A")])

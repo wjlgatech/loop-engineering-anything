@@ -65,7 +65,11 @@ class Resolver:
         # 2. oracle — grounded answer can keep or reverse the default.
         verdict = self.oracle.resolve(card)
         if verdict.grounded:
-            if card.chosen_default is not None and verdict.chosen_option_id == card.chosen_default:
+            # Reverse only when there is a *concrete* default to reverse away from
+            # and the oracle disagrees with it. With no default, the agent built on
+            # no committed option, so there is nothing to roll back — adopt the
+            # grounded choice as the kept decision rather than discarding the work.
+            if card.chosen_default is None or verdict.chosen_option_id == card.chosen_default:
                 return Resolution(KEEP_DEFAULT, verdict.chosen_option_id, basis=list(verdict.citations))
             return Resolution(REVERSE, verdict.chosen_option_id, basis=list(verdict.citations))
 
