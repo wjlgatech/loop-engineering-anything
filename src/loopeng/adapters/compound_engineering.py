@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 
+from ..loop.fork_card import ForkCard, ForkCardParseError
 from .base import RefactorBrief
 from .safety import is_infra_failure, run_tool
 
@@ -28,13 +29,19 @@ DEFAULT_TIMEOUT = 30 * 60  # seconds
 _USAGE_ARGS = ("--output-format", "json")
 
 
-def parse_token_cost(stdout: str) -> int | None:
-    """Extract total token usage from a ``claude -p --output-format json`` result
-    envelope. Returns ``None`` if the output is not the expected JSON shape."""
+def _safe_loads(stdout: str) -> dict | None:
+    """Parse the ``claude -p --output-format json`` envelope once; ``None`` if it
+    is not the expected JSON object. Token cost and fork cards are both read from
+    this single parse in ``refactor`` (KTD1 -- no double ``json.loads``)."""
     try:
         data = json.loads(stdout)
     except (ValueError, TypeError):
         return None
+    return data if isinstance(data, dict) else None
+
+
+def _token_cost_from(data: dict | None) -> int | None:
+    """Total token usage from a parsed result envelope; ``None`` when absent."""
     usage = data.get("usage") if isinstance(data, dict) else None
     if not isinstance(usage, dict):
         return None
@@ -46,6 +53,38 @@ def parse_token_cost(stdout: str) -> int | None:
             total += val
             found = True
     return total if found else None
+
+
+def _fork_cards_from(data: dict | None) -> list[ForkCard]:
+    """Map a parsed envelope's ``fork_cards`` array to ``ForkCard`` objects.
+
+    Defensive by contract: a malformed card is skipped (and its siblings kept),
+    never raised -- a buggy emission must not crash the refiner (KTD1). An absent
+    or non-list ``fork_cards`` yields an empty list.
+    """
+    raw = data.get("fork_cards") if isinstance(data, dict) else None
+    if not isinstance(raw, list):
+        return []
+    cards: list[ForkCard] = []
+    for entry in raw:
+        try:
+            cards.append(ForkCard.from_dict(entry))
+        except ForkCardParseError:
+            continue
+    return cards
+
+
+def parse_token_cost(stdout: str) -> int | None:
+    """Extract total token usage from a ``claude -p --output-format json`` result
+    envelope. Returns ``None`` if the output is not the expected JSON shape."""
+    return _token_cost_from(_safe_loads(stdout))
+
+
+def parse_fork_cards(stdout: str) -> list[ForkCard]:
+    """Extract emitted Fork-Cards from a ``claude -p --output-format json`` result
+    envelope. Returns ``[]`` for non-JSON output or output with no ``fork_cards``
+    key; skips malformed cards rather than raising."""
+    return _fork_cards_from(_safe_loads(stdout))
 
 
 class ClaudeCodeRefiner:
@@ -62,6 +101,10 @@ class ClaudeCodeRefiner:
         # reads this to retry transient failures without confusing them with a
         # clean no-change result or a quality regression.
         self.last_infra_failure: bool = False
+        # Fork-Cards the agent emitted on the last refactor (plan 2026-06-17 U4):
+        # build decisions the spec/northstar did not determine. Parsed off the same
+        # JSON envelope as token cost; the controller reads it protocol-bound.
+        self.last_fork_cards: list[ForkCard] = []
 
     def _build_prompt(self, brief: RefactorBrief) -> str:
         dims = ", ".join(brief.target_dimensions) or "the lowest-scoring dimensions"
@@ -86,6 +129,18 @@ class ClaudeCodeRefiner:
             prompt += (
                 f"\nUpstream fleet items this work depends on (context only): {lines}."
             )
+        # Fork-Card emission convention (plan 2026-06-17 U4): the supervised loop
+        # needs undetermined decisions to be visible, not silently defaulted. Do
+        # NOT stop to ask -- emit the decision as data and keep building.
+        prompt += (
+            "\n\nDecision protocol: when a choice is NOT determined by the goal/spec above "
+            "(the spec is silent, vague, or contradictory), do NOT pause to ask. Instead pick "
+            "the most reversible reasonable default, keep building on it, and record the fork in "
+            "your final JSON result under a top-level \"fork_cards\" array. Each entry: "
+            "{id, options:[{id,label,description}], spec_clause, chosen_default (an option id), "
+            "reversibility (reversible|hard_to_reverse|irreversible), blast_radius "
+            "(local|module|cross_cutting)}. Decisions the goal/spec DO determine need no card."
+        )
         return prompt
 
     def refactor(self, tool_path: str, brief: RefactorBrief) -> str | None:
@@ -94,8 +149,10 @@ class ClaudeCodeRefiner:
             cwd=tool_path,
             timeout=self.timeout,
         )
-        # Best-effort token accounting for the proof pack; None if unavailable.
-        self.last_token_cost = parse_token_cost(res.stdout)
+        # Parse the JSON envelope once for both token cost and fork cards (KTD1).
+        envelope = _safe_loads(res.stdout)
+        self.last_token_cost = _token_cost_from(envelope)
+        self.last_fork_cards = _fork_cards_from(envelope)
         self.last_infra_failure = is_infra_failure(res)
         if not res.ok:
             return None

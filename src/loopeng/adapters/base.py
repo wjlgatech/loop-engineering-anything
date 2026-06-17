@@ -94,12 +94,18 @@ class Refiner(Protocol):
     reads it to retry transient failures; a refiner that omits it would silently
     forgo retries, so it is part of the contract.
 
-    Both are declared on the protocol so the controller reads them protocol-bound
+    ``last_fork_cards`` is the list of Fork-Cards the agent emitted on the last
+    refactor (plan 2026-06-17 U4) -- build decisions the spec did not determine.
+    Empty when the refiner emits none or cannot report them; the controller reads
+    it protocol-bound (via ``getattr``) so a refiner that omits it is harmless.
+
+    All are declared on the protocol so the controller reads them protocol-bound
     rather than reaching into a concrete refiner class.
     """
 
     last_token_cost: int | None
     last_infra_failure: bool
+    last_fork_cards: list
 
     def refactor(self, tool_path: str, brief: RefactorBrief) -> str | None: ...
 
