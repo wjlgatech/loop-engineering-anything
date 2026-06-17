@@ -15,6 +15,7 @@ from .integrity import (
     gate_requires_confirmation,
 )
 from .refactor_brief import build_refactor_brief
+from .resolver import ESCALATE, KEEP_DEFAULT, REVERSE, Resolution, Resolver
 
 __all__ = [
     "LoopController",
@@ -27,6 +28,11 @@ __all__ = [
     "ForkOption",
     "ForkCardParseError",
     "UNRESOLVED",
+    "Resolver",
+    "Resolution",
+    "KEEP_DEFAULT",
+    "REVERSE",
+    "ESCALATE",
     "IntegrityError",
     "assert_loop_integrity",
     "assert_maker_distinct_from_checker",
