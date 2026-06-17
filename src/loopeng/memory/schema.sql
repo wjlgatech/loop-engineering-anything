@@ -85,7 +85,29 @@ CREATE TABLE IF NOT EXISTS fleet_items (
     UNIQUE (fleet_id, key)
 );
 
+-- Fork-Card decision channel (plan 2026-06-17 U5). Append-only record of each
+-- build decision the spec/northstar did not determine: what the agent emitted,
+-- and how the supervisor resolved it. Like `confirmations`, this is an audit
+-- trail surfaced at end-review; resolution never auto-reverses outside the loop.
+-- New table via CREATE TABLE IF NOT EXISTS -> appears on next open (no _migrate).
+CREATE TABLE IF NOT EXISTS fork_cards (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id         INTEGER NOT NULL REFERENCES runs(id),
+    iteration_id   INTEGER,                          -- iteration index n; nullable
+    card_id        TEXT NOT NULL,                    -- the agent-assigned fork id
+    options_json   TEXT NOT NULL DEFAULT '[]',       -- enumerated options
+    spec_clause    TEXT,
+    chosen_default TEXT,                             -- option id the agent built on; nullable
+    reversibility  TEXT,
+    blast_radius   TEXT,
+    basis          TEXT,                             -- citation refs (json) or 'unresolved'
+    decision       TEXT,                             -- keep_default|reverse|escalate|recorded
+    chosen_option  TEXT,                             -- resolver's chosen option id; nullable
+    created        TEXT                              -- ISO-8601, supplied by caller; nullable
+);
+
 CREATE INDEX IF NOT EXISTS idx_iterations_run ON iterations(run_id, n);
 CREATE INDEX IF NOT EXISTS idx_learnings_run ON learnings(run_id);
 CREATE INDEX IF NOT EXISTS idx_confirmations_run ON confirmations(run_id);
 CREATE INDEX IF NOT EXISTS idx_fleet_items_fleet ON fleet_items(fleet_id);
+CREATE INDEX IF NOT EXISTS idx_fork_cards_run ON fork_cards(run_id);
