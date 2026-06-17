@@ -65,6 +65,10 @@ class LoopOutcome:
     # firing reason (which dimension/score was borderline) without re-judging (U5).
     score: float = 0.0
     dims: dict = field(default_factory=dict)
+    # Fork-Cards emitted across the run (plan 2026-06-17 U6): build decisions the
+    # spec did not determine, surfaced for end-review. Defaulted to honor KTD1
+    # (LoopOutcome additions stay nullable/defaulted).
+    fork_cards: list = field(default_factory=list)
 
 
 class LoopController:
@@ -78,6 +82,7 @@ class LoopController:
         store: MemoryStore,
         budget: Budget | None = None,
         compressor=None,
+        resolver=None,
         sleeper=time.sleep,
         upstream_context=None,
     ):
@@ -89,6 +94,9 @@ class LoopController:
         self.budget = budget or Budget()
         # Optional History Compression Engine (U7); None = no compression pass.
         self.compressor = compressor
+        # Optional Fork-Card resolver (plan 2026-06-17 U6); None = cards are
+        # recorded + surfaced but not resolved/reversed (backward compatible).
+        self.resolver = resolver
         # Injectable so tests can drive retry backoff without real sleeps (plan-005 U3).
         self.sleeper = sleeper
         # Upstream fleet-item outcomes routed into this run's briefs (plan-006 U3).
@@ -100,6 +108,8 @@ class LoopController:
         verdict = self.judge.judge(tool_path)
         n = 1
         self._record(run_id, n, verdict, diff_ref=None)
+        # Fork-Cards collected across this run, surfaced on the outcome (U6).
+        self._collected_fork_cards: list = []
         tokens_spent = 0
         accepted = 0  # count of kept improvements, for compression cadence
         start = time.monotonic()  # controller owns the clock; evaluate stays pure (U4)
@@ -183,7 +193,13 @@ class LoopController:
             n += 1
             self._record(run_id, n, new_verdict, diff_ref=diff_ref, token_cost=cost)
 
+            # Fork-Card decision channel (U6): resolve + record any decisions the
+            # agent emitted this iteration; a grounded resolver overrule is a
+            # reversal. Always recorded, even on the safety-halt path below.
+            fork_reversal = self._process_fork_cards(run_id, n)
+
             # Safety failure introduced by the refactor: roll back, halt, no ship.
+            # Safety is terminal and wins over a fork reversal.
             if not new_verdict.safety_ok:
                 self.checkpoint.restore(token)
                 return self._finish(
@@ -193,7 +209,12 @@ class LoopController:
                     n,
                 )
 
-            if cv.is_improvement(verdict, new_verdict, self.budget):
+            if fork_reversal:
+                # The resolver overruled the agent's chosen default for a fork on
+                # this iteration -> reverse via the existing rollback, even when
+                # the grade improved (KTD2). Keep the prior verdict; do not compound.
+                self.checkpoint.restore(token)
+            elif cv.is_improvement(verdict, new_verdict, self.budget):
                 # Improvement accepted and kept -> compound (never on rollback).
                 self.compounder.compound(
                     f"iteration {n}: grade {verdict.grade} -> {new_verdict.grade} "
@@ -235,6 +256,43 @@ class LoopController:
             attempt += 1
             self.sleeper(_TOOL_RETRY_BASE_SECONDS * (2 ** (attempt - 1)))
 
+    def _process_fork_cards(self, run_id: int, n: int) -> bool:
+        """Resolve, record, and collect the Fork-Cards the refiner emitted this
+        iteration (U6). Returns ``True`` when a grounded resolution reverses the
+        agent's default. Cards are read protocol-bound (``getattr``), so a refiner
+        that emits none is a no-op. With no resolver wired, cards are recorded as
+        ``recorded`` and surfaced for end-review but never reverse the build.
+        """
+        cards = getattr(self.refiner, "last_fork_cards", None) or []
+        reversal = False
+        for card in cards:
+            resolution = self.resolver.resolve(card) if self.resolver is not None else None
+            if resolution is not None:
+                decision = resolution.decision
+                chosen = resolution.chosen_option_id
+                basis = resolution.basis
+                if resolution.is_reversal:
+                    reversal = True
+            else:
+                decision = "recorded"
+                chosen = None
+                basis = card.basis
+            self.store.record_fork_card(
+                run_id,
+                card_id=card.id,
+                options=[o.to_dict() for o in card.options],
+                spec_clause=card.spec_clause,
+                chosen_default=card.chosen_default,
+                reversibility=card.reversibility,
+                blast_radius=card.blast_radius,
+                basis=basis,
+                decision=decision,
+                chosen_option=chosen,
+                iteration_id=n,
+            )
+            self._collected_fork_cards.append(card)
+        return reversal
+
     def _record(
         self, run_id: int, n: int, verdict: Verdict, diff_ref: str | None, token_cost: int | None = None
     ) -> None:
@@ -260,4 +318,5 @@ class LoopController:
             iterations=n,
             score=verdict.score,
             dims=dict(verdict.dims),
+            fork_cards=list(getattr(self, "_collected_fork_cards", [])),
         )

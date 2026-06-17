@@ -498,3 +498,120 @@ def test_no_upstream_context_brief_has_empty_upstream(store):
     run_id = store.create_run("t", "service", "improve", "2026-06-15T00:00:00Z")
     ctrl.run(run_id, "tool/")
     assert refiner.briefs[0].upstream_outcomes == []
+
+
+# ----- U6: Fork-Card decision channel (plan 2026-06-17) ------------------
+
+from loopeng.adapters.base import OracleVerdict
+from loopeng.adapters.oracle import NoGroundingOracle
+from loopeng.loop.fork_card import UNRESOLVED, ForkCard, ForkOption
+from loopeng.loop.resolver import Resolver
+
+
+def _fc(card_id="f1", chosen_default="a"):
+    return ForkCard(
+        id=card_id,
+        options=[ForkOption("a", "A"), ForkOption("b", "B")],
+        spec_clause="silent",
+        chosen_default=chosen_default,
+    )
+
+
+class ForkEmittingRefiner:
+    """A refiner that emits given fork cards on the FIRST refactor only."""
+
+    def __init__(self, cards):
+        self.cards = cards
+        self.calls = 0
+        self.last_fork_cards = []
+
+    def refactor(self, tool_path, brief):
+        self.calls += 1
+        self.last_fork_cards = list(self.cards) if self.calls == 1 else []
+        return f"diff-{self.calls}"
+
+
+class FakeGroundedOracle:
+    """Grounds to a fixed option with a citation (drives a reversal)."""
+
+    def __init__(self, option_id):
+        self.option_id = option_id
+
+    def resolve(self, fork_card):
+        return OracleVerdict(self.option_id, ["kernel.yaml:1"])
+
+
+def _ctrl_with(store, judge, refiner, resolver, budget=None):
+    checkpoint = FakeCheckpoint()
+    ctrl = LoopController(
+        judge=judge,
+        refiner=refiner,
+        compounder=RecordingCompounder(),
+        checkpoint=checkpoint,
+        store=store,
+        budget=budget or Budget(target_grade="A"),
+        resolver=resolver,
+    )
+    return ctrl, checkpoint
+
+
+def test_grounded_reversal_rolls_back_even_on_improvement(store):
+    """A grounded resolver overrule reverses the iteration via rollback even when
+    the grade improved (KTD2) — mirrors the regression-rollback restore counter."""
+    run_id = store.create_run("t", "service", None, "2026-06-17T00:00:00Z")
+    # Grade improves C -> A, so without a fork the iteration would be accepted.
+    judge = ScriptedJudge([v("C"), v("A")])
+    refiner = ForkEmittingRefiner([_fc(chosen_default="a")])
+    resolver = Resolver(FakeGroundedOracle("b"))  # picks 'b' != default 'a' -> reverse
+    ctrl, checkpoint = _ctrl_with(store, judge, refiner, resolver, Budget(max_iterations=2))
+    ctrl.run(run_id, "tool/")
+    assert checkpoint.restores >= 1  # the forced reversal fired
+
+
+def test_no_grounding_never_reverses_but_records_and_flags(store):
+    run_id = store.create_run("t", "service", None, "2026-06-17T00:00:00Z")
+    judge = ScriptedJudge([v("C"), v("A")])
+    refiner = ForkEmittingRefiner([_fc(chosen_default="a")])
+    resolver = Resolver(NoGroundingOracle())
+    ctrl, checkpoint = _ctrl_with(store, judge, refiner, resolver, Budget(target_grade="A"))
+    outcome = ctrl.run(run_id, "tool/")
+    # No reversal: the improving iteration is accepted (restores from regression only).
+    recs = store.fork_cards(run_id)
+    assert len(recs) == 1
+    assert recs[0].decision == "escalate"
+    assert recs[0].basis == UNRESOLVED
+    # Surfaced on the outcome for end-review.
+    assert len(outcome.fork_cards) == 1
+    assert outcome.fork_cards[0].is_unresolved
+
+
+def test_every_card_recorded_once(store):
+    run_id = store.create_run("t", "service", None, "2026-06-17T00:00:00Z")
+    judge = ScriptedJudge([v("C"), v("A")])
+    refiner = ForkEmittingRefiner([_fc("f1"), _fc("f2")])
+    resolver = Resolver(NoGroundingOracle())
+    ctrl, _ = _ctrl_with(store, judge, refiner, resolver, Budget(target_grade="A"))
+    ctrl.run(run_id, "tool/")
+    assert sorted(r.card_id for r in store.fork_cards(run_id)) == ["f1", "f2"]
+
+
+def test_no_resolver_records_as_recorded_and_does_not_reverse(store):
+    run_id = store.create_run("t", "service", None, "2026-06-17T00:00:00Z")
+    judge = ScriptedJudge([v("C"), v("A")])
+    refiner = ForkEmittingRefiner([_fc()])
+    # resolver=None -> backward-compatible: cards recorded, never reversed.
+    ctrl, checkpoint = _ctrl_with(store, judge, refiner, None, Budget(target_grade="A"))
+    ctrl.run(run_id, "tool/")
+    recs = store.fork_cards(run_id)
+    assert len(recs) == 1
+    assert recs[0].decision == "recorded"
+
+
+def test_controller_without_fork_cards_behaves_as_before(store):
+    """A plain FakeRefiner (no last_fork_cards) is unaffected."""
+    judge = ScriptedJudge([v("C"), v("B"), v("A")])
+    ctrl, refiner, compounder, checkpoint = _controller(store, judge, Budget(target_grade="A"))
+    run_id = store.create_run("t", "service", None, "2026-06-17T00:00:00Z")
+    outcome = ctrl.run(run_id, "tool/")
+    assert outcome.final_state is LoopState.CONVERGED
+    assert outcome.fork_cards == []
