@@ -2,6 +2,7 @@
 
 from .controller import LoopController, LoopOutcome, LoopState
 from .convergence import Decision, evaluate
+from .fork_card import UNRESOLVED, ForkCard, ForkCardParseError, ForkOption
 from .integrity import (
     IntegrityError,
     assert_heldout_disjoint,
@@ -20,6 +21,10 @@ __all__ = [
     "Decision",
     "evaluate",
     "build_refactor_brief",
+    "ForkCard",
+    "ForkOption",
+    "ForkCardParseError",
+    "UNRESOLVED",
     "IntegrityError",
     "assert_loop_integrity",
     "assert_maker_distinct_from_checker",
