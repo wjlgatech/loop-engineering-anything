@@ -15,6 +15,8 @@ from loopeng.loop.integrity import (
     assert_heldout_disjoint,
     assert_loop_integrity,
     assert_maker_distinct_from_checker,
+    assert_oracle_distinct_from_checker,
+    assert_oracle_distinct_from_maker,
     assert_referee_immutable_to_maker,
     confirm_convergence,
     gate_requires_confirmation,
@@ -104,6 +106,59 @@ def test_run_loop_rejects_same_maker_checker_before_any_work(store, tmp_path):
         )
     # No run row was created — failed closed before create_run.
     assert store.list_runs() == []
+
+
+# ----- oracle ≠ checker / oracle ≠ maker (plan 2026-06-17 U2) -------------
+
+
+class OracleCheckerSameObject:
+    """One object answering forks AND grading the build — the wiring to reject."""
+
+    def resolve(self, fork_card):
+        return None
+
+    def judge(self, tool_path):
+        return v("A")
+
+
+def test_oracle_equals_checker_rejected():
+    agent = OracleCheckerSameObject()
+    with pytest.raises(IntegrityError, match="oracle/checker"):
+        assert_oracle_distinct_from_checker(agent, agent)
+
+
+def test_distinct_oracle_checker_passes():
+    from loopeng.adapters.oracle import NoGroundingOracle
+
+    assert_oracle_distinct_from_checker(NoGroundingOracle(), ScriptedJudge([v("A")]))
+
+
+def test_oracle_equals_maker_rejected():
+    from loopeng.adapters.oracle import NoGroundingOracle
+
+    oracle = NoGroundingOracle()
+    with pytest.raises(IntegrityError, match="oracle/maker"):
+        assert_oracle_distinct_from_maker(oracle, oracle)
+
+
+def test_loop_integrity_rejects_oracle_equals_checker():
+    """assert_loop_integrity fires the oracle check when an oracle is wired."""
+    agent = OracleCheckerSameObject()
+    with pytest.raises(IntegrityError, match="oracle/checker"):
+        assert_loop_integrity(refiner=FakeRefiner(), judge=agent, oracle=agent)
+
+
+def test_loop_integrity_skips_oracle_checks_when_none():
+    """No oracle wired -> oracle checks are skipped (backward compatible)."""
+    assert_loop_integrity(refiner=FakeRefiner(), judge=ScriptedJudge([v("A")]))
+
+
+def test_loop_integrity_passes_with_distinct_oracle():
+    from loopeng.adapters.oracle import NoGroundingOracle
+
+    assert_loop_integrity(
+        refiner=FakeRefiner(), judge=ScriptedJudge([v("A")]), oracle=NoGroundingOracle()
+    )
 
 
 # ----- held-out seed disjointness (R6/KTD6) ------------------------------

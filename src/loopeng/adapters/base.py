@@ -104,6 +104,39 @@ class Refiner(Protocol):
     def refactor(self, tool_path: str, brief: RefactorBrief) -> str | None: ...
 
 
+@dataclass(frozen=True)
+class OracleVerdict:
+    """An oracle's answer to one Fork-Card (plan 2026-06-17 U2).
+
+    ``chosen_option_id`` is the option the oracle would pick; ``citations`` are the
+    grounding references behind it (a Vision-Kernel clause, a person-map node). A
+    verdict is **grounded** only when it names an option AND carries at least one
+    citation -- a closed-set scorer with no grounding returns an empty verdict and
+    the resolver escalates (anti preference-hallucination, origin idea #2).
+    """
+
+    chosen_option_id: str | None = None
+    citations: list = field(default_factory=list)
+
+    @property
+    def grounded(self) -> bool:
+        return self.chosen_option_id is not None and bool(self.citations)
+
+
+@runtime_checkable
+class Oracle(Protocol):
+    """Answers a Fork-Card from the user's persona/digital-twin.
+
+    The oracle that ANSWERS a fork must never be the ``Judge`` that GRADES the
+    build (oracle ≠ checker, enforced in ``loop.integrity``) -- otherwise persona
+    preference launders into "quality". ``fork_card`` is left untyped here to keep
+    the adapters layer free of a ``loop`` import; concrete oracles accept a
+    ``loop.fork_card.ForkCard``.
+    """
+
+    def resolve(self, fork_card) -> "OracleVerdict": ...
+
+
 @runtime_checkable
 class Compounder(Protocol):
     """Records a learning + regression test on an accepted fix (/ce-compound)."""

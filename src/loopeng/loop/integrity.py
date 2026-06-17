@@ -56,6 +56,40 @@ def assert_maker_distinct_from_checker(refiner: object, judge: object) -> None:
         )
 
 
+def assert_oracle_distinct_from_checker(oracle: object, judge: object) -> None:
+    """Reject a wiring where the persona oracle (which ANSWERS a Fork-Card) and the
+    checker (``judge``, which GRADES the build) are the same object (oracle ≠
+    checker). If they were one, persona preference would launder into "quality" --
+    a build aligned-but-wrong would score well because the same agent that chose
+    the fork also graded the result (Goodhart through the back door).
+
+    Identity, not type; fail-closed with a name, never the object repr (an oracle
+    may carry creds). Mirrors ``assert_maker_distinct_from_checker``.
+    """
+    if oracle is None or judge is None:
+        raise IntegrityError("oracle/checker integrity: oracle and judge must both be wired")
+    if oracle is judge:
+        raise IntegrityError(
+            "oracle/checker integrity: the oracle (answers forks) and checker (grades the "
+            "build) are the same object — persona preference must not grade its own work"
+        )
+
+
+def assert_oracle_distinct_from_maker(oracle: object, refiner: object) -> None:
+    """Reject a wiring where the oracle and the maker (``refiner``) are the same
+    object (oracle ≠ maker). The fork-answerer must be an independent authority
+    from the agent that writes the code; otherwise the maker rationalizes its own
+    forks. Identity, not type; fail-closed with a name.
+    """
+    if oracle is None or refiner is None:
+        raise IntegrityError("oracle/maker integrity: oracle and refiner must both be wired")
+    if oracle is refiner:
+        raise IntegrityError(
+            "oracle/maker integrity: the oracle (answers forks) and maker (refiner) are the "
+            "same object — the maker must not answer its own forks"
+        )
+
+
 def assert_referee_immutable_to_maker(
     referee_paths: Iterable[str], maker_write_paths: Iterable[str]
 ) -> None:
@@ -114,6 +148,7 @@ def assert_loop_integrity(
     *,
     refiner: object,
     judge: object,
+    oracle: object | None = None,
     referee_paths: Iterable[str] = (),
     maker_write_paths: Iterable[str] = (),
     dev_seeds: Iterable[int] | None = None,
@@ -121,13 +156,18 @@ def assert_loop_integrity(
 ) -> None:
     """Run every applicable contract assertion (the single preflight call).
 
-    ``maker ≠ checker`` is always checked. The immutability and held-out checks
-    are only enforced when the domain declares the relevant inputs (a
-    letter-grade software domain has no seeds; a sim domain does) — but when a
-    domain declares *one* of a held-out pair, it must declare both, so a
-    half-wired held-out grade cannot slip through.
+    ``maker ≠ checker`` is always checked. The oracle checks fire only when an
+    ``oracle`` is wired (a loop with no Fork-Card resolver declares none). The
+    immutability and held-out checks are only enforced when the domain declares
+    the relevant inputs (a letter-grade software domain has no seeds; a sim domain
+    does) — but when a domain declares *one* of a held-out pair, it must declare
+    both, so a half-wired held-out grade cannot slip through.
     """
     assert_maker_distinct_from_checker(refiner, judge)
+
+    if oracle is not None:
+        assert_oracle_distinct_from_checker(oracle, judge)
+        assert_oracle_distinct_from_maker(oracle, refiner)
 
     if referee_paths or maker_write_paths:
         assert_referee_immutable_to_maker(referee_paths, maker_write_paths)
