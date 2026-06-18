@@ -146,3 +146,18 @@ def test_resolve_override_beats_manifest(tmp_path):
         _gen(tool, {"id": "mytool"}), override=str(override), registry_dir=str(reg)
     )
     assert got.endswith("chosen.py")
+
+
+# ----- fail-closed on an unexpectedly-shaped report.json (code review) -------
+
+def test_judge_fails_closed_on_wrong_shape_report(tmp_path, monkeypatch):
+    tool = tmp_path / "tool"; tool.mkdir()
+    out = tool / ".cli-judge"; out.mkdir()
+    # Valid JSON, but "dimensions" is a list and score is non-numeric -> would
+    # crash parse_report; the judge must return F/not-safe instead. (judge() reads
+    # report.json from disk and ignores run_tool's return, so the stub returns None.)
+    (out / "report.json").write_text('{"grade": "A+", "score": "high", "dimensions": ["correctness"]}')
+    monkeypatch.setattr("loopeng.adapters.judge.run_tool", lambda *a, **k: None)
+    v = CLIJudge(adapter_path="x").judge(str(tool))
+    assert v.grade == "F"
+    assert v.safety_ok is False

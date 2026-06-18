@@ -39,7 +39,7 @@ def test_fleet_run_executes_by_default(store, tmp_path, monkeypatch):
 
     calls: list[str] = []
 
-    def fake_runner(*, store, fleet_goal, judge_adapter_override, refiner_kind):
+    def fake_runner(*, store, fleet_goal, judge_adapter_override, judge_registry, refiner_kind):
         from loopeng.autonomous.runner import RunResult
         from loopeng.loop.controller import LoopOutcome, LoopState
 

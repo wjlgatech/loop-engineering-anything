@@ -8,6 +8,8 @@ graph fails before any fleet row is created.
 
 from __future__ import annotations
 
+from ..config import Lane
+
 
 class FleetSpecError(ValueError):
     """A malformed fleet spec (missing key, duplicate key, dangling dependency)."""
@@ -44,8 +46,14 @@ def parse_fleet_spec(data: dict) -> list[dict]:
         if goal is not None and not isinstance(goal, str):
             raise FleetSpecError(f"item {key!r} 'goal' must be a string when present")
         lane = entry.get("lane")
-        if lane is not None and not isinstance(lane, str):
-            raise FleetSpecError(f"item {key!r} 'lane' must be a string when present")
+        if lane is not None:
+            if not isinstance(lane, str):
+                raise FleetSpecError(f"item {key!r} 'lane' must be a string when present")
+            valid = {ln.value for ln in Lane}
+            if lane not in valid:
+                raise FleetSpecError(
+                    f"item {key!r} 'lane' must be one of {sorted(valid)}, got {lane!r}"
+                )
         items.append({
             "key": key,
             "target": target,

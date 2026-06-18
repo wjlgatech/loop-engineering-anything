@@ -203,3 +203,12 @@ def test_chain_satisfies_refiner_protocol():
     from loopeng.adapters.base import Refiner
     chain = lr.ChainedRefiner([_FakeRefiner(result=None, infra=False)])
     assert isinstance(chain, Refiner)
+
+
+def test_chain_accumulates_token_cost_across_fallover():
+    # claude spends tokens then infra-fails; its cost must survive the fall-through.
+    a = _FakeRefiner(result=None, infra=True, token_cost=40, name="claude")
+    b = _FakeRefiner(result="diffB", infra=False, token_cost=10, name="llm")
+    chain = lr.ChainedRefiner([a, b])
+    chain.refactor("/t", _brief())
+    assert chain.last_token_cost == 50  # 40 (failed claude) + 10 (llm), not erased

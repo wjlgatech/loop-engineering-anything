@@ -42,7 +42,7 @@ from ..router import route
 
 @dataclass(frozen=True)
 class RunResult:
-    run_id: int
+    run_id: int | None  # None when no run row was created (e.g. fleet gen failure)
     outcome: LoopOutcome
     # Anti-cognitive-surrender (U17, R10): a CONVERGED outcome is only
     # ``shippable`` once the human-confirm gate is satisfied. ``False`` means

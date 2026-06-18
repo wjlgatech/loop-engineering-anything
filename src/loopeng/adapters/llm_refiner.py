@@ -129,10 +129,11 @@ _MAX_BRIEF_FIELD = 2000  # cap interpolated brief text (prompt-injection surface
 
 
 def _clip(text: str) -> str:
-    """Bound a brief field before it is interpolated into an LLM prompt: strip
-    control characters (CR/LF/NUL etc. that could forge message structure) and
-    truncate. Brief fields can carry routed ``upstream_context`` from another
-    fleet item, which is untrusted relative to this run (R-4)."""
+    """Bound a brief field before it is interpolated into this refiner's LLM
+    prompt: strip control characters (CR/LF/NUL etc. that could forge message
+    structure) and truncate. The goal/fixtures may be operator- or fleet-supplied,
+    so cap them as defense-in-depth against prompt injection (R-4). (Note: this
+    refiner does not interpolate ``brief.upstream_outcomes``.)"""
     cleaned = "".join(ch for ch in str(text) if ch == " " or ch == "\t" or (ch.isprintable()))
     return cleaned[:_MAX_BRIEF_FIELD]
 
@@ -183,16 +184,20 @@ class ChainedRefiner:
         self.last_refiner: str | None = None
 
     def refactor(self, tool_path: str, brief: RefactorBrief) -> str | None:
+        # Accumulate token cost ACROSS rungs within this single call: a rung that
+        # spent tokens then infra-failed still burned them, so its cost must not be
+        # erased when we fall through (else the controller's token gate under-counts).
+        total_cost: int | None = None
         result = None
         for ref in self.inner:
-            # Reset before each rung so nothing leaks across refiners.
-            self.last_token_cost = None
+            # last_infra_failure / last_fork_cards reflect only the rung that ran.
             self.last_infra_failure = False
             self.last_fork_cards = []
             result = ref.refactor(tool_path, brief)
-            # Re-expose the controller-read attributes from the inner that ran
-            # (getattr: FallbackLLMRefiner declares no last_fork_cards).
-            self.last_token_cost = getattr(ref, "last_token_cost", None)
+            rung_cost = getattr(ref, "last_token_cost", None)
+            if rung_cost is not None:
+                total_cost = (total_cost or 0) + rung_cost
+            self.last_token_cost = total_cost
             self.last_infra_failure = bool(getattr(ref, "last_infra_failure", False))
             self.last_fork_cards = list(getattr(ref, "last_fork_cards", []) or [])
             self.last_refiner = (

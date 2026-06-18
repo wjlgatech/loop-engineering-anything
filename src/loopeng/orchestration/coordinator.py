@@ -85,8 +85,11 @@ def apply_item_result(
     when a later wave's dependent pulls it (closes the converged-without-outcome
     window)."""
     if not res.ok or not isinstance(res.value, RunResult):
+        msg = res.error or "no RunResult"
         store.set_item_status(item.id, on_fail)
-        store.record_item_outcome(item.id, {"error": res.error or "no RunResult"})
+        # Carry the error under both keys so `fleet escalations` / the report (which
+        # read gate_reason|reason) show a cause instead of '-'.
+        store.record_item_outcome(item.id, {"error": msg, "reason": msg})
         return None
     result = res.value
     store.record_item_outcome(item.id, outcome_summary(result))
@@ -124,6 +127,7 @@ def default_fleet_runner(
     store: MemoryStore,
     fleet_goal: str | None,
     judge_adapter_override: str | None = None,
+    judge_registry: str | None = None,
     refiner_kind: str = "chain",
     config=None,
 ) -> Callable[[FleetItem, str, list[dict]], RunResult]:
@@ -149,13 +153,15 @@ def default_fleet_runner(
         gen = factory.generate(decision.normalized_target, goal, worktree)
         if not gen.ok:
             return RunResult(
-                run_id=0,
+                run_id=None,  # no run row was created; never a phantom run 0
                 outcome=LoopOutcome(
                     LoopState.STOPPED, grade="", reason="factory generation failed", iterations=0
                 ),
                 shippable=False,
             )
-        adapter = resolve_judge_adapter(gen, override=judge_adapter_override)
+        adapter = resolve_judge_adapter(
+            gen, override=judge_adapter_override, registry_dir=judge_registry
+        )
         deps = build_loop_deps(
             tool_path=gen.tool_path, judge_adapter=adapter, refiner_kind=refiner_kind
         )

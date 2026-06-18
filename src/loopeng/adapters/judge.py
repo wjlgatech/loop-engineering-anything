@@ -181,10 +181,13 @@ class CLIJudge:
                            failing_fixtures=["cli-judge produced no report.json"])
         try:
             data = json.loads(report.read_text())
-        except (json.JSONDecodeError, OSError):
+            return parse_report(data, strict_unknown=self.strict_unknown)
+        except (json.JSONDecodeError, OSError, ValueError, AttributeError, TypeError):
+            # Fail closed (KTD5): a malformed OR unexpectedly-shaped report.json
+            # (e.g. a list where a dict is expected, a non-numeric score) must read
+            # as F/not-safe, never crash the referee mid-loop.
             return Verdict(grade="F", score=0.0, dims={}, safety_ok=False,
-                           failing_fixtures=["report.json was malformed"])
-        return parse_report(data, strict_unknown=self.strict_unknown)
+                           failing_fixtures=["report.json was malformed or had an unexpected shape"])
 
 
 @dataclass(frozen=True)

@@ -68,3 +68,13 @@ def test_add_fleet_item_targetless_still_works(store):
     item = store.fleet_items(fid)[0]
     assert item.id == iid
     assert item.target is None and item.goal is None
+
+
+def test_parse_invalid_lane_raises():
+    with pytest.raises(FleetSpecError):
+        parse_fleet_spec({"items": [{"key": "a", "target": "./x", "lane": "frontend"}]})
+
+
+def test_parse_valid_lane_accepted():
+    items = parse_fleet_spec({"items": [{"key": "a", "target": "./x", "lane": "codebase"}]})
+    assert items[0]["lane"] == "codebase"

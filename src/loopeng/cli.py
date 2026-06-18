@@ -76,6 +76,8 @@ def preflight_cmd(as_json: bool, lane: str | None) -> None:
 )
 @click.option("--judge-adapter", "judge_adapter", default=None,
               help="Path to the CLI-Judge adapter (overrides auto-discovery). Must live outside the generated tool.")
+@click.option("--judge-registry", "judge_registry", default=None,
+              help="Operator-controlled dir of CLI-Judge adapters, addressed by the tool's manifest.")
 @click.option("--refiner", "refiner_kind", type=click.Choice(["chain", "claude", "llm"]),
               default="chain", show_default=True, help="Refiner: chain (claude->LLM), claude, or llm.")
 @click.option("--workspace", default="workspace", show_default=True, help="Workspace root for the generated tool.")
@@ -85,7 +87,8 @@ def preflight_cmd(as_json: bool, lane: str | None) -> None:
 @click.option("--max-iterations", type=int, default=None, help="Override the loop's max iterations.")
 def run_cmd(
     target: str, goal: str, lane: str | None, judge_adapter: str | None,
-    refiner_kind: str, workspace: str, confirm: bool, scheduled: bool, max_iterations: int | None,
+    judge_registry: str | None, refiner_kind: str, workspace: str, confirm: bool,
+    scheduled: bool, max_iterations: int | None,
 ) -> None:
     """Route TARGET, generate the tool, and drive a real refine loop to Grade A."""
     # Anti-surrender: a scheduled (unattended) run cannot be pre-confirmed from the
@@ -105,7 +108,10 @@ def run_cmd(
     from .loop.controller import LoopState
     from .memory.store import MemoryStore
 
-    decision = route(target, forced_lane=Lane(lane) if lane else None)
+    try:
+        decision = route(target, forced_lane=Lane(lane) if lane else None)
+    except ValueError as e:  # unclassifiable target -> actionable message, not a traceback
+        raise click.ClickException(str(e))
     click.echo(f"Lane: {decision.lane.value} ({decision.reason})")
 
     missing = missing_for_lane(decision.lane)
@@ -128,7 +134,7 @@ def run_cmd(
         )
 
     try:
-        adapter = resolve_judge_adapter(gen, override=judge_adapter)
+        adapter = resolve_judge_adapter(gen, override=judge_adapter, registry_dir=judge_registry)
     except JudgeAdapterError as e:
         raise click.ClickException(str(e))
 
@@ -241,6 +247,8 @@ def fleet_grp() -> None:
 @click.option("--dry-run", is_flag=True, help="Materialize the fleet only; do not execute (the old default).")
 @click.option("--judge-adapter", "judge_adapter", default=None,
               help="CLI-Judge adapter path applied to every item (overrides per-item discovery).")
+@click.option("--judge-registry", "judge_registry", default=None,
+              help="Operator-controlled dir of CLI-Judge adapters, addressed by each item's manifest.")
 @click.option("--refiner", "refiner_kind", type=click.Choice(["chain", "claude", "llm"]),
               default="chain", show_default=True, help="Refiner kind for every item.")
 @click.option("--repo", default=".", show_default=True, help="Repo dir the item worktrees branch from.")
@@ -248,7 +256,7 @@ def fleet_grp() -> None:
               help="Root for per-item git worktrees.")
 def fleet_run_cmd(
     spec_path: str, goal: str | None, dry_run: bool, judge_adapter: str | None,
-    refiner_kind: str, repo: str, worktrees_root: str,
+    judge_registry: str | None, refiner_kind: str, repo: str, worktrees_root: str,
 ) -> None:
     """Parse a fleet SPEC (JSON), materialize it, and execute the items.
 
@@ -270,22 +278,28 @@ def fleet_run_cmd(
     store = MemoryStore.default()
     started = datetime.now(timezone.utc).isoformat()
     fleet_goal = goal or data.get("goal")
+
+    # For an execute run, route + preflight BEFORE materializing any fleet rows, so
+    # a bad target or a missing tool fails cleanly without orphaning a pending fleet.
+    if not dry_run:
+        try:
+            lanes = {
+                route(it["target"], forced_lane=Lane(it["lane"]) if it.get("lane") else None).lane
+                for it in items
+            }
+        except ValueError as e:  # unclassifiable per-item target
+            raise click.ClickException(str(e))
+        missing = [m for ln in lanes for m in missing_for_lane(ln)]
+        if missing:
+            names = ", ".join(sorted({m.label for m in missing}))
+            raise click.ClickException(f"Cannot run fleet -- missing required tools: {names}")
+
     fleet_id = materialize_fleet(store, fleet_goal, items, started)
     click.echo(f"Fleet #{fleet_id} created with {len(items)} items.")
 
     if dry_run:
         click.echo("Materialized only (--dry-run). Inspect with `fleet status` / `fleet report`.")
         return
-
-    # Preflight every distinct lane BEFORE any worktree is created (R5).
-    lanes = {
-        route(it["target"], forced_lane=Lane(it["lane"]) if it.get("lane") else None).lane
-        for it in items
-    }
-    missing = [m for ln in lanes for m in missing_for_lane(ln)]
-    if missing:
-        names = ", ".join(sorted({m.label for m in missing}))
-        raise click.ClickException(f"Cannot run fleet -- missing required tools: {names}")
 
     # Behavior-change notice (KTD6): fleet run now executes by default.
     click.echo("Executing fleet (use --dry-run to only materialize) ...")
@@ -296,7 +310,8 @@ def fleet_run_cmd(
 
     item_runner = default_fleet_runner(
         store=store, fleet_goal=fleet_goal,
-        judge_adapter_override=judge_adapter, refiner_kind=refiner_kind,
+        judge_adapter_override=judge_adapter, judge_registry=judge_registry,
+        refiner_kind=refiner_kind,
     )
     status = run_fleet(
         store, fleet_id, item_runner,
