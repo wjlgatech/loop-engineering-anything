@@ -238,8 +238,22 @@ def fleet_grp() -> None:
 @fleet_grp.command("run")
 @click.argument("spec_path")
 @click.option("--goal", default=None, help="Top-level goal for the fleet.")
-def fleet_run_cmd(spec_path: str, goal: str | None) -> None:
-    """Parse a fleet SPEC (JSON) and materialize the fleet run."""
+@click.option("--dry-run", is_flag=True, help="Materialize the fleet only; do not execute (the old default).")
+@click.option("--judge-adapter", "judge_adapter", default=None,
+              help="CLI-Judge adapter path applied to every item (overrides per-item discovery).")
+@click.option("--refiner", "refiner_kind", type=click.Choice(["chain", "claude", "llm"]),
+              default="chain", show_default=True, help="Refiner kind for every item.")
+@click.option("--repo", default=".", show_default=True, help="Repo dir the item worktrees branch from.")
+@click.option("--worktrees-root", default=".loopeng/fleet-worktrees", show_default=True,
+              help="Root for per-item git worktrees.")
+def fleet_run_cmd(
+    spec_path: str, goal: str | None, dry_run: bool, judge_adapter: str | None,
+    refiner_kind: str, repo: str, worktrees_root: str,
+) -> None:
+    """Parse a fleet SPEC (JSON), materialize it, and execute the items.
+
+    Executes by default (topological waves over per-item worktrees). Pass
+    ``--dry-run`` to only materialize the fleet rows (the pre-wiring behavior)."""
     import json
     from datetime import datetime, timezone
 
@@ -255,15 +269,42 @@ def fleet_run_cmd(spec_path: str, goal: str | None) -> None:
 
     store = MemoryStore.default()
     started = datetime.now(timezone.utc).isoformat()
-    fleet_id = materialize_fleet(store, goal or data.get("goal"), items, started)
+    fleet_goal = goal or data.get("goal")
+    fleet_id = materialize_fleet(store, fleet_goal, items, started)
     click.echo(f"Fleet #{fleet_id} created with {len(items)} items.")
-    # Live per-item execution drives run_loop per item, which needs the factory
-    # adapters (same gate as `run`). The coordinator (run_fleet) is exercised in
-    # tests; inspect a materialized fleet with `fleet status` / `fleet report`.
-    click.echo(
-        "Live per-item execution requires the factory adapters (see `run`). "
-        "Inspect this fleet with `fleet status` / `fleet report`."
+
+    if dry_run:
+        click.echo("Materialized only (--dry-run). Inspect with `fleet status` / `fleet report`.")
+        return
+
+    # Preflight every distinct lane BEFORE any worktree is created (R5).
+    lanes = {
+        route(it["target"], forced_lane=Lane(it["lane"]) if it.get("lane") else None).lane
+        for it in items
+    }
+    missing = [m for ln in lanes for m in missing_for_lane(ln)]
+    if missing:
+        names = ", ".join(sorted({m.label for m in missing}))
+        raise click.ClickException(f"Cannot run fleet -- missing required tools: {names}")
+
+    # Behavior-change notice (KTD6): fleet run now executes by default.
+    click.echo("Executing fleet (use --dry-run to only materialize) ...")
+
+    from .orchestration.coordinator import default_fleet_runner, run_fleet
+    from .orchestration.escalation import classify_with_escalation
+    from .orchestration.fleet_report import build_fleet_report, render_fleet_report
+
+    item_runner = default_fleet_runner(
+        store=store, fleet_goal=fleet_goal,
+        judge_adapter_override=judge_adapter, refiner_kind=refiner_kind,
     )
+    status = run_fleet(
+        store, fleet_id, item_runner,
+        repo_dir=repo, worktrees_root=worktrees_root,
+        classify=classify_with_escalation,
+    )
+    click.echo(f"\nFleet terminal status: {status.value}")
+    click.echo(render_fleet_report(build_fleet_report(store, fleet_id)))
 
 
 @fleet_grp.command("status")
