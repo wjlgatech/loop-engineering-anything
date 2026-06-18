@@ -6,6 +6,26 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **`run` and `fleet run` now execute real loops (loop adapters wired)** — the
+  loop engine was built and tested but unplugged from the CLI; both entrypoints
+  previously stopped at a "not yet wired" raise / materialize-only. `loopeng run`
+  now generates via the routed factory, auto-locates a CLI-Judge adapter, builds
+  the default bindings, and drives the existing `run_refine_loop` end to end;
+  `loopeng fleet run` executes its DAG by default (`--dry-run` keeps the old
+  materialize-only behavior). New: a **`ChainedRefiner`** (`claude` primary →
+  free-tier LLM fallback on infra failure only, with provenance via `last_refiner`,
+  `adapters/llm_refiner.py`); **fail-closed, out-of-jail judge-adapter discovery**
+  (`resolve_judge_adapter`, `adapters/judge.py`) that refuses any adapter inside
+  the maker's write tree so the referee stays immutable; a **default bindings
+  builder** (`bindings.py`); **per-item fleet targets** (`target`/`goal`/`lane` on
+  the fleet spec, `fleet_items` schema, and `FleetItem`); and a
+  **`default_fleet_runner`** that drives a real per-item loop inside each worktree
+  with the referee protected and `upstream_context` routed. New `run` flags:
+  `--judge-adapter`, `--refiner {chain,claude,llm}`, `--workspace`,
+  `--confirm/--no-confirm`, `--scheduled` (`--scheduled --confirm` is rejected —
+  anti-surrender), `--max-iterations`. _Why:_ the missing floor under the proven
+  orchestration layer. Origin:
+  `docs/plans/2026-06-18-001-feat-wire-loop-adapters-cli-plan.md`.
 - **Fork-Card decision channel (headless v1)** — the supervised-loop keystone: a
   mid-build decision the spec/northstar doesn't determine is now a first-class,
   gradable artifact instead of a silent default. The headless agent emits a typed
