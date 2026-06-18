@@ -32,10 +32,27 @@ def parse_fleet_spec(data: dict) -> list[dict]:
         if key in keys:
             raise FleetSpecError(f"duplicate item key: {key!r}")
         keys.add(key)
+        # U7: a runnable item needs a target (what the loop runs on). Required and
+        # non-empty so the fleet never feeds an arbitrary key into the router.
+        target = entry.get("target")
+        if not isinstance(target, str) or not target.strip():
+            raise FleetSpecError(f"item {key!r} needs a non-empty string 'target'")
         deps = entry.get("depends_on", [])
         if not isinstance(deps, list) or not all(isinstance(d, str) for d in deps):
             raise FleetSpecError(f"item {key!r} 'depends_on' must be a list of strings")
-        items.append({"key": key, "depends_on": list(deps)})
+        goal = entry.get("goal")
+        if goal is not None and not isinstance(goal, str):
+            raise FleetSpecError(f"item {key!r} 'goal' must be a string when present")
+        lane = entry.get("lane")
+        if lane is not None and not isinstance(lane, str):
+            raise FleetSpecError(f"item {key!r} 'lane' must be a string when present")
+        items.append({
+            "key": key,
+            "target": target,
+            "goal": goal,
+            "lane": lane,
+            "depends_on": list(deps),
+        })
 
     for it in items:
         for dep in it["depends_on"]:
@@ -48,5 +65,13 @@ def materialize_fleet(store, goal: str | None, items: list[dict], started: str) 
     """Create a fleet run and its items from a parsed spec; return the fleet id."""
     fleet_id = store.create_fleet(goal, started)
     for it in items:
-        store.add_fleet_item(fleet_id, it["key"], depends_on=it["depends_on"])
+        store.add_fleet_item(
+            fleet_id,
+            it["key"],
+            depends_on=it["depends_on"],
+            target=it.get("target"),
+            # An item with no explicit goal inherits the fleet's top-level goal.
+            goal=it.get("goal") or goal,
+            lane=it.get("lane"),
+        )
     return fleet_id

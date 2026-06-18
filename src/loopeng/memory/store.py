@@ -422,12 +422,21 @@ class MemoryStore:
             row = self._conn.execute("SELECT * FROM fleet_runs WHERE id = ?", (fleet_id,)).fetchone()
         return self._row_to_fleet(row) if row else None
 
-    def add_fleet_item(self, fleet_id: int, key: str, depends_on: list | None = None) -> int:
+    def add_fleet_item(
+        self,
+        fleet_id: int,
+        key: str,
+        depends_on: list | None = None,
+        *,
+        target: str | None = None,
+        goal: str | None = None,
+        lane: str | None = None,
+    ) -> int:
         with self._wlock:
             cur = self._conn.execute(
-                "INSERT INTO fleet_items (fleet_id, key, status, depends_on_json) "
-                "VALUES (?, ?, 'pending', ?)",
-                (fleet_id, key, json.dumps(list(depends_on or []))),
+                "INSERT INTO fleet_items (fleet_id, key, status, depends_on_json, target, goal, lane) "
+                "VALUES (?, ?, 'pending', ?, ?, ?, ?)",
+                (fleet_id, key, json.dumps(list(depends_on or [])), target, goal, lane),
             )
             self._conn.commit()
             return int(cur.lastrowid)
@@ -594,12 +603,16 @@ class MemoryStore:
 
     @staticmethod
     def _row_to_fleet_item(row: sqlite3.Row) -> FleetItem:
+        keys = row.keys()
         return FleetItem(
             id=row["id"],
             fleet_id=row["fleet_id"],
             key=row["key"],
             status=FleetItemStatus(row["status"]),
             depends_on=json.loads(row["depends_on_json"]),
+            target=row["target"] if "target" in keys else None,
+            goal=row["goal"] if "goal" in keys else None,
+            lane=row["lane"] if "lane" in keys else None,
             run_id=row["run_id"],
             outcome=json.loads(row["outcome_json"]) if row["outcome_json"] else None,
         )

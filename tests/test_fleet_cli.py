@@ -20,7 +20,7 @@ def store(tmp_path, monkeypatch):
 
 
 def test_fleet_run_materializes_fleet(store, tmp_path):
-    spec = {"goal": "g", "items": [{"key": "a"}, {"key": "b", "depends_on": ["a"]}]}
+    spec = {"goal": "g", "items": [{"key": "a", "target": "./a"}, {"key": "b", "target": "./b", "depends_on": ["a"]}]}
     p = tmp_path / "spec.json"
     p.write_text(json.dumps(spec))
     res = CliRunner().invoke(main, ["fleet", "run", str(p)])
@@ -32,7 +32,7 @@ def test_fleet_run_materializes_fleet(store, tmp_path):
 
 
 def test_fleet_run_rejects_unknown_dependency(store, tmp_path):
-    spec = {"items": [{"key": "a", "depends_on": ["missing"]}]}
+    spec = {"items": [{"key": "a", "target": "./a", "depends_on": ["missing"]}]}
     p = tmp_path / "spec.json"
     p.write_text(json.dumps(spec))
     res = CliRunner().invoke(main, ["fleet", "run", str(p)])

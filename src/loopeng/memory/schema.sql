@@ -80,6 +80,9 @@ CREATE TABLE IF NOT EXISTS fleet_items (
     key             TEXT NOT NULL,             -- stable item key (also the worktree slug)
     status          TEXT NOT NULL DEFAULT 'pending',
     depends_on_json TEXT NOT NULL DEFAULT '[]',  -- list of upstream item keys
+    target          TEXT,                      -- what this item runs on (URL/dir/spec); nullable for direct-add
+    goal            TEXT,                      -- per-item goal; falls back to the fleet goal when null
+    lane            TEXT,                      -- optional lane override (service|codebase); null = auto-route
     run_id          INTEGER,                   -- the per-target run this item spawned; nullable
     outcome_json    TEXT,                      -- routed outcome summary; nullable
     UNIQUE (fleet_id, key)
