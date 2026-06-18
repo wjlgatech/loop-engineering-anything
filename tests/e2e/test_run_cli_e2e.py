@@ -67,6 +67,10 @@ def env(tmp_path, monkeypatch):
     from loopeng.config import DEPENDENCIES
     from loopeng.preflight import ToolStatus
 
+    # Neutralize the CI bypass so the human-confirm gate behaves identically
+    # locally and in CI (else `CI=true` would auto-ship converged items and the
+    # fleet would converge instead of parking awaiting_human).
+    monkeypatch.delenv("CI", raising=False)
     monkeypatch.setattr("loopeng.cli.missing_for_lane", lambda lane: [])
     monkeypatch.setattr(
         "loopeng.preflight.preflight",
