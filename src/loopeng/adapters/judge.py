@@ -19,8 +19,75 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from .base import Judge, Verdict
-from .safety import ProcResult, run_tool
+from .base import GenerateResult, Judge, Verdict
+from .safety import ProcResult, run_tool, within_workspace
+
+
+class JudgeAdapterError(RuntimeError):
+    """No usable CLI-Judge adapter could be resolved for a target (fail-closed).
+
+    Raised on a missing adapter, a wrong explicit override, or — critically — an
+    adapter that resolves *inside* the maker's write tree or escapes the operator
+    registry. The referee must be immutable to the maker (KTD3), so an in-jail
+    adapter is rejected rather than silently trusted.
+    """
+
+
+def resolve_judge_adapter(
+    gen: GenerateResult,
+    *,
+    override: str | None = None,
+    registry_dir: str | None = None,
+) -> str:
+    """Resolve the CLI-Judge adapter path for a generated tool, fail-closed.
+
+    Precedence (deterministic):
+      1. ``override`` (operator-supplied ``--judge-adapter``) — must exist.
+      2. an operator-controlled ``registry_dir`` entry named by the tool's
+         manifest (``judge_adapter`` path/basename, or ``<id>.py``).
+
+    Every resolved path must (a) exist and (b) live OUTSIDE ``gen.tool_path`` —
+    the maker's write jail — or ``JudgeAdapterError`` is raised. A manifest-named
+    path that escapes ``registry_dir`` is rejected (path-escape guard). When
+    nothing resolves, the error names the ``--judge-adapter`` escape hatch."""
+    tool_path = gen.tool_path
+
+    def _out_of_jail(path: str) -> str:
+        ap = os.path.abspath(path)
+        if within_workspace(ap, tool_path):
+            raise JudgeAdapterError(
+                f"refusing a CLI-Judge adapter inside the generated tool ({ap}): the "
+                f"referee must be immutable to the maker. Pass --judge-adapter to a "
+                f"path outside {tool_path}."
+            )
+        return ap
+
+    # 1. Explicit override — highest trust, but still must exist and be out-of-jail.
+    if override:
+        if not os.path.exists(override):
+            raise JudgeAdapterError(f"--judge-adapter path does not exist: {override}")
+        return _out_of_jail(override)
+
+    # 2. Operator-controlled registry, addressed by the tool's manifest.
+    if registry_dir:
+        reg = os.path.abspath(registry_dir)
+        named = gen.manifest.get("judge_adapter")
+        if not named and gen.manifest.get("id"):
+            named = f"{gen.manifest['id']}.py"
+        if named:
+            cand = os.path.abspath(os.path.join(reg, named))
+            # Path-escape guard: a manifest must not point outside the registry.
+            if not within_workspace(cand, reg):
+                raise JudgeAdapterError(
+                    f"manifest judge adapter escapes the operator registry: {named!r}"
+                )
+            if os.path.exists(cand):
+                return _out_of_jail(cand)
+
+    raise JudgeAdapterError(
+        f"no CLI-Judge adapter found for this tool; pass --judge-adapter PATH "
+        f"(a path outside the generated tool at {tool_path})"
+    )
 
 
 def derive_safety_ok(data: dict, dims: dict, *, strict_unknown: bool = False) -> bool:

@@ -77,3 +77,72 @@ def test_safety_blocker_field_is_authoritative():
     ok = parse_report({"grade": "F", "score": 32.6, "safety_blocker": False, "dimensions": {"D1": {"points": 7, "max_points": 30}}})
     assert ok.safety_ok is True
     assert ok.dims["D1"] == 7.0
+
+
+# ----- resolve_judge_adapter (U3): fail-closed, out-of-jail -----------------
+
+import pytest
+
+from loopeng.adapters.base import GenerateResult
+from loopeng.adapters.judge import JudgeAdapterError, resolve_judge_adapter
+
+
+def _gen(tool_path, manifest=None):
+    return GenerateResult(tool_path=str(tool_path), lane="codebase", ok=True, manifest=manifest or {})
+
+
+def test_resolve_override_outside_jail_returned(tmp_path):
+    tool = tmp_path / "tool"; tool.mkdir()
+    adapter = tmp_path / "registry" / "a.py"; adapter.parent.mkdir(); adapter.write_text("x\n")
+    got = resolve_judge_adapter(_gen(tool), override=str(adapter))
+    assert got == str(adapter.resolve()) or got == str(adapter)
+
+
+def test_resolve_registry_by_manifest_id(tmp_path):
+    tool = tmp_path / "tool"; tool.mkdir()
+    reg = tmp_path / "registry"; reg.mkdir()
+    (reg / "mytool.py").write_text("x\n")
+    got = resolve_judge_adapter(_gen(tool, {"id": "mytool"}), registry_dir=str(reg))
+    assert got.endswith("mytool.py")
+
+
+def test_resolve_override_missing_raises(tmp_path):
+    tool = tmp_path / "tool"; tool.mkdir()
+    with pytest.raises(JudgeAdapterError):
+        resolve_judge_adapter(_gen(tool), override=str(tmp_path / "nope.py"))
+
+
+def test_resolve_rejects_adapter_inside_tool_path(tmp_path):
+    # The central safety guard: an adapter inside the maker's write tree is refused.
+    tool = tmp_path / "tool"; tool.mkdir()
+    inside = tool / "cli-judge-adapter.py"; inside.write_text("x\n")
+    with pytest.raises(JudgeAdapterError):
+        resolve_judge_adapter(_gen(tool), override=str(inside))
+
+
+def test_resolve_rejects_manifest_path_escape(tmp_path):
+    tool = tmp_path / "tool"; tool.mkdir()
+    reg = tmp_path / "registry"; reg.mkdir()
+    evil = tmp_path / "evil.py"; evil.write_text("x\n")
+    with pytest.raises(JudgeAdapterError):
+        resolve_judge_adapter(_gen(tool, {"judge_adapter": str(evil)}), registry_dir=str(reg))
+
+
+def test_resolve_nothing_found_raises_with_hint(tmp_path):
+    tool = tmp_path / "tool"; tool.mkdir()
+    reg = tmp_path / "registry"; reg.mkdir()
+    with pytest.raises(JudgeAdapterError) as ei:
+        resolve_judge_adapter(_gen(tool, {"id": "absent"}), registry_dir=str(reg))
+    assert "--judge-adapter" in str(ei.value)
+
+
+def test_resolve_override_beats_manifest(tmp_path):
+    # Deterministic precedence: explicit override wins over a registry candidate.
+    tool = tmp_path / "tool"; tool.mkdir()
+    reg = tmp_path / "registry"; reg.mkdir()
+    (reg / "mytool.py").write_text("registry\n")
+    override = tmp_path / "chosen.py"; override.write_text("override\n")
+    got = resolve_judge_adapter(
+        _gen(tool, {"id": "mytool"}), override=str(override), registry_dir=str(reg)
+    )
+    assert got.endswith("chosen.py")
