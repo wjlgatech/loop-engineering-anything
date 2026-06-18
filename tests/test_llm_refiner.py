@@ -118,3 +118,88 @@ def test_parse_edits_tolerates_json_fence():
     summary, edits = lr._parse_edits('```json\n{"summary":"s","edits":[{"path":"a","content":"b"}]}\n```')
     assert summary == "s"
     assert edits == [{"path": "a", "content": "b"}]
+
+
+# ----- ChainedRefiner (U2) ------------------------------------------------
+
+
+class _FakeRefiner:
+    """A controllable Refiner stub for chain tests."""
+
+    def __init__(self, *, result, infra, token_cost=None, fork_cards=None, name="fake"):
+        self._result = result
+        self._infra = infra
+        self._token_cost = token_cost
+        self._fork_cards = fork_cards
+        self.name = name
+        self.calls = 0
+        self.last_token_cost = None
+        self.last_infra_failure = False
+        # deliberately NO last_fork_cards on some instances to mirror FallbackLLMRefiner
+
+    def refactor(self, tool_path, brief):
+        self.calls += 1
+        self.last_token_cost = self._token_cost
+        self.last_infra_failure = self._infra
+        if self._fork_cards is not None:
+            self.last_fork_cards = list(self._fork_cards)
+        return self._result
+
+
+def test_chain_returns_first_success_without_calling_rest():
+    a = _FakeRefiner(result="diffA", infra=False, token_cost=42, name="claude")
+    b = _FakeRefiner(result="diffB", infra=False, name="llm")
+    chain = lr.ChainedRefiner([a, b])
+    assert chain.refactor("/t", _brief()) == "diffA"
+    assert a.calls == 1 and b.calls == 0
+    assert chain.last_token_cost == 42
+    assert chain.last_refiner == "claude"
+    assert chain.last_infra_failure is False
+
+
+def test_chain_falls_through_on_infra_failure():
+    a = _FakeRefiner(result=None, infra=True, token_cost=7, name="claude")
+    b = _FakeRefiner(result="diffB", infra=False, name="llm")
+    chain = lr.ChainedRefiner([a, b])
+    assert chain.refactor("/t", _brief()) == "diffB"
+    assert a.calls == 1 and b.calls == 1
+    assert chain.last_infra_failure is False  # b succeeded; not an infra failure
+    assert chain.last_refiner == "llm"
+
+
+def test_chain_does_not_fall_through_on_clean_no_change():
+    # Claude ran, made no change, but did NOT infra-fail -> stop, do not try LLM.
+    a = _FakeRefiner(result=None, infra=False, name="claude")
+    b = _FakeRefiner(result="diffB", infra=False, name="llm")
+    chain = lr.ChainedRefiner([a, b])
+    assert chain.refactor("/t", _brief()) is None
+    assert a.calls == 1 and b.calls == 0  # critical: no-change is not a fallback trigger
+
+
+def test_chain_exhaustion_reports_infra_failure():
+    a = _FakeRefiner(result=None, infra=True, name="claude")
+    b = _FakeRefiner(result=None, infra=True, name="llm")
+    chain = lr.ChainedRefiner([a, b])
+    assert chain.refactor("/t", _brief()) is None
+    assert a.calls == 1 and b.calls == 1
+    assert chain.last_infra_failure is True  # honest exhaustion
+
+
+def test_chain_resets_fork_cards_across_rungs():
+    # Claude emits fork-cards then infra-fails; LLM (no fork_cards attr) runs.
+    a = _FakeRefiner(result=None, infra=True, fork_cards=["card1"], name="claude")
+    b = _FakeRefiner(result="diffB", infra=False, name="llm")  # no last_fork_cards
+    chain = lr.ChainedRefiner([a, b])
+    chain.refactor("/t", _brief())
+    assert chain.last_fork_cards == []  # not the stale ["card1"] from claude
+
+
+def test_chain_empty_inner_rejected():
+    with pytest.raises(ValueError):
+        lr.ChainedRefiner([])
+
+
+def test_chain_satisfies_refiner_protocol():
+    from loopeng.adapters.base import Refiner
+    chain = lr.ChainedRefiner([_FakeRefiner(result=None, infra=False)])
+    assert isinstance(chain, Refiner)

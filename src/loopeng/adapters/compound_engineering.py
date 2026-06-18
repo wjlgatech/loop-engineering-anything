@@ -90,6 +90,8 @@ def parse_fork_cards(stdout: str) -> list[ForkCard]:
 class ClaudeCodeRefiner:
     """Drives ``/ce-work`` headlessly via ``claude -p`` (Refiner protocol)."""
 
+    name = "claude"  # provenance for ChainedRefiner.last_refiner (KTD5)
+
     def __init__(self, *, executable: str = "claude", timeout: float = DEFAULT_TIMEOUT,
                  extra_args: tuple[str, ...] = ("--permission-mode", "acceptEdits", *_USAGE_ARGS)):
         self.executable = executable
