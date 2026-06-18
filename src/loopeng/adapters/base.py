@@ -94,14 +94,53 @@ class Refiner(Protocol):
     reads it to retry transient failures; a refiner that omits it would silently
     forgo retries, so it is part of the contract.
 
-    Both are declared on the protocol so the controller reads them protocol-bound
+    ``last_fork_cards`` is the list of Fork-Cards the agent emitted on the last
+    refactor (plan 2026-06-17 U4) -- build decisions the spec did not determine.
+    Empty when the refiner emits none or cannot report them; the controller reads
+    it protocol-bound (via ``getattr``) so a refiner that omits it is harmless.
+
+    All are declared on the protocol so the controller reads them protocol-bound
     rather than reaching into a concrete refiner class.
     """
 
     last_token_cost: int | None
     last_infra_failure: bool
+    last_fork_cards: list
 
     def refactor(self, tool_path: str, brief: RefactorBrief) -> str | None: ...
+
+
+@dataclass(frozen=True)
+class OracleVerdict:
+    """An oracle's answer to one Fork-Card (plan 2026-06-17 U2).
+
+    ``chosen_option_id`` is the option the oracle would pick; ``citations`` are the
+    grounding references behind it (a Vision-Kernel clause, a person-map node). A
+    verdict is **grounded** only when it names an option AND carries at least one
+    citation -- a closed-set scorer with no grounding returns an empty verdict and
+    the resolver escalates (anti preference-hallucination, origin idea #2).
+    """
+
+    chosen_option_id: str | None = None
+    citations: list = field(default_factory=list)
+
+    @property
+    def grounded(self) -> bool:
+        return self.chosen_option_id is not None and bool(self.citations)
+
+
+@runtime_checkable
+class Oracle(Protocol):
+    """Answers a Fork-Card from the user's persona/digital-twin.
+
+    The oracle that ANSWERS a fork must never be the ``Judge`` that GRADES the
+    build (oracle ≠ checker, enforced in ``loop.integrity``) -- otherwise persona
+    preference launders into "quality". ``fork_card`` is left untyped here to keep
+    the adapters layer free of a ``loop`` import; concrete oracles accept a
+    ``loop.fork_card.ForkCard``.
+    """
+
+    def resolve(self, fork_card) -> "OracleVerdict": ...
 
 
 @runtime_checkable

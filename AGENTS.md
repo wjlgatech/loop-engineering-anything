@@ -38,7 +38,10 @@ implementation plan.
   loop runs, `loop.integrity.assert_loop_integrity` fails closed if the refiner
   (maker) and judge (checker) are the same object, if a referee path lives
   inside the maker's write surface, or if the held-out grade seeds overlap the
-  maker's dev seeds. A `CONVERGED` result is a *claim*: `RunResult.shippable`
+  maker's dev seeds. When a Fork-Card **oracle** is wired (the persona/twin that
+  answers undetermined build decisions), it must also be distinct from the judge
+  and the refiner — `oracle ≠ checker` / `oracle ≠ maker` — so persona preference
+  never grades or makes its own work. A `CONVERGED` result is a *claim*: `RunResult.shippable`
   is gated by the human-confirm `VerificationGate` (ON by default). Do NOT add a
   caller-settable bypass — the only bypass keys on the CI-infrastructure env var
   for **attended** runs; **scheduled** runs stay confirm-required regardless of
@@ -98,7 +101,7 @@ protocol, so the refine engine is selectable:
 | `src/loopeng/adopt.py` | catalog tool adopter — venv-isolated, env-pruned, full-SHA-pinned (proof pipeline U1, KTD7) |
 | `src/loopeng/connectors/` | actuator layer — `Connector` protocol (structured `act(payload)`, never shell-interpolated) + install/credential isolation boundary: strict allowlisted `env=` (`minimal_env`), full-SHA pin, install outside the worktree, credentials by name only; one reference connector (plan-004 U15, KTD8/R8). Optional/injected — the controller never imports it (KTD7) |
 | `src/loopeng/proof.py` | `ProofPack` builder + `StoreBackedCompounder` (proof pipeline U3) |
-| `src/loopeng/loop/` | controller, convergence, brief, compound, `GitCheckpoint` (U6); `integrity.py` — maker≠checker / referee-immutability / held-out-disjoint assertions + human-confirm verification gate, all fail-closed (plan-004 U17, R6/R10, KTD6) |
+| `src/loopeng/loop/` | controller, convergence, brief, compound, `GitCheckpoint` (U6); `integrity.py` — maker≠checker / oracle≠checker / oracle≠maker / referee-immutability / held-out-disjoint assertions + human-confirm verification gate, all fail-closed (plan-004 U17, R6/R10, KTD6); `fork_card.py` + `resolver.py` — the Fork-Card decision channel: a build decision the spec didn't determine, resolved spec→oracle→escalate, reversed via existing rollback (plan 2026-06-17) |
 | `src/loopeng/autonomous/` | research report + autonomous runner; `run_refine_loop` (refine-only, proof pipeline U2); runs the U17 integrity preflight + gates `CONVERGED` via `RunResult.shippable` (`scheduled`/`confirmed`); `parallel.py` — worktree fan-out (`run_parallel`): one git worktree per target, bounded by `max_parallel`, crash-isolated, auto-cleaned (plan-004 U16, R9) |
 | `src/loopeng/scheduler/` | `Heartbeat` cadence engine — durable `schedule_state`, due-calc, failure isolation, resume anchor; runner-agnostic (injected, KTD7). `tick` (sequential) + `tick_parallel` (fans due targets through `autonomous/parallel.py` into isolated worktrees, plan-004 U16). `loop-anything schedule add/list/remove/tick` (plan-004 U14, R7) |
 | `src/loopeng/orchestration/` | fleet orchestration layer (plan-006) — coordinates *many* self-improving loops under one goal ABOVE the per-target controller. `coordinator.run_fleet` runs items in topological waves over `autonomous/parallel.run_parallel` (cycles fail closed; non-converged deps block dependents; escalations PARK the fleet `awaiting_human`); `routing.py` pulls deps' outcomes into a dependent's brief via the U3 `upstream_context` seam; `escalation.py` routes only blocked/gated/stuck items to a human + `rebrief_item`; `spec.py`/`fleet_report.py` back the `loop-anything fleet` CLI. Depends only on `run_parallel` + `RunResult` + the store — the `LoopController` is untouched (KTD1). `memory/fleet_state.py` holds the lifecycle enums + transition guard. |

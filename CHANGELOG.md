@@ -5,6 +5,35 @@ All notable changes to this project are documented here, following
 
 ## [Unreleased]
 
+### Added
+- **Fork-Card decision channel (headless v1)** — the supervised-loop keystone: a
+  mid-build decision the spec/northstar doesn't determine is now a first-class,
+  gradable artifact instead of a silent default. The headless agent emits a typed
+  `ForkCard` (`loop/fork_card.py`) in its `--output-format json` output and keeps
+  building a reversible default; the refiner parses it off the same envelope it
+  already reads for token cost (`adapters/compound_engineering.py`,
+  `parse_fork_cards`). A pluggable `Oracle` (`adapters/base.py`) + `Resolver`
+  cascade (`loop/resolver.py`, spec → oracle → escalate) decides each card; a
+  grounded overrule of the agent's default reverses the iteration through the
+  loop's existing regression rollback (`loop/controller.py`). Cards persist to a
+  new append-only `fork_cards` table (`memory/store.py`, `record_fork_card` /
+  `fork_cards`) and surface on `LoopOutcome.fork_cards` for end-review. A new
+  `oracle ≠ checker` / `oracle ≠ maker` integrity guard (`loop/integrity.py`,
+  threaded through both `runner.py` preflights) keeps the fork-answerer distinct
+  from the referee and the maker. v1 ships a `NoGroundingOracle` default, so the
+  channel is end-to-end (emit → parse → resolve → record → surface) but never
+  auto-reverses until a real twin-backed oracle lands. Origin:
+  `docs/plans/2026-06-17-001-feat-fork-card-decision-channel-plan.md`.
+
+### Investigated / Rejected
+- **Interactive `AskUserQuestion` hook (deferred, not built).** Validated that a
+  Claude Code `PreToolUse` hook *fires* on `AskUserQuestion` and sees the options,
+  but has **no field to inject a substitute tool result** — it can only
+  allow/deny/ask. So a hook cannot silently auto-answer the menu from the twin;
+  the only clean injection path is the Agent SDK `canUseTool` callback, which
+  would mean wrapping Claude Code in the SDK. Interactive capture is therefore
+  deferred to keep v1 on the bare CLI (per user direction: autonomous first).
+
 ### Fixed
 - **Flaky `test_concurrent_sqlite_writes_do_not_corrupt` (concurrent git-worktree
   race).** `git worktree add`/`remove`/`prune` mutate shared `.git/worktrees/`
