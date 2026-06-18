@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ideation: Supervised Coding Loop</title>
+<link rel="preconnect" href="https://fonts.bunny.net">
+<link rel="stylesheet" href="https://fonts.bunny.net/css?family=inter:400,500,600,700|jetbrains-mono:400,500">
+<style>
+  :root{
+    --bg:#0f1115; --surface:#171a21; --surface-2:#1d212b; --line:#2a2f3a;
+    --ink:#e7eaf0; --ink-soft:#aab2c2; --ink-faint:#7c8699;
+    --accent:#56c596; --accent-soft:#15281f; --accent-ink:#7ee0b4;
+    --warn:#e0a35a; --warn-soft:#2a2114; --warn-ink:#f0c187;
+    --info:#6aa6e8; --info-soft:#14202e; --info-ink:#9cc6f5;
+    --bad:#e0796a; --bad-soft:#2a1714; --bad-ink:#f0a497;
+    --radius:10px;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme:light){
+    :root{
+      --bg:#f6f7f9; --surface:#ffffff; --surface-2:#f0f2f5; --line:#e0e3e9;
+      --ink:#1a1d24; --ink-soft:#46505f; --ink-faint:#6b7585;
+      --accent:#1f9d6b; --accent-soft:#e6f6ee; --accent-ink:#137a51;
+      --warn:#b5781f; --warn-soft:#fbf1df; --warn-ink:#8a5b14;
+      --info:#2f6fc4; --info-soft:#e7f0fb; --info-ink:#1f5099;
+      --bad:#c0503c; --bad-soft:#fbe9e5; --bad-ink:#993c2c;
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--sans); font-size:15.5px; line-height:1.62;
+    font-feature-settings:"cv05","ss01"; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:940px; margin-inline:auto; padding:48px 24px 96px}
+  p{max-width:72ch}
+  p,li{color:var(--ink)}
+  a{color:var(--accent-ink); text-decoration:none; border-bottom:1px solid transparent}
+  a:hover{border-bottom-color:var(--accent-ink)}
+  code{font-family:var(--mono); font-size:.86em; background:var(--surface-2);
+    padding:.1em .38em; border-radius:5px; color:var(--ink-soft)}
+  h1{font-size:2.05rem; line-height:1.15; letter-spacing:-.02em; margin:.2em 0 .1em; font-weight:700}
+  h2{font-size:1.4rem; letter-spacing:-.01em; margin:2.6em 0 .6em; font-weight:650;
+    padding-bottom:.3em; border-bottom:1px solid var(--line)}
+  h3{font-size:1.12rem; margin:0 0 .2em; font-weight:600}
+  .eyebrow{font-size:.72rem; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ink-faint); font-weight:600; margin-bottom:.5em}
+  .sub{color:var(--ink-soft); font-size:1.02rem; max-width:74ch}
+  .meta{display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 8px}
+  .chip{font-size:.74rem; font-weight:500; padding:.28em .7em; border-radius:999px;
+    border:1px solid var(--line); background:var(--surface); color:var(--ink-soft)}
+  .chip.k{background:var(--accent-soft); color:var(--accent-ink); border-color:transparent}
+  .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; margin:26px 0 8px}
+  .stat{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px}
+  .stat .n{font-size:1.5rem; font-weight:700; letter-spacing:-.02em}
+  .stat .l{font-size:.76rem; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.07em; margin-top:2px}
+  section{margin-top:8px}
+  .lead{font-size:1.05rem; color:var(--ink-soft)}
+  table{width:100%; border-collapse:collapse; margin:18px 0; font-size:.92rem}
+  th,td{text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{font-size:.74rem; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-faint); font-weight:600}
+  td code{white-space:nowrap}
+  .jump{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px 18px; margin:18px 0}
+  .jump ul{margin:.3em 0 0; padding-left:1.1em; columns:2; column-gap:28px}
+  .jump li{margin:.2em 0; font-size:.9rem; break-inside:avoid}
+  article.idea{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    padding:22px 24px; margin:18px 0; scroll-margin-top:18px}
+  .idea-head{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:6px}
+  .rank{font-family:var(--mono); font-size:.85rem; font-weight:500; color:var(--accent-ink);
+    background:var(--accent-soft); padding:.18em .55em; border-radius:6px}
+  .idea-meta{display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 16px}
+  .pill{font-size:.73rem; padding:.26em .68em; border-radius:999px; font-weight:500;
+    border:1px solid var(--line); background:var(--surface-2); color:var(--ink-soft)}
+  .pill.axis{background:var(--info-soft); color:var(--info-ink); border-color:transparent}
+  .pill.conf{background:var(--accent-soft); color:var(--accent-ink); border-color:transparent}
+  .pill.cx{background:var(--warn-soft); color:var(--warn-ink); border-color:transparent}
+  dl.fields{margin:0; display:grid; grid-template-columns:max-content 1fr; gap:6px 18px}
+  dl.fields dt{font-size:.72rem; text-transform:uppercase; letter-spacing:.07em;
+    color:var(--ink-faint); font-weight:600; padding-top:2px}
+  dl.fields dd{margin:0}
+  dl.fields dd p{margin:0 0 .5em}
+  .basis{border-left:2px solid var(--line); padding-left:12px; margin:.2em 0}
+  .basis .tag{font-family:var(--mono); font-size:.8rem; font-weight:500}
+  .tag.direct{color:var(--accent-ink)} .tag.external{color:var(--info-ink)} .tag.reasoned{color:var(--warn-ink)}
+  figure{margin:18px 0; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:14px}
+  figure svg{display:block; width:100%; height:auto}
+  figcaption{font-size:.8rem; color:var(--ink-faint); margin-top:8px}
+  .callout{border-radius:var(--radius); padding:14px 18px; margin:18px 0; font-size:.95rem}
+  .callout.info{background:var(--info-soft); border:1px solid transparent}
+  .callout.info .lab{color:var(--info-ink); font-weight:600; font-size:.74rem; letter-spacing:.07em; text-transform:uppercase}
+  .callout.accent{background:var(--accent-soft)}
+  .callout.accent .lab{color:var(--accent-ink); font-weight:600; font-size:.74rem; letter-spacing:.07em; text-transform:uppercase}
+  footer.composition-signal{margin-top:64px; padding-top:18px; border-top:1px solid var(--line);
+    font-size:.8rem; color:var(--ink-faint)}
+  .svg-label{font-family:var(--sans); font-size:13px; fill:var(--ink)}
+  .svg-label.soft{fill:var(--ink-soft); font-size:12px}
+  .svg-mono{font-family:var(--mono); font-size:11.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Compound Engineering · Ideation</div>
+  <h1>The supervised coding loop — let the agent build to the end, you review the end</h1>
+  <p class="sub">A closed loop where a <strong>supervisor</strong> drives the coding agent (Claude Code) to a finished product, auto-resolving its mid-build "which option?" forks from your <strong>digital twin</strong> + the project <strong>northstar</strong>. You write the goal and review the result. You already own every piece — the 10X is <em>wiring</em>, not building.</p>
+  <div class="meta">
+    <span class="chip">date: 2026-06-17</span>
+    <span class="chip">topic: supervisor-loop-over-coding-agent</span>
+    <span class="chip">mode: repo-grounded</span>
+    <span class="chip k">focus: persona + spec resolve forks · human at the edges</span>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="n">7</div><div class="l">Ranked ideas</div></div>
+    <div class="stat"><div class="n">20 → 12</div><div class="l">Raw → deduped</div></div>
+    <div class="stat"><div class="n">5</div><div class="l">Cut / folded</div></div>
+    <div class="stat"><div class="n">5</div><div class="l">Axes covered</div></div>
+    <div class="stat"><div class="n">4</div><div class="l">Systems you already own</div></div>
+  </div>
+</header>
+
+<section>
+  <h2>Grounding Context</h2>
+  <p class="lead">The headline: this is a <strong>wiring problem, not a build problem</strong>. The four systems you need already exist and are proven separately. The supervised loop is the integration that nobody on the market has shipped — the literature has a generic supervisor (OpenAI Auto-review) and a generic spec-driver (Kiro, OpenHands), but <em>no one wires a persona-oracle + spec + an independent referee into one loop</em>.</p>
+
+  <table>
+    <thead><tr><th>You already own</th><th>What it gives the loop</th><th>Real primitive</th></tr></thead>
+    <tbody>
+      <tr><td><strong>loop-engineering-anything</strong></td><td>the loop engine: judge → refactor → re-judge → converge; rollback; maker≠checker; human-confirm gate; fleet coordinator</td><td><code>controller.py</code>, <code>integrity.py</code>, <code>coordinator.py</code></td></tr>
+      <tr><td><strong>super-u</strong> (Digital Twin)</td><td>the persona oracle: scores choices <em>toward/sideways/away</em> a hand-written Vision Kernel; golden-label calibration against your own corrected labels</td><td><code>kernel.yaml</code>, <code>golden.jsonl</code></td></tr>
+      <tr><td><strong>dreammaketrue</strong> (knowledgefy)</td><td>grounded person-maps from your real published work; <em>refuse-to-hallucinate</em> grounding</td><td>person-maps / avatars</td></tr>
+      <tr><td><strong>Claude Code</strong></td><td>the maker — the coding agent that today pauses to ask "which option?"</td><td><code>ClaudeCodeRefiner</code> via <code>claude -p</code></td></tr>
+    </tbody>
+  </table>
+
+  <p>The request maps cleanly onto the 2026 governance vocabulary: move from <strong>human-in-the-loop</strong> (approve every step — today) to <strong>human-in-command</strong> (you set the rules + the northstar; the loop executes within them and escalates by exception). The prior art and its hazards:</p>
+  <ul>
+    <li><strong>OpenAI Auto-review</strong> — a separate reviewer agent grades the coding agent's escalation requests: ~200× fewer human interventions, 99.1% auto-approve. The production proof a supervisor works — but its policy is generic, not <em>your</em> taste.</li>
+    <li><strong>PersonaTwin</strong> names the two killer risks: <strong>preference hallucination</strong> (confident fabricated preference on a novel fork) and <strong>persona drift</strong> (the twin wanders over a long session). Both are designed against below.</li>
+    <li><strong>Microsoft red-team (Jun 2026)</strong>: human-in-the-loop bypass via <em>consent fatigue</em>, memory poisoning of the persona, and silent <em>Goodhart</em> spec failures.</li>
+  </ul>
+
+  <figure>
+    <svg viewBox="0 0 900 360" role="img" aria-label="The supervised coding loop architecture">
+      <!-- maker -->
+      <rect x="30" y="150" width="150" height="62" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+      <text class="svg-label" x="105" y="176" text-anchor="middle" font-weight="600">Claude Code</text>
+      <text class="svg-label soft" x="105" y="194" text-anchor="middle">the maker</text>
+      <!-- fork card -->
+      <rect x="245" y="150" width="150" height="62" rx="8" fill="var(--info-soft)" stroke="none"/>
+      <text class="svg-label" x="320" y="172" text-anchor="middle" font-weight="600">Fork-Card</text>
+      <text class="svg-label soft" x="320" y="190" text-anchor="middle">typed decision</text>
+      <!-- supervisor -->
+      <rect x="460" y="130" width="170" height="102" rx="8" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.5"/>
+      <text class="svg-label" x="545" y="156" text-anchor="middle" font-weight="600">Supervisor</text>
+      <text class="svg-label soft" x="545" y="176" text-anchor="middle">resolve · cite</text>
+      <text class="svg-label soft" x="545" y="192" text-anchor="middle">or escalate</text>
+      <text class="svg-label soft" x="545" y="212" text-anchor="middle">+ ledger</text>
+      <!-- oracle -->
+      <rect x="695" y="40" width="175" height="74" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+      <text class="svg-label" x="782" y="64" text-anchor="middle" font-weight="600">Digital Twin</text>
+      <text class="svg-label soft" x="782" y="82" text-anchor="middle">scores options</text>
+      <text class="svg-label soft" x="782" y="100" text-anchor="middle">kernel + person-map</text>
+      <!-- referee -->
+      <rect x="695" y="150" width="175" height="62" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+      <text class="svg-label" x="782" y="176" text-anchor="middle" font-weight="600">CLI-Judge</text>
+      <text class="svg-label soft" x="782" y="194" text-anchor="middle">referee ≠ oracle</text>
+      <!-- human -->
+      <rect x="695" y="248" width="175" height="74" rx="8" fill="var(--accent-soft)" stroke="none"/>
+      <text class="svg-label" x="782" y="272" text-anchor="middle" font-weight="600">You</text>
+      <text class="svg-label soft" x="782" y="290" text-anchor="middle">northstar (start)</text>
+      <text class="svg-label soft" x="782" y="308" text-anchor="middle">review pack (end)</text>
+      <!-- arrows -->
+      <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="var(--ink-faint)"/></marker></defs>
+      <line x1="180" y1="181" x2="243" y2="181" stroke="var(--ink-faint)" marker-end="url(#a)"/>
+      <line x1="395" y1="181" x2="458" y2="181" stroke="var(--ink-faint)" marker-end="url(#a)"/>
+      <line x1="630" y1="160" x2="693" y2="92" stroke="var(--ink-faint)" marker-end="url(#a)"/>
+      <line x1="630" y1="181" x2="693" y2="181" stroke="var(--ink-faint)" marker-end="url(#a)"/>
+      <line x1="630" y1="210" x2="693" y2="278" stroke="var(--ink-faint)" stroke-dasharray="4 3" marker-end="url(#a)"/>
+      <!-- resolved decision back to maker -->
+      <path d="M460,222 C300,300 200,300 105,214" fill="none" stroke="var(--accent)" stroke-dasharray="5 4" marker-end="url(#a)"/>
+      <text class="svg-mono" x="270" y="300" fill="var(--accent-ink)">resolved option → keep building</text>
+    </svg>
+    <figcaption>The keystone shape: the maker emits a typed <em>Fork-Card</em> instead of pausing; the supervisor resolves it from the twin (solid) and grades output with an independent referee (the twin never grades its own answers); only high-judgment forks reach you (dashed). You touch the loop twice — northstar at the start, a review pack at the end.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Topic Axes</h2>
+  <table>
+    <thead><tr><th>Axis</th><th>The question it answers</th></tr></thead>
+    <tbody>
+      <tr><td><strong>decision-interception</strong></td><td>How does the supervisor catch the coding agent's mid-build forks instead of letting it pause for you?</td></tr>
+      <tr><td><strong>persona-oracle</strong></td><td>How are answers grounded in your twin — and what stops it fabricating a preference?</td></tr>
+      <tr><td><strong>spec-northstar-reasoning</strong></td><td>How does the project goal resolve forks the persona can't, and keep the referee honest?</td></tr>
+      <tr><td><strong>convergence-to-end-result</strong></td><td>What makes "done = the finished product" real — and how is the same fork never re-decided?</td></tr>
+      <tr><td><strong>human-at-the-edges</strong></td><td>You write the northstar and review the end. How is that <em>safe</em> rather than a rubber stamp?</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>Ranked Ideas</h2>
+  <div class="jump">
+    <strong>The 7 survivors</strong> — the first three are the minimum viable supervised loop; the rest harden it against the documented failure modes.
+    <ul>
+      <li><a href="#i1">1 · Fork-Card decision channel</a> <em>(keystone)</em></li>
+      <li><a href="#i2">2 · Twin scores the options, cite-or-escalate</a></li>
+      <li><a href="#i3">3 · oracle ≠ checker ≠ maker (asserted)</a></li>
+      <li><a href="#i4">4 · Spend the human only where it matters</a></li>
+      <li><a href="#i5">5 · Decision Ledger — answer each fork once</a></li>
+      <li><a href="#i6">6 · Living spec — forks patch the northstar</a></li>
+      <li><a href="#i7">7 · Golden-label flywheel + drift tripwire</a> <em>(the 10X)</em></li>
+    </ul>
+  </div>
+
+  <article class="idea" id="i1">
+    <div class="idea-head"><span class="rank">01</span><h3>Fork-Card decision channel — the agent emits a decision, it never pauses</h3></div>
+    <div class="idea-meta">
+      <span class="pill axis">decision-interception</span>
+      <span class="pill conf">confidence: High</span>
+      <span class="pill cx">complexity: High</span>
+      <span class="pill">keystone</span>
+    </div>
+    <dl class="fields">
+      <dt>What</dt><dd><p>Today Claude Code pauses and waits for you at every "which option?" fork. Wrap <code>claude -p</code> with a decision-emission contract: when the agent would ask, it instead writes a typed <code>ForkCard{options[], spec_clause, reversibility, blast_radius}</code> to a queue the supervisor consumes — no terminal pause. The agent keeps building the reversible default; only a <em>reversal</em> of that default triggers the loop's existing rollback. The fork becomes a first-class, gradable build artifact, exactly as the engine already treats a target.</p></dd>
+      <dt>Basis</dt><dd><div class="basis"><span class="tag direct">direct</span> — <code>adapters/compound_engineering.py</code> (<code>ClaudeCodeRefiner</code> already drives the agent headlessly; the only missing primitive is a decision channel) + <code>controller.py</code> regression rollback for the reversal case.</div></dd>
+      <dt>Why it matters</dt><dd><p>This is the single unblock that converts "human babysits" into "supervisor answers." Every other idea depends on this surface existing. Reframing the fork as a non-blocking emitted artifact also means the build never stalls on an oracle round-trip.</p></dd>
+      <dt>Watch out</dt><dd><p>Claude Code doesn't natively emit typed Fork-Cards — you shape this via the <code>/ce-work</code> prompt convention (and/or pause-detection). This is the hard part of the whole project; prototype the contract first.</p></dd>
+      <dt>Meeting test</dt><dd><p>"Should a decision be a blocking question or a reversible default we can un-pick?" is the first architecture argument the team must have.</p></dd>
+    </dl>
+  </article>
+
+  <article class="idea" id="i2">
+    <div class="idea-head"><span class="rank">02</span><h3>The twin SCORES the options + cite-or-escalate — it never authors a free-text answer</h3></div>
+    <div class="idea-meta">
+      <span class="pill axis">persona-oracle</span>
+      <span class="pill conf">confidence: High</span>
+      <span class="pill cx">complexity: Medium</span>
+    </div>
+    <dl class="fields">
+      <dt>What</dt><dd><p>Break the assumption that the oracle replies in prose. super-u's Digital Twin already scores <em>toward/sideways/away</em> a Vision Kernel — so point it at the Fork-Card's <em>enumerated</em> options and have it rank them with a per-option alignment delta. The supervisor auto-picks argmax only if (a) the margin clears a threshold AND (b) the choice cites a <code>kernel.yaml</code> clause or a dreammaketrue person-map node. No citation, weak margin, or all-sideways → escalate. Require <em>two</em> grounding sources to agree, so a single poisoned source can't carry a decision.</p></dd>
+      <dt>Basis</dt><dd><div class="basis"><span class="tag direct">direct</span> — super-u toward/sideways/away scoring (<code>kernel.yaml</code>) + dreammaketrue refuse-to-hallucinate person-maps.</div><div class="basis"><span class="tag external">external</span> — PersonaTwin (arXiv 2508.10906) names "preference hallucination" as the exact failure this prevents.</div></dd>
+      <dt>Why it matters</dt><dd><p>A <em>scorer over a closed option set</em> structurally cannot fabricate a preference for a case it has no grounding on — it returns low confidence and escalates. A generative oracle confidently invents one. The score+citation tuple is also the auditable artifact that makes "the supervisor decided X" reviewable later.</p></dd>
+      <dt>Watch out</dt><dd><p>The twin scores words/actions today; scoring build-decision options is a real (but small) extension — frame each option as a scorable item.</p></dd>
+      <dt>Meeting test</dt><dd><p>"Does the twin generate the answer, or just grade the choices?" decides whether the whole loop is safe.</p></dd>
+    </dl>
+  </article>
+
+  <article class="idea" id="i3">
+    <div class="idea-head"><span class="rank">03</span><h3>oracle ≠ checker ≠ maker — a three-body separation, asserted fail-closed</h3></div>
+    <div class="idea-meta">
+      <span class="pill axis">spec-northstar-reasoning</span>
+      <span class="pill conf">confidence: High</span>
+      <span class="pill cx">complexity: Low</span>
+      <span class="pill">cheapest soundness win</span>
+    </div>
+    <dl class="fields">
+      <dt>What</dt><dd><p>Name the boundary the design only implies. <code>integrity.py</code> already enforces maker≠checker via <code>assert_maker_distinct_from_checker</code>. The supervisor adds a third role — the persona oracle that <em>answers</em> forks. Add <code>assert_oracle_distinct_from_checker</code>: the twin that resolves a decision must never be the referee (<code>CLIJudge</code>) that grades the build toward the northstar. Three roles, three distinct objects, asserted before any run.</p></dd>
+      <dt>Basis</dt><dd><div class="basis"><span class="tag direct">direct</span> — <code>integrity.py</code> <code>assert_maker_distinct_from_checker</code> ("a maker cannot referee its own work, R10") + <code>confirm_convergence</code> as the sole shippability authority.</div></dd>
+      <dt>Why it matters</dt><dd><p>Without it, a persona-aligned-but-wrong build scores well because the same persona graded it — Goodhart through the back door, the exact sycophancy failure the red-team flags. This is the one-line invariant that makes persona-driving sound, and it reuses an assertion the repo already ships.</p></dd>
+      <dt>Meeting test</dt><dd><p>A senior engineer will immediately ask "what stops the twin from grading its own decisions?" This is the enforceable answer.</p></dd>
+    </dl>
+  </article>
+
+  <figure>
+    <svg viewBox="0 0 760 200" role="img" aria-label="Three-body separation of roles">
+      <rect x="30" y="70" width="190" height="60" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+      <text class="svg-label" x="125" y="95" text-anchor="middle" font-weight="600">MAKER</text>
+      <text class="svg-label soft" x="125" y="113" text-anchor="middle">writes the code</text>
+      <rect x="285" y="70" width="190" height="60" rx="8" fill="var(--info-soft)" stroke="none"/>
+      <text class="svg-label" x="380" y="95" text-anchor="middle" font-weight="600">ORACLE</text>
+      <text class="svg-label soft" x="380" y="113" text-anchor="middle">answers the forks</text>
+      <rect x="540" y="70" width="190" height="60" rx="8" fill="var(--accent-soft)" stroke="none"/>
+      <text class="svg-label" x="635" y="95" text-anchor="middle" font-weight="600">CHECKER</text>
+      <text class="svg-label soft" x="635" y="113" text-anchor="middle">grades the output</text>
+      <text class="svg-mono" x="252" y="104" text-anchor="middle" fill="var(--ink-faint)">≠</text>
+      <text class="svg-mono" x="507" y="104" text-anchor="middle" fill="var(--ink-faint)">≠</text>
+      <text class="svg-label soft" x="380" y="170" text-anchor="middle">none of the three may play another's role — asserted before the run</text>
+    </svg>
+    <figcaption>maker≠checker is shipped today; the supervisor adds the third body. The oracle's preference must never be laundered into "quality" by the same model that grades.</figcaption>
+  </figure>
+
+  <article class="idea" id="i4">
+    <div class="idea-head"><span class="rank">04</span><h3>Spend the human only where it matters — reversibility-gating + an escalation budget + a merge-readiness pack</h3></div>
+    <div class="idea-meta">
+      <span class="pill axis">human-at-the-edges</span>
+      <span class="pill conf">confidence: High</span>
+      <span class="pill cx">complexity: Medium</span>
+    </div>
+    <dl class="fields">
+      <dt>What</dt><dd><p>Three cousin mechanisms that all protect your scarce attention. <strong>(a) Reversibility-gating:</strong> auto-resolve trivially-reversible forks (naming, layout, a lib behind a wrapper) even at medium confidence; route irreversible ones (schema migration, public API shape, auth boundary) to you regardless of persona confidence. <strong>(b) Escalation budget:</strong> a hard "N questions per build" cap forces the supervisor to triage by expected regret = uncertainty × irreversibility × blast-radius. <strong>(c) Merge-readiness pack:</strong> on convergence, the human doesn't review a green checkmark — they review a structured pack (every Fork-Card, option chosen, grounding citation, alignment margin, spec clause served, which forks were escalated, and a "least-confident decisions" shortlist), built by extending <code>describe_gate_reason</code>.</p></dd>
+      <dt>Basis</dt><dd><div class="basis"><span class="tag direct">direct</span> — <code>integrity.py</code> <code>VerificationGate</code> / <code>confirm_convergence</code> / <code>describe_gate_reason</code> (legible firing reason).</div><div class="basis"><span class="tag external">external</span> — OpenAI Auto-review's ~200× fewer interventions; Microsoft red-team "consent fatigue / rubber-stamp" failure mode; ALMAS escalate-with-action-history.</div></dd>
+      <dt>Why it matters</dt><dd><p>The whole value prop ("you only review the end") collapses if the end-review is a rubber stamp. Scarcity makes each human touch deliberate; the least-confident shortlist points your eye exactly where judgment was thinnest. This is what keeps you genuinely <em>in command</em>, not nominally in the loop.</p></dd>
+      <dt>Meeting test</dt><dd><p>"When I approve the final product, what am I actually looking at?" — a decision trail, not a diff dump.</p></dd>
+    </dl>
+  </article>
+
+  <article class="idea" id="i5">
+    <div class="idea-head"><span class="rank">05</span><h3>Decision Ledger — answer each fork once, replay it forever</h3></div>
+    <div class="idea-meta">
+      <span class="pill axis">convergence-to-end-result</span>
+      <span class="pill conf">confidence: High</span>
+      <span class="pill cx">complexity: Medium</span>
+    </div>
+    <dl class="fields">
+      <dt>What</dt><dd><p>Persist every resolved fork as <code>{fork_fingerprint → option, citation, score, outcome}</code> in a project-local ledger. Before escalating or re-asking, the supervisor checks the ledger; a matching fingerprint replays the prior decision <em>and its grounding</em>. This kills the "context lost between sessions / re-deciding the same thing" pain. The natural extension: when the twin has zero grounding on a <em>reversible</em> fork, don't escalate — build both branches in parallel worktrees (the fleet already does this) and let the referee break the tie, then bank the answer in the ledger.</p></dd>
+      <dt>Basis</dt><dd><div class="basis"><span class="tag direct">direct</span> — <code>refactor_brief.py</code> <code>build_refactor_brief(upstream_outcomes=...)</code> already threads prior outcomes into briefs; the ledger is the persistent, fingerprinted version. The race-both extension reuses <code>coordinator.py</code> worktree waves.</div><div class="basis"><span class="tag external">external</span> — ALMAS summarized-action-history.</div></dd>
+      <dt>Why it matters</dt><dd><p>Decisions become a compounding asset instead of evaporating per session. The second build of a similar feature inherits the first build's judgment — and "no grounding" turns from a dead-end escalation into free, refereed exploration.</p></dd>
+      <dt>Meeting test</dt><dd><p>"Why did the agent ask me the identical question it asked last Tuesday?" It shouldn't.</p></dd>
+    </dl>
+  </article>
+
+  <article class="idea" id="i6">
+    <div class="idea-head"><span class="rank">06</span><h3>Living spec — the northstar is a runnable referee, and every resolved fork patches it</h3></div>
+    <div class="idea-meta">
+      <span class="pill axis">spec-northstar-reasoning</span>
+      <span class="pill conf">confidence: Medium</span>
+      <span class="pill cx">complexity: Medium</span>
+    </div>
+    <dl class="fields">
+      <dt>What</dt><dd><p>Break "the spec is a static doc." Treat OBJECTIVES/SPEC as a constitution the <code>CLIJudge</code> grades against (Constitution &gt; Spec &gt; Tasks), AND make each oracle-resolved Fork-Card append a GIVEN/WHEN/THEN clause back to the spec. The decision the twin made on iteration 3 becomes a referee-checkable acceptance criterion on iteration 4 — the spec <em>densifies</em> exactly at the ambiguity points that forced a fork. When a fork has weak persona grounding but clear spec relevance, the supervisor resolves it against the governing clause, not vibes.</p></dd>
+      <dt>Basis</dt><dd><div class="basis"><span class="tag direct">direct</span> — <code>adapters/judge.py</code> <code>CLIJudge</code> grades toward a suite/spec; <code>docs/solutions/outer-loop-non-gaps.md</code> "quality only from the referee."</div><div class="basis"><span class="tag external">external</span> — Spec-Driven Development / Kiro; Fowler's caveat that the spec must judge output <em>after the fact</em>.</div></dd>
+      <dt>Why it matters</dt><dd><p>Silent Goodhart failures happen because the spec is sparse where the real decisions live. Auto-densifying the spec at decision points is the highest-leverage place to add referee coverage — and it routes forks by type: persona answers "what do I want," spec answers "what does the project require."</p></dd>
+      <dt>Meeting test</dt><dd><p>"The spec writes itself at the decision points" is a genuinely new mechanism, not a config knob.</p></dd>
+    </dl>
+  </article>
+
+  <article class="idea" id="i7">
+    <div class="idea-head"><span class="rank">07</span><h3>Golden-label flywheel + drift tripwire — the loop gets more unattended the more you use it</h3></div>
+    <div class="idea-meta">
+      <span class="pill axis">persona-oracle</span>
+      <span class="pill conf">confidence: High</span>
+      <span class="pill cx">complexity: Medium</span>
+      <span class="pill">the 10X payoff</span>
+    </div>
+    <dl class="fields">
+      <dt>What</dt><dd><p><strong>Flywheel:</strong> when you overturn a supervisor decision at end-review, that correction is written back as a golden label on a <em>build decision</em> (and, if it reveals a missing principle, proposed as a Vision-Kernel / spec edit). super-u's golden-label loop already calibrates the twin against your own corrected labels — so each review tightens the oracle and shrinks future escalations, OpenAI-Auto-review-style. <strong>Tripwire:</strong> on long unattended runs the twin can drift, so every K resolved forks re-score a frozen held-out slice of <code>golden.jsonl</code>; if alignment decays past a threshold, halt-and-escalate with the action history rather than keep auto-resolving on a drifted oracle.</p></dd>
+      <dt>Basis</dt><dd><div class="basis"><span class="tag direct">direct</span> — super-u golden-label loop (<code>golden.jsonl</code>, calibration / anti-drift); <code>controller.py</code> regression-rollback is the structural analog the tripwire reuses.</div><div class="basis"><span class="tag external">external</span> — OpenAI Auto-review (200× fewer interventions as the policy learns); PersonaTwin persona-drift; Microsoft memory-poisoning.</div></dd>
+      <dt>Why it matters</dt><dd><p>This is the actual 10X compounding mechanism: it turns your scarcest output — taste — into a durable, measurable asset, so review #2 is cheaper than review #1. The tripwire is what makes a multi-hour unattended run <em>allowed</em> at all: a cheap canary against frozen truth catches a twin that's quietly gone sycophantic.</p></dd>
+      <dt>Meeting test</dt><dd><p>"Does correcting it once make it stop asking, or do I correct it forever?" — and "how would you even know the persona drifted during a 6-hour run?"</p></dd>
+    </dl>
+  </article>
+</section>
+
+<section>
+  <h2>Rejection Summary</h2>
+  <p>20 raw ideas across two ideation lenses, deduped to 12 (strong cross-agent convergence — both agents independently surfaced the Fork-Card channel, oracle≠checker, cite-or-escalate, reversibility-gating, the ledger, the living spec, the merge pack, the flywheel, and the drift tripwire). 7 survive; 5 were cut or folded:</p>
+  <table>
+    <thead><tr><th>Idea</th><th>Disposition</th><th>Reason</th></tr></thead>
+    <tbody>
+      <tr><td>Standalone merge-readiness pack</td><td>Folded → #4</td><td>Same axis (human-at-the-edges) and same goal — protecting your attention. Lives as mechanism (c) of #4.</td></tr>
+      <tr><td>Zero-grounding → race both branches</td><td>Folded → #5</td><td>A powerful optimization but second-order: it presupposes the Fork-Card channel and the ledger. Surfaced as #5's extension.</td></tr>
+      <tr><td>Cite-or-escalate as its own idea</td><td>Folded → #2</td><td>The grounding-receipt gate is inseparable from "the twin scores the options" — they're one safe-oracle design.</td></tr>
+      <tr><td>Fleet-of-forks (resolve once across parallel builds)</td><td>Deferred</td><td>Strong, and the substrate exists (proven one-person-industrial-engine fleet F→A) — but it's the multi-component scale-out (plan-006 territory). Phase 2, once the single-build supervised loop works.</td></tr>
+      <tr><td>Persona-drift tripwire as its own idea</td><td>Folded → #7</td><td>Both use the same super-u golden asset; flywheel (learn) and tripwire (guard against drift) are the two halves of one calibration loop.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2>The honest bottom line</h2>
+  <div class="callout accent">
+    <div class="lab">10X framing</div>
+    <p style="margin:.4em 0 0">You asked whether loop-anything can build a supervisor that drives the coding agent to the end. The answer is <strong>yes, and you already own all four parts</strong> — the loop engine, the Digital Twin, the person-map oracle, and the coding agent. Nobody on the market has wired persona + spec + an independent referee into one loop. The minimum viable version is just three ideas: <strong>#1</strong> (emit forks instead of pausing), <strong>#2</strong> (twin scores + cites or escalates), <strong>#3</strong> (oracle ≠ checker, asserted). <strong>#7</strong> is what makes it compound — each end-review you do makes the next build need fewer.</p>
+  </div>
+  <div class="callout info">
+    <div class="lab">verification note</div>
+    <p style="margin:.4em 0 0">Idea bases are direct citations to repo primitives confirmed this session (<code>integrity.py</code>, <code>controller.py</code>, <code>compound_engineering.py</code>, <code>coordinator.py</code>, <code>refactor_brief.py</code>, <code>judge.py</code>), the two referenced repos' own docs, and named external sources. A separate adversarial-verifier agent was not dispatched this run; verification was performed orchestrator-side against known primitives — treat the "Watch out" notes on #1 and #2 as the two real feasibility risks to probe first.</p>
+  </div>
+</section>
+
+<footer class="composition-signal">
+  Ideation artifact · ce-ideate · repo-grounded · 2026-06-17 · run 60a0f9cc<br>
+  Grounding: web research (OpenAI Auto-review, PersonaTwin, ALMAS, Kiro SDD, HITL/HOTL/HIC, MS red-team) + repo primitives + super-u &amp; dreammaketrue READMEs.
+  Generation: 2 ideation lenses (assumption-break/constraint-flip · pain/inversion), 20 raw → 12 deduped → 7 ranked. Synthesis &amp; verification on the orchestrator (ceiling tier).
+  Next: <code>/ce-brainstorm</code> on a chosen idea (start with #1, the keystone), then <code>/ce-plan</code>.
+</footer>
+
+</div>
+</body>
+</html>

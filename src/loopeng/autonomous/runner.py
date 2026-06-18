@@ -22,11 +22,13 @@ from datetime import datetime, timezone
 
 from ..adapters.base import Checkpoint, Compounder, Factory, Judge, Refiner
 from ..adapters.cli_anything import CLIAnythingFactory
+from ..adapters.oracle import NoGroundingOracle
 from ..adapters.printing_press import PrintingPressFactory
 from ..adapters.safety import run_tool, validate_target, within_workspace
 from ..config import Budget, Config, Lane
 from ..loop.checkpoint import GitCheckpoint
 from ..loop.controller import LoopController, LoopOutcome, LoopState
+from ..loop.resolver import Resolver
 from ..loop.integrity import (
     assert_loop_integrity,
     confirm_convergence,
@@ -40,7 +42,7 @@ from ..router import route
 
 @dataclass(frozen=True)
 class RunResult:
-    run_id: int
+    run_id: int | None  # None when no run row was created (e.g. fleet gen failure)
     outcome: LoopOutcome
     # Anti-cognitive-surrender (U17, R10): a CONVERGED outcome is only
     # ``shippable`` once the human-confirm gate is satisfied. ``False`` means
@@ -121,6 +123,7 @@ def run_loop(
     dev_seeds=None,
     heldout_seeds=None,
     upstream_context=None,
+    oracle=None,
 ) -> RunResult:
     """Drive one unattended loop. Raises before any work starts if preflight,
     the credential gate, or the maker/checker integrity contract (U17) fails;
@@ -136,12 +139,20 @@ def run_loop(
     budget = budget or config.budget
     validate_target(target)
 
+    # Fork-Card resolver (plan 2026-06-17 U6): default to the no-grounding oracle
+    # so the headless decision channel is end-to-end (cards captured + recorded +
+    # surfaced) without auto-reversing until a real twin-backed oracle is wired.
+    oracle = oracle if oracle is not None else NoGroundingOracle()
+    resolver = Resolver(oracle)
+
     # U17 integrity contract (fail-closed, before any work — mirrors the
-    # credential gate): maker ≠ checker, referee immutable to the maker, and a
-    # disjoint held-out grade when the domain declares seeds (R6/R10/KTD6).
+    # credential gate): maker ≠ checker, oracle ≠ checker/maker, referee immutable
+    # to the maker, and a disjoint held-out grade when the domain declares seeds
+    # (R6/R10/KTD6).
     assert_loop_integrity(
         refiner=refiner,
         judge=judge,
+        oracle=oracle,
         referee_paths=referee_paths,
         maker_write_paths=maker_write_paths,
         dev_seeds=dev_seeds,
@@ -184,6 +195,7 @@ def run_loop(
         checkpoint=checkpoint,
         store=store,
         budget=budget,
+        resolver=resolver,
         upstream_context=upstream_context,
     )
     outcome = controller.run(run_id, gen.tool_path, goal)
@@ -216,6 +228,7 @@ def run_refine_loop(
     dev_seeds=None,
     heldout_seeds=None,
     upstream_context=None,
+    oracle=None,
 ) -> RunResult:
     """Drive the loop on an **already-present** tool (proof pipeline, U2).
 
@@ -229,11 +242,18 @@ def run_refine_loop(
     config = config or Config()
     budget = budget or config.budget
 
+    # Fork-Card resolver (plan 2026-06-17 U6); no-grounding default keeps the
+    # channel end-to-end without auto-reversing.
+    oracle = oracle if oracle is not None else NoGroundingOracle()
+    resolver = Resolver(oracle)
+
     # U17 integrity contract (fail-closed, before any work): maker ≠ checker,
-    # referee immutable to the maker, disjoint held-out grade (R6/R10/KTD6).
+    # oracle ≠ checker/maker, referee immutable to the maker, disjoint held-out
+    # grade (R6/R10/KTD6).
     assert_loop_integrity(
         refiner=refiner,
         judge=judge,
+        oracle=oracle,
         referee_paths=referee_paths,
         maker_write_paths=maker_write_paths,
         dev_seeds=dev_seeds,
@@ -273,6 +293,7 @@ def run_refine_loop(
         checkpoint=checkpoint,
         store=store,
         budget=budget,
+        resolver=resolver,
         upstream_context=upstream_context,
     )
     outcome = controller.run(run_id, tool_path, goal)

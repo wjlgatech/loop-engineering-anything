@@ -2,13 +2,15 @@
 
 Subcommands:
   preflight  Detect the four external dependencies.
-  run        Route a target and (when factories are wired) drive the loop.
+  run        Route a target, generate the tool, and drive a real refine loop.
   status     Show recorded runs from the memory store.
   report     Render the research report for a run.
+  fleet      Coordinate a fleet of self-improving loops.
 
 The skill (skills/loop-anything/SKILL.md) and this CLI are the two agent-native
-surfaces (R10). Preflight is fully wired; ``run`` gates on preflight and routes,
-then stops where the real factory adapters (U4/U5) are not yet bound.
+surfaces (R10). ``run`` gates on preflight, generates via the routed factory,
+resolves an out-of-jail CLI-Judge adapter, and drives ``run_refine_loop`` end to
+end with the referee protected from the maker.
 """
 
 from __future__ import annotations
@@ -72,9 +74,44 @@ def preflight_cmd(as_json: bool, lane: str | None) -> None:
     default=None,
     help="Force the target lane instead of auto-classifying.",
 )
-def run_cmd(target: str, goal: str, lane: str | None) -> None:
-    """Route TARGET and (when factories are wired) drive the loop."""
-    decision = route(target, forced_lane=Lane(lane) if lane else None)
+@click.option("--judge-adapter", "judge_adapter", default=None,
+              help="Path to the CLI-Judge adapter (overrides auto-discovery). Must live outside the generated tool.")
+@click.option("--judge-registry", "judge_registry", default=None,
+              help="Operator-controlled dir of CLI-Judge adapters, addressed by the tool's manifest.")
+@click.option("--refiner", "refiner_kind", type=click.Choice(["chain", "claude", "llm"]),
+              default="chain", show_default=True, help="Refiner: chain (claude->LLM), claude, or llm.")
+@click.option("--workspace", default="workspace", show_default=True, help="Workspace root for the generated tool.")
+@click.option("--confirm/--no-confirm", default=False,
+              help="Provide the human affirmative for the verification gate (attended runs only).")
+@click.option("--scheduled", is_flag=True, help="Mark an unattended run (gate stays confirm-required).")
+@click.option("--max-iterations", type=int, default=None, help="Override the loop's max iterations.")
+def run_cmd(
+    target: str, goal: str, lane: str | None, judge_adapter: str | None,
+    judge_registry: str | None, refiner_kind: str, workspace: str, confirm: bool,
+    scheduled: bool, max_iterations: int | None,
+) -> None:
+    """Route TARGET, generate the tool, and drive a real refine loop to Grade A."""
+    # Anti-surrender: a scheduled (unattended) run cannot be pre-confirmed from the
+    # CLI -- confirmation must come from a human after the run (R5).
+    if scheduled and confirm:
+        raise click.ClickException(
+            "a scheduled run cannot be pre-confirmed from the CLI; confirmation must "
+            "come from an attended human after the run completes."
+        )
+
+    import dataclasses
+
+    from .adapters.judge import JudgeAdapterError, resolve_judge_adapter
+    from .autonomous import runner as _runner
+    from .bindings import build_loop_deps
+    from .config import Config
+    from .loop.controller import LoopState
+    from .memory.store import MemoryStore
+
+    try:
+        decision = route(target, forced_lane=Lane(lane) if lane else None)
+    except ValueError as e:  # unclassifiable target -> actionable message, not a traceback
+        raise click.ClickException(str(e))
     click.echo(f"Lane: {decision.lane.value} ({decision.reason})")
 
     missing = missing_for_lane(decision.lane)
@@ -82,14 +119,75 @@ def run_cmd(target: str, goal: str, lane: str | None) -> None:
         names = ", ".join(m.label for m in missing)
         raise click.ClickException(f"Cannot run -- missing required tools: {names}")
 
-    # The factory adapters (U4) and judge adapter (U5) bind to the real external
-    # tools and are built in a later unit; the controller core (U6) is exercised
-    # via tests against injectable Judge/Refiner protocols until then.
-    raise click.ClickException(
-        "Factory adapters (U4/U5) are not yet wired to the real tools. "
-        "The loop controller core is unit-tested against recorded verdicts; "
-        f"routing for '{target}' resolved to the {decision.lane.value} lane."
+    # Generate the tool, then resolve the judge adapter against the produced tool
+    # and drive the EXISTING run_refine_loop (KTD2: no run_loop changes; the
+    # adapter is only knowable post-generate).
+    import os
+
+    os.makedirs(workspace, exist_ok=True)
+    factory = _runner._default_factories()[decision.factory]
+    gen = factory.generate(decision.normalized_target, goal, workspace)
+    if not gen.ok:
+        raise click.ClickException(
+            f"factory generation failed on the {decision.lane.value} lane: "
+            f"{(gen.logs or '').strip()[:300] or 'no logs'}"
+        )
+
+    try:
+        adapter = resolve_judge_adapter(gen, override=judge_adapter, registry_dir=judge_registry)
+    except JudgeAdapterError as e:
+        raise click.ClickException(str(e))
+
+    deps = build_loop_deps(
+        tool_path=gen.tool_path, judge_adapter=adapter, refiner_kind=refiner_kind
     )
+    if deps.provider_env_keys and not any(os.environ.get(k) for k in deps.provider_env_keys):
+        click.echo(
+            f"warning: no LLM provider key set ({', '.join(deps.provider_env_keys)}); "
+            "the fallback refiner will degrade to a local (Ollama) rung.",
+            err=True,
+        )
+
+    config = Config()
+    if max_iterations is not None:
+        config = dataclasses.replace(
+            config, budget=dataclasses.replace(config.budget, max_iterations=max_iterations)
+        )
+
+    store = MemoryStore.default()
+    try:
+        result = _runner.run_refine_loop(
+            gen.tool_path,
+            goal,
+            judge=deps.judge,
+            refiner=deps.refiner,
+            compounder=deps.compounder,
+            store=store,
+            workspace_root=workspace,
+            lane=decision.lane,
+            config=config,
+            referee_paths=[adapter],
+            maker_write_paths=[gen.tool_path],
+            scheduled=scheduled,
+            confirmed=confirm,
+        )
+    except RuntimeError as e:  # preflight / credential / integrity failures
+        raise click.ClickException(str(e))
+
+    o = result.outcome
+    refiner_used = getattr(deps.refiner, "last_refiner", None)
+    converged = o.final_state is LoopState.CONVERGED
+    click.echo(
+        f"Run #{result.run_id}: {o.final_state.value} grade={o.grade or '-'} "
+        f"over {o.iterations} iter(s)"
+        + (f" via {refiner_used}" if refiner_used else "")
+    )
+    if converged:
+        click.echo(
+            f"shippable={result.shippable}"
+            + (f" -- gate: {result.gate_reason}" if result.gate_reason else "")
+        )
+    click.echo(f"Inspect: loopeng report {result.run_id}")
 
 
 @main.command("judge-variance")
@@ -146,8 +244,24 @@ def fleet_grp() -> None:
 @fleet_grp.command("run")
 @click.argument("spec_path")
 @click.option("--goal", default=None, help="Top-level goal for the fleet.")
-def fleet_run_cmd(spec_path: str, goal: str | None) -> None:
-    """Parse a fleet SPEC (JSON) and materialize the fleet run."""
+@click.option("--dry-run", is_flag=True, help="Materialize the fleet only; do not execute (the old default).")
+@click.option("--judge-adapter", "judge_adapter", default=None,
+              help="CLI-Judge adapter path applied to every item (overrides per-item discovery).")
+@click.option("--judge-registry", "judge_registry", default=None,
+              help="Operator-controlled dir of CLI-Judge adapters, addressed by each item's manifest.")
+@click.option("--refiner", "refiner_kind", type=click.Choice(["chain", "claude", "llm"]),
+              default="chain", show_default=True, help="Refiner kind for every item.")
+@click.option("--repo", default=".", show_default=True, help="Repo dir the item worktrees branch from.")
+@click.option("--worktrees-root", default=".loopeng/fleet-worktrees", show_default=True,
+              help="Root for per-item git worktrees.")
+def fleet_run_cmd(
+    spec_path: str, goal: str | None, dry_run: bool, judge_adapter: str | None,
+    judge_registry: str | None, refiner_kind: str, repo: str, worktrees_root: str,
+) -> None:
+    """Parse a fleet SPEC (JSON), materialize it, and execute the items.
+
+    Executes by default (topological waves over per-item worktrees). Pass
+    ``--dry-run`` to only materialize the fleet rows (the pre-wiring behavior)."""
     import json
     from datetime import datetime, timezone
 
@@ -163,15 +277,49 @@ def fleet_run_cmd(spec_path: str, goal: str | None) -> None:
 
     store = MemoryStore.default()
     started = datetime.now(timezone.utc).isoformat()
-    fleet_id = materialize_fleet(store, goal or data.get("goal"), items, started)
+    fleet_goal = goal or data.get("goal")
+
+    # For an execute run, route + preflight BEFORE materializing any fleet rows, so
+    # a bad target or a missing tool fails cleanly without orphaning a pending fleet.
+    if not dry_run:
+        try:
+            lanes = {
+                route(it["target"], forced_lane=Lane(it["lane"]) if it.get("lane") else None).lane
+                for it in items
+            }
+        except ValueError as e:  # unclassifiable per-item target
+            raise click.ClickException(str(e))
+        missing = [m for ln in lanes for m in missing_for_lane(ln)]
+        if missing:
+            names = ", ".join(sorted({m.label for m in missing}))
+            raise click.ClickException(f"Cannot run fleet -- missing required tools: {names}")
+
+    fleet_id = materialize_fleet(store, fleet_goal, items, started)
     click.echo(f"Fleet #{fleet_id} created with {len(items)} items.")
-    # Live per-item execution drives run_loop per item, which needs the factory
-    # adapters (same gate as `run`). The coordinator (run_fleet) is exercised in
-    # tests; inspect a materialized fleet with `fleet status` / `fleet report`.
-    click.echo(
-        "Live per-item execution requires the factory adapters (see `run`). "
-        "Inspect this fleet with `fleet status` / `fleet report`."
+
+    if dry_run:
+        click.echo("Materialized only (--dry-run). Inspect with `fleet status` / `fleet report`.")
+        return
+
+    # Behavior-change notice (KTD6): fleet run now executes by default.
+    click.echo("Executing fleet (use --dry-run to only materialize) ...")
+
+    from .orchestration.coordinator import default_fleet_runner, run_fleet
+    from .orchestration.escalation import classify_with_escalation
+    from .orchestration.fleet_report import build_fleet_report, render_fleet_report
+
+    item_runner = default_fleet_runner(
+        store=store, fleet_goal=fleet_goal,
+        judge_adapter_override=judge_adapter, judge_registry=judge_registry,
+        refiner_kind=refiner_kind,
     )
+    status = run_fleet(
+        store, fleet_id, item_runner,
+        repo_dir=repo, worktrees_root=worktrees_root,
+        classify=classify_with_escalation,
+    )
+    click.echo(f"\nFleet terminal status: {status.value}")
+    click.echo(render_fleet_report(build_fleet_report(store, fleet_id)))
 
 
 @fleet_grp.command("status")

@@ -226,14 +226,19 @@ loops toward one goal — the orchestration layer above the loop:
 
 ```bash
 loop-anything fleet run fleet.json --goal "ship the feature across these targets"
+loop-anything fleet run fleet.json --dry-run     # materialize only, don't execute
 loop-anything fleet status <fleet_id>
 loop-anything fleet report <fleet_id>
 loop-anything fleet escalations <fleet_id>
 ```
 
+Each fleet item carries its own `target` (and optional `goal`/`lane`); `fleet run`
+executes the DAG by default — generating, judging, and refining each item inside
+its own git worktree, with the referee held immutable to the maker per item.
+`--dry-run` keeps the old materialize-only behavior.
+
 This is a loop **engine** coordinating our own loops — not an issue→PR→CI Agent
-IDE. The coordinator is exercised in tests; live per-item execution rides on the
-same factory frontier as a single `run`. Boundary + rationale:
+IDE. Boundary + rationale:
 [`docs/solutions/fleet-orchestration-boundary.md`](docs/solutions/fleet-orchestration-boundary.md).
 
 ## 🏛️ Architecture
@@ -307,14 +312,23 @@ pytest -q                      # 286 passing
 [ok ]     compound-engineering plugin (/ce-work, /ce-compound) -- plugin found
 ```
 
-**Drive a target** (auto-routes by lane; gates on preflight):
+**Drive a target** (auto-routes by lane; gates on preflight; generates → judges →
+refines to Grade A):
 
 ```bash
 loop-anything run https://api.example.com --goal "make this agent-native and keep improving it"
 loop-anything run ./my-repo            --goal "raise correctness and safety to Grade A"
+loop-anything run ./my-repo --refiner chain        # claude, then free-tier LLM on infra failure (default)
+loop-anything run ./my-repo --judge-adapter path/to/adapter.py   # override adapter auto-discovery
 loop-anything status                   # recorded runs
 loop-anything report <run_id> --json   # the research report
 ```
+
+The CLI-Judge adapter is auto-located from the generated tool (override with
+`--judge-adapter`); an adapter inside the tool itself is refused so the referee
+stays immutable to the maker. A converged run is marked *shippable* only after a
+human confirms it (`--confirm`); `--scheduled --confirm` is rejected so an
+unattended run can't pre-confirm itself.
 
 ---
 

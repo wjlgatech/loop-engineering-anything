@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 
 from ..autonomous.parallel import ParallelTarget, run_parallel
 from ..autonomous.runner import RunResult
-from ..loop.controller import LoopState
+from ..loop.controller import LoopOutcome, LoopState
 from ..memory.fleet_state import FleetItem, FleetItemStatus, FleetRunStatus
 from ..memory.store import MemoryStore
 from .routing import gather_upstream_outcomes
@@ -85,8 +85,11 @@ def apply_item_result(
     when a later wave's dependent pulls it (closes the converged-without-outcome
     window)."""
     if not res.ok or not isinstance(res.value, RunResult):
+        msg = res.error or "no RunResult"
         store.set_item_status(item.id, on_fail)
-        store.record_item_outcome(item.id, {"error": res.error or "no RunResult"})
+        # Carry the error under both keys so `fleet escalations` / the report (which
+        # read gate_reason|reason) show a cause instead of '-'.
+        store.record_item_outcome(item.id, {"error": msg, "reason": msg})
         return None
     result = res.value
     store.record_item_outcome(item.id, outcome_summary(result))
@@ -117,6 +120,67 @@ def _assert_acyclic(items: dict[str, FleetItem]) -> None:
                 queue.append(child)
     if seen != len(items):
         raise FleetGraphError("fleet dependency graph has a cycle")
+
+
+def default_fleet_runner(
+    *,
+    store: MemoryStore,
+    fleet_goal: str | None,
+    judge_adapter_override: str | None = None,
+    judge_registry: str | None = None,
+    refiner_kind: str = "chain",
+    config=None,
+) -> Callable[[FleetItem, str, list[dict]], RunResult]:
+    """Build the default per-item runner: drive a real ``run_refine_loop`` inside
+    each item's worktree, with the referee protected and ``upstream_context`` routed.
+
+    Mirrors single ``run`` (U4): generate via the routed factory **into the item's
+    worktree** (``workspace_root=worktree`` — a plain pass, not a rebase), resolve
+    an out-of-jail adapter (U3), build deps (U1), then drive the existing
+    ``run_refine_loop`` with ``referee_paths``/``maker_write_paths`` set so
+    referee-immutability fires per worktree (KTD3)."""
+    from ..adapters.judge import JudgeAdapterError, resolve_judge_adapter
+    from ..autonomous import runner as _runner
+    from ..bindings import build_loop_deps
+    from ..config import Lane
+    from ..router import route
+
+    def _run(item: FleetItem, worktree: str, upstream: list[dict]) -> RunResult:
+        goal = item.goal or fleet_goal or ""
+        forced = Lane(item.lane) if item.lane else None
+        decision = route(item.target, forced_lane=forced)
+        factory = _runner._default_factories()[decision.factory]
+        gen = factory.generate(decision.normalized_target, goal, worktree)
+        if not gen.ok:
+            return RunResult(
+                run_id=None,  # no run row was created; never a phantom run 0
+                outcome=LoopOutcome(
+                    LoopState.STOPPED, grade="", reason="factory generation failed", iterations=0
+                ),
+                shippable=False,
+            )
+        adapter = resolve_judge_adapter(
+            gen, override=judge_adapter_override, registry_dir=judge_registry
+        )
+        deps = build_loop_deps(
+            tool_path=gen.tool_path, judge_adapter=adapter, refiner_kind=refiner_kind
+        )
+        return _runner.run_refine_loop(
+            gen.tool_path,
+            goal,
+            judge=deps.judge,
+            refiner=deps.refiner,
+            compounder=deps.compounder,
+            store=store,
+            workspace_root=worktree,
+            lane=decision.lane,
+            config=config,
+            referee_paths=[adapter],
+            maker_write_paths=[gen.tool_path],
+            upstream_context=upstream,
+        )
+
+    return _run
 
 
 def run_fleet(

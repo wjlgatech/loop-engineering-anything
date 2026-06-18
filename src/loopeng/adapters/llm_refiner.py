@@ -125,11 +125,24 @@ def _collect_files(tool_path: str) -> dict[str, str]:
     return out
 
 
+_MAX_BRIEF_FIELD = 2000  # cap interpolated brief text (prompt-injection surface, R-4)
+
+
+def _clip(text: str) -> str:
+    """Bound a brief field before it is interpolated into this refiner's LLM
+    prompt: strip control characters (CR/LF/NUL etc. that could forge message
+    structure) and truncate. The goal/fixtures may be operator- or fleet-supplied,
+    so cap them as defense-in-depth against prompt injection (R-4). (Note: this
+    refiner does not interpolate ``brief.upstream_outcomes``.)"""
+    cleaned = "".join(ch for ch in str(text) if ch == " " or ch == "\t" or (ch.isprintable()))
+    return cleaned[:_MAX_BRIEF_FIELD]
+
+
 def _build_messages(tool_path: str, brief: RefactorBrief) -> list[dict]:
     files = _collect_files(tool_path)
     listing = "\n\n".join(f"### {p}\n```\n{c}\n```" for p, c in files.items()) or "(no readable source files)"
-    dims = ", ".join(brief.target_dimensions) or "the lowest-scoring dimensions"
-    fixtures = ", ".join(brief.failing_fixtures) or "none reported"
+    dims = ", ".join(_clip(d) for d in brief.target_dimensions) or "the lowest-scoring dimensions"
+    fixtures = ", ".join(_clip(f) for f in brief.failing_fixtures) or "none reported"
     system = (
         "You are a senior engineer improving an agent-native CLI so an independent "
         "grader (CLI-Judge) raises its score. Make focused, correct edits. "
@@ -139,12 +152,63 @@ def _build_messages(tool_path: str, brief: RefactorBrief) -> list[dict]:
         "Never add destructive shell commands, network exfiltration, or secrets."
     )
     user = (
-        f"Goal: {brief.goal}\n"
+        f"Goal: {_clip(brief.goal)}\n"
         f"Prioritize these dimensions: {dims}.\n"
         f"Failing fixtures to address: {fixtures}.\n\n"
         f"Current files:\n{listing}"
     )
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
+class ChainedRefiner:
+    """Tries each inner ``Refiner`` in order, falling through to the next ONLY on
+    an infra failure (the inner returned ``None`` AND set ``last_infra_failure``).
+
+    A clean no-change (``None`` with ``last_infra_failure`` False) STOPS the chain
+    -- it is a real answer the controller should act on (roll back / re-judge),
+    not a transient failure to paper over (KTD4). The three controller-read
+    attributes are reset before each attempt and overwritten from whichever inner
+    ran, so a stale Fork-Card list from an earlier rung never leaks. ``last_refiner``
+    records which inner produced the returned result for an honest audit trail
+    (KTD5): a run that converged only after the free-tier fallback is visible, not
+    laundered as a clean primary-refiner convergence.
+    """
+
+    def __init__(self, inner: list):
+        if not inner:
+            raise ValueError("ChainedRefiner requires at least one inner refiner")
+        self.inner = list(inner)
+        self.last_token_cost: int | None = None
+        self.last_infra_failure: bool = False
+        self.last_fork_cards: list = []
+        self.last_refiner: str | None = None
+
+    def refactor(self, tool_path: str, brief: RefactorBrief) -> str | None:
+        # Accumulate token cost ACROSS rungs within this single call: a rung that
+        # spent tokens then infra-failed still burned them, so its cost must not be
+        # erased when we fall through (else the controller's token gate under-counts).
+        total_cost: int | None = None
+        result = None
+        for ref in self.inner:
+            # last_infra_failure / last_fork_cards reflect only the rung that ran.
+            self.last_infra_failure = False
+            self.last_fork_cards = []
+            result = ref.refactor(tool_path, brief)
+            rung_cost = getattr(ref, "last_token_cost", None)
+            if rung_cost is not None:
+                total_cost = (total_cost or 0) + rung_cost
+            self.last_token_cost = total_cost
+            self.last_infra_failure = bool(getattr(ref, "last_infra_failure", False))
+            self.last_fork_cards = list(getattr(ref, "last_fork_cards", []) or [])
+            self.last_refiner = (
+                getattr(ref, "name", None)
+                or getattr(ref, "last_provider", None)
+                or type(ref).__name__
+            )
+            if result is None and self.last_infra_failure:
+                continue  # transient infra failure -> try the next rung
+            return result  # real diff, or a clean no-change -> stop here
+        return result  # chain exhausted; attrs reflect the final attempt
 
 
 def _parse_edits(content: str) -> tuple[str, list[dict]]:

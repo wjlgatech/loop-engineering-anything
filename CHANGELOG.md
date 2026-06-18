@@ -5,6 +5,55 @@ All notable changes to this project are documented here, following
 
 ## [Unreleased]
 
+### Added
+- **`run` and `fleet run` now execute real loops (loop adapters wired)** — the
+  loop engine was built and tested but unplugged from the CLI; both entrypoints
+  previously stopped at a "not yet wired" raise / materialize-only. `loopeng run`
+  now generates via the routed factory, auto-locates a CLI-Judge adapter, builds
+  the default bindings, and drives the existing `run_refine_loop` end to end;
+  `loopeng fleet run` executes its DAG by default (`--dry-run` keeps the old
+  materialize-only behavior). New: a **`ChainedRefiner`** (`claude` primary →
+  free-tier LLM fallback on infra failure only, with provenance via `last_refiner`,
+  `adapters/llm_refiner.py`); **fail-closed, out-of-jail judge-adapter discovery**
+  (`resolve_judge_adapter`, `adapters/judge.py`) that refuses any adapter inside
+  the maker's write tree so the referee stays immutable; a **default bindings
+  builder** (`bindings.py`); **per-item fleet targets** (`target`/`goal`/`lane` on
+  the fleet spec, `fleet_items` schema, and `FleetItem`); and a
+  **`default_fleet_runner`** that drives a real per-item loop inside each worktree
+  with the referee protected and `upstream_context` routed. New `run` flags:
+  `--judge-adapter`, `--refiner {chain,claude,llm}`, `--workspace`,
+  `--confirm/--no-confirm`, `--scheduled` (`--scheduled --confirm` is rejected —
+  anti-surrender), `--max-iterations`. _Why:_ the missing floor under the proven
+  orchestration layer. Origin:
+  `docs/plans/2026-06-18-001-feat-wire-loop-adapters-cli-plan.md`.
+- **Fork-Card decision channel (headless v1)** — the supervised-loop keystone: a
+  mid-build decision the spec/northstar doesn't determine is now a first-class,
+  gradable artifact instead of a silent default. The headless agent emits a typed
+  `ForkCard` (`loop/fork_card.py`) in its `--output-format json` output and keeps
+  building a reversible default; the refiner parses it off the same envelope it
+  already reads for token cost (`adapters/compound_engineering.py`,
+  `parse_fork_cards`). A pluggable `Oracle` (`adapters/base.py`) + `Resolver`
+  cascade (`loop/resolver.py`, spec → oracle → escalate) decides each card; a
+  grounded overrule of the agent's default reverses the iteration through the
+  loop's existing regression rollback (`loop/controller.py`). Cards persist to a
+  new append-only `fork_cards` table (`memory/store.py`, `record_fork_card` /
+  `fork_cards`) and surface on `LoopOutcome.fork_cards` for end-review. A new
+  `oracle ≠ checker` / `oracle ≠ maker` integrity guard (`loop/integrity.py`,
+  threaded through both `runner.py` preflights) keeps the fork-answerer distinct
+  from the referee and the maker. v1 ships a `NoGroundingOracle` default, so the
+  channel is end-to-end (emit → parse → resolve → record → surface) but never
+  auto-reverses until a real twin-backed oracle lands. Origin:
+  `docs/plans/2026-06-17-001-feat-fork-card-decision-channel-plan.md`.
+
+### Investigated / Rejected
+- **Interactive `AskUserQuestion` hook (deferred, not built).** Validated that a
+  Claude Code `PreToolUse` hook *fires* on `AskUserQuestion` and sees the options,
+  but has **no field to inject a substitute tool result** — it can only
+  allow/deny/ask. So a hook cannot silently auto-answer the menu from the twin;
+  the only clean injection path is the Agent SDK `canUseTool` callback, which
+  would mean wrapping Claude Code in the SDK. Interactive capture is therefore
+  deferred to keep v1 on the bare CLI (per user direction: autonomous first).
+
 ### Fixed
 - **Flaky `test_concurrent_sqlite_writes_do_not_corrupt` (concurrent git-worktree
   race).** `git worktree add`/`remove`/`prune` mutate shared `.git/worktrees/`

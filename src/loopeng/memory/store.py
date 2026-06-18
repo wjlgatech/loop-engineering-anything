@@ -27,6 +27,7 @@ import sqlite3
 import threading
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from .fleet_state import (
     FleetItem,
@@ -85,6 +86,25 @@ class Iteration:
     token_cost: int | None
     diff_ref: str | None
     score: float | None = None
+
+
+@dataclass
+class ForkCardRecord:
+    """A persisted Fork-Card + its supervisor resolution (plan 2026-06-17 U5)."""
+
+    id: int
+    run_id: int
+    iteration_id: int | None
+    card_id: str
+    options: list
+    spec_clause: str | None
+    chosen_default: str | None
+    reversibility: str | None
+    blast_radius: str | None
+    basis: Any
+    decision: str | None
+    chosen_option: str | None
+    created: str | None
 
 
 class MemoryStore:
@@ -254,6 +274,78 @@ class MemoryStore:
             ).fetchall()
         return [{**dict(r), "confirmed": bool(r["confirmed"])} for r in rows]
 
+    # ----- fork cards (decision channel audit trail, plan 2026-06-17 U5) ---
+
+    def record_fork_card(
+        self,
+        run_id: int,
+        *,
+        card_id: str,
+        options: list | None = None,
+        spec_clause: str | None = None,
+        chosen_default: str | None = None,
+        reversibility: str | None = None,
+        blast_radius: str | None = None,
+        basis: Any = None,
+        decision: str | None = None,
+        chosen_option: str | None = None,
+        iteration_id: int | None = None,
+        created: str | None = None,
+    ) -> int:
+        """Persist one Fork-Card and its resolution (append-only audit, KTD5).
+
+        Takes decomposed primitives rather than a ``ForkCard`` so the store stays
+        free of a ``loop`` import (the controller decomposes the card). ``options``
+        and ``basis`` are JSON-encoded; the read path decodes them.
+        """
+        with self._wlock:
+            cur = self._conn.execute(
+                "INSERT INTO fork_cards (run_id, iteration_id, card_id, options_json, "
+                "spec_clause, chosen_default, reversibility, blast_radius, basis, decision, "
+                "chosen_option, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    run_id,
+                    iteration_id,
+                    card_id,
+                    json.dumps(options or []),
+                    spec_clause,
+                    chosen_default,
+                    reversibility,
+                    blast_radius,
+                    json.dumps(basis),
+                    decision,
+                    chosen_option,
+                    created,
+                ),
+            )
+            self._conn.commit()
+            return int(cur.lastrowid)
+
+    def fork_cards(self, run_id: int) -> list[ForkCardRecord]:
+        with self._wlock:
+            rows = self._conn.execute(
+                "SELECT * FROM fork_cards WHERE run_id = ? ORDER BY id", (run_id,)
+            ).fetchall()
+        return [self._row_to_fork_card(r) for r in rows]
+
+    @staticmethod
+    def _row_to_fork_card(r) -> ForkCardRecord:
+        return ForkCardRecord(
+            id=r["id"],
+            run_id=r["run_id"],
+            iteration_id=r["iteration_id"],
+            card_id=r["card_id"],
+            options=json.loads(r["options_json"]) if r["options_json"] else [],
+            spec_clause=r["spec_clause"],
+            chosen_default=r["chosen_default"],
+            reversibility=r["reversibility"],
+            blast_radius=r["blast_radius"],
+            basis=json.loads(r["basis"]) if r["basis"] is not None else None,
+            decision=r["decision"],
+            chosen_option=r["chosen_option"],
+            created=r["created"],
+        )
+
     # ----- scheduler state (U14) -----------------------------------------
 
     def upsert_schedule(
@@ -330,12 +422,21 @@ class MemoryStore:
             row = self._conn.execute("SELECT * FROM fleet_runs WHERE id = ?", (fleet_id,)).fetchone()
         return self._row_to_fleet(row) if row else None
 
-    def add_fleet_item(self, fleet_id: int, key: str, depends_on: list | None = None) -> int:
+    def add_fleet_item(
+        self,
+        fleet_id: int,
+        key: str,
+        depends_on: list | None = None,
+        *,
+        target: str | None = None,
+        goal: str | None = None,
+        lane: str | None = None,
+    ) -> int:
         with self._wlock:
             cur = self._conn.execute(
-                "INSERT INTO fleet_items (fleet_id, key, status, depends_on_json) "
-                "VALUES (?, ?, 'pending', ?)",
-                (fleet_id, key, json.dumps(list(depends_on or []))),
+                "INSERT INTO fleet_items (fleet_id, key, status, depends_on_json, target, goal, lane) "
+                "VALUES (?, ?, 'pending', ?, ?, ?, ?)",
+                (fleet_id, key, json.dumps(list(depends_on or [])), target, goal, lane),
             )
             self._conn.commit()
             return int(cur.lastrowid)
@@ -502,12 +603,16 @@ class MemoryStore:
 
     @staticmethod
     def _row_to_fleet_item(row: sqlite3.Row) -> FleetItem:
+        keys = row.keys()
         return FleetItem(
             id=row["id"],
             fleet_id=row["fleet_id"],
             key=row["key"],
             status=FleetItemStatus(row["status"]),
             depends_on=json.loads(row["depends_on_json"]),
+            target=row["target"] if "target" in keys else None,
+            goal=row["goal"] if "goal" in keys else None,
+            lane=row["lane"] if "lane" in keys else None,
             run_id=row["run_id"],
             outcome=json.loads(row["outcome_json"]) if row["outcome_json"] else None,
         )

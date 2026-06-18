@@ -71,6 +71,13 @@ class FleetItem:
     key: str
     status: FleetItemStatus
     depends_on: list[str] = field(default_factory=list)
+    # What this item runs on + how (U7). ``target``/``goal`` let the fleet drive a
+    # real loop per item; ``None`` for direct-add items whose tests inject a runner.
+    # ``goal`` falls back to the fleet goal at run time; ``lane`` is an optional
+    # router override.
+    target: str | None = None
+    goal: str | None = None
+    lane: str | None = None
     run_id: int | None = None
     outcome: dict | None = None
 

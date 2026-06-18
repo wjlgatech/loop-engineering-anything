@@ -174,3 +174,79 @@ def test_fleet_status_set_to_awaiting_human(store):
     f = store.get_fleet(fid)
     assert f.status is FleetRunStatus.AWAITING_HUMAN
     assert f.finished == "2026-06-16T01:00:00Z"
+
+
+# ----- fork cards (plan 2026-06-17 U5) -----------------------------------
+
+
+def test_record_and_read_fork_card_round_trips(store):
+    run_id = store.create_run("t", "service", None, "2026-06-17T00:00:00Z")
+    store.record_fork_card(
+        run_id,
+        card_id="f1",
+        options=[{"id": "a", "label": "A"}, {"id": "b", "label": "B"}],
+        spec_clause="silent",
+        chosen_default="a",
+        reversibility="reversible",
+        blast_radius="local",
+        basis="unresolved",
+        decision="escalate",
+        iteration_id=2,
+    )
+    cards = store.fork_cards(run_id)
+    assert len(cards) == 1
+    c = cards[0]
+    assert c.card_id == "f1"
+    assert c.chosen_default == "a"
+    assert c.basis == "unresolved"
+    assert c.decision == "escalate"
+    assert c.options[0]["id"] == "a"
+    assert c.iteration_id == 2
+
+
+def test_fork_card_nullable_default_and_citation_basis(store):
+    run_id = store.create_run("t", "service", None, "2026-06-17T00:00:00Z")
+    store.record_fork_card(
+        run_id, card_id="f2", chosen_default=None, basis=["kernel.yaml:3"], decision="reverse",
+        chosen_option="b",
+    )
+    c = store.fork_cards(run_id)[0]
+    assert c.chosen_default is None
+    assert c.basis == ["kernel.yaml:3"]
+    assert c.chosen_option == "b"
+
+
+def test_fork_cards_scoped_and_ordered_per_run(store):
+    r1 = store.create_run("t", "service", None, "2026-06-17T00:00:00Z")
+    r2 = store.create_run("t", "service", None, "2026-06-17T00:00:00Z")
+    store.record_fork_card(r1, card_id="a")
+    store.record_fork_card(r1, card_id="b")
+    store.record_fork_card(r2, card_id="c")
+    assert [c.card_id for c in store.fork_cards(r1)] == ["a", "b"]
+    assert [c.card_id for c in store.fork_cards(r2)] == ["c"]
+
+
+def test_fork_cards_table_present_on_fresh_db_without_migrate(tmp_path):
+    s = MemoryStore(tmp_path / "fresh.db")
+    try:
+        run_id = s.create_run("t", "service", None, "2026-06-17T00:00:00Z")
+        s.record_fork_card(run_id, card_id="x")  # would raise if table missing
+        assert len(s.fork_cards(run_id)) == 1
+    finally:
+        s.close()
+
+
+def test_concurrent_fork_card_writes_do_not_corrupt(store):
+    import threading
+
+    run_id = store.create_run("t", "service", None, "2026-06-17T00:00:00Z")
+
+    def writer(i):
+        store.record_fork_card(run_id, card_id=f"c{i}")
+
+    threads = [threading.Thread(target=writer, args=(i,)) for i in range(20)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(store.fork_cards(run_id)) == 20

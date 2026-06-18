@@ -6,12 +6,15 @@ from .base import (
     Factory,
     GenerateResult,
     Judge,
+    Oracle,
+    OracleVerdict,
     Refiner,
     Verdict,
 )
 from .cli_anything import CLIAnythingFactory
 from .compound_engineering import ClaudeCodeCompounder, ClaudeCodeRefiner
 from .judge import CLIJudge, VarianceReport, parse_report, probe_grade_variance
+from .oracle import NoGroundingOracle
 from .printing_press import PrintingPressFactory
 
 __all__ = [
@@ -22,6 +25,9 @@ __all__ = [
     "Compounder",
     "Factory",
     "Checkpoint",
+    "Oracle",
+    "OracleVerdict",
+    "NoGroundingOracle",
     "PrintingPressFactory",
     "CLIAnythingFactory",
     "CLIJudge",
