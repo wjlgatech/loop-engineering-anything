@@ -52,3 +52,9 @@ def test_proof_same_run_both_legs_rejected():
     res = ablation_result(_leg(7, 3), _leg(7, 6), heldout_seed_hash="s")
     with pytest.raises(FlywheelProofError):
         assert_valid_flywheel_proof(res)
+
+
+def test_reuse_helped_when_off_never_converges():
+    # ON converged; OFF stalled (never converged) -> the strongest win.
+    res = ablation_result(_leg(1, 2), _leg(2, 4, converged=False), heldout_seed_hash="s")
+    assert res["reuse_helped"] is True
