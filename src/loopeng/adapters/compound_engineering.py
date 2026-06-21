@@ -17,6 +17,7 @@ import json
 
 from ..loop.fork_card import ForkCard, ForkCardParseError
 from .base import RefactorBrief
+from .reflection_render import reflection_lines as _reflection_lines
 from .safety import is_infra_failure, run_tool
 
 DEFAULT_TIMEOUT = 30 * 60  # seconds
@@ -131,6 +132,12 @@ class ClaudeCodeRefiner:
             prompt += (
                 f"\nUpstream fleet items this work depends on (context only): {lines}."
             )
+        # Reflective context (plan 2026-06-20 U3): tell the agent what the last
+        # attempt did and how it scored so it reflects rather than blindly re-edits.
+        # judge_feedback is sanitized at source (U4), so no extra clipping here --
+        # consistent with the un-clipped recurring/upstream rendering above.
+        for line in _reflection_lines(getattr(brief, "reflection", None)):
+            prompt += f"\n{line}"
         # Fork-Card emission convention (plan 2026-06-17 U4): the supervised loop
         # needs undetermined decisions to be visible, not silently defaulted. Do
         # NOT stop to ask -- emit the decision as data and keep building.

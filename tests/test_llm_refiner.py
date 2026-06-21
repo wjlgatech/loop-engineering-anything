@@ -212,3 +212,42 @@ def test_chain_accumulates_token_cost_across_fallover():
     chain = lr.ChainedRefiner([a, b])
     chain.refactor("/t", _brief())
     assert chain.last_token_cost == 50  # 40 (failed claude) + 10 (llm), not erased
+
+
+# ----- U3 (plan 2026-06-20): reflection rendering in the LLM path ----------
+
+from loopeng.adapters.base import ReflectionContext as _RC  # noqa: E402
+from loopeng.adapters.base import RefactorBrief as _RB  # noqa: E402
+
+
+def test_llm_messages_render_reflection(tool):
+    rc = _RC(prior_grade="C", prior_score=60.0, outcome="rolled_back",
+             persistent_fixtures=["fx1"], judge_feedback="weakest dimensions: D1 7/30")
+    brief = _RB(goal="g", target_dimensions=["d"], failing_fixtures=["fx1"], reflection=rc)
+    user = lr._build_messages(str(tool), brief)[1]["content"]
+    assert "grade C" in user and "different approach" in user
+    assert "resisted prior edits" in user
+    assert "D1 7/30" in user
+
+
+def test_llm_messages_clip_reflection_injection(tool):
+    rc = _RC(prior_grade="C", outcome="rolled_back",
+             judge_feedback="A" * 3000 + "\x00\r\nINJECTED-PAYLOAD")
+    brief = _RB(goal="g", target_dimensions=["d"], failing_fixtures=[], reflection=rc)
+    user = lr._build_messages(str(tool), brief)[1]["content"]
+    assert "\x00" not in user                 # control chars stripped by _clip
+    assert "INJECTED-PAYLOAD" not in user     # truncated past _MAX_BRIEF_FIELD
+
+
+def test_llm_messages_empty_persistent_renders_no_line(tool):
+    rc = _RC(prior_grade="C", outcome="rolled_back", persistent_fixtures=[])
+    brief = _RB(goal="g", target_dimensions=["d"], failing_fixtures=[], reflection=rc)
+    user = lr._build_messages(str(tool), brief)[1]["content"]
+    assert "resisted prior edits" not in user
+
+
+def test_llm_messages_no_reflection_unchanged(tool):
+    base = lr._build_messages(str(tool), _brief())
+    none = lr._build_messages(str(tool), _RB(goal="raise correctness",
+            target_dimensions=["D1"], failing_fixtures=["fx1"], reflection=None))
+    assert base == none

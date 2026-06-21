@@ -34,6 +34,7 @@ import urllib.request
 from dataclasses import dataclass
 
 from .base import RefactorBrief
+from .reflection_render import reflection_lines as _reflection_lines
 from .safety import run_tool, within_workspace
 
 # Verified free OpenAI-compatible endpoints (free-llm skill, 2026-06-11).
@@ -151,10 +152,14 @@ def _build_messages(tool_path: str, brief: RefactorBrief) -> list[dict]:
         "Each edit replaces the entire file. Do not include files you are not changing. "
         "Never add destructive shell commands, network exfiltration, or secrets."
     )
+    # Reflective context (plan 2026-06-20 U3): every interpolated segment is routed
+    # through _clip as defense-in-depth (R4), even though judge_feedback is already
+    # sanitized at source (U4).
+    reflection = "".join(f"\n{line}" for line in _reflection_lines(getattr(brief, "reflection", None), sanitize=_clip))
     user = (
         f"Goal: {_clip(brief.goal)}\n"
         f"Prioritize these dimensions: {dims}.\n"
-        f"Failing fixtures to address: {fixtures}.\n\n"
+        f"Failing fixtures to address: {fixtures}.{reflection}\n\n"
         f"Current files:\n{listing}"
     )
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
