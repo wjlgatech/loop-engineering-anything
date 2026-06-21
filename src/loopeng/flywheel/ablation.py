@@ -36,11 +36,13 @@ class AblationLeg:
 
 
 def ablation_result(on: AblationLeg, off: AblationLeg, *, heldout_seed_hash: str) -> dict:
-    """Compute the paired ablation outcome. ``reuse_helped`` is True only when the
-    reuse-ON leg converged in *strictly fewer* iterations than reuse-OFF -- matching
-    reuse-OFF is a failure of the premise, not a pass (U6)."""
+    """Compute the paired ablation outcome. ``reuse_helped`` is True when the reuse-ON
+    leg converged AND it did strictly better than reuse-OFF -- either reuse-OFF failed
+    to converge at all, or both converged and ON used strictly fewer iterations.
+    Matching reuse-OFF (both converged, equal iterations) is a failure of the premise,
+    not a pass (U6)."""
     delta_iters = off.iterations - on.iterations  # positive = reuse saved iterations
-    reuse_helped = on.converged and off.converged and on.iterations < off.iterations
+    reuse_helped = on.converged and (not off.converged or on.iterations < off.iterations)
     return {
         "heldout_seed_hash": heldout_seed_hash,
         "reuse_on": {"run_id": on.run_id, "iterations": on.iterations, "first_grade": on.first_grade},
