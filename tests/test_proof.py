@@ -77,7 +77,7 @@ def test_store_backed_compounder_records_learning_and_delegates(store):
         def __init__(self):
             self.calls = []
 
-        def compound(self, summary, *, regression_test_ref=None):
+        def compound(self, summary, *, regression_test_ref=None, grade_delta=None):
             self.calls.append((summary, regression_test_ref))
 
     inner = Inner()

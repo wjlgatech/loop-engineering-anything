@@ -250,3 +250,128 @@ def test_concurrent_fork_card_writes_do_not_corrupt(store):
     for t in threads:
         t.join()
     assert len(store.fork_cards(run_id)) == 20
+
+
+# ----- learning-reuse flywheel (plan 2026-06-21 U2/U1) --------------------
+
+
+def _conv_run(store, target, started, *, n_iters, first_grade="C"):
+    """Create a converged run with n_iters iterations (first iter grade fixed)."""
+    rid = store.create_run(target, "service", "g", started)
+    for i in range(1, n_iters + 1):
+        g = first_grade if i == 1 else "A"
+        store.record_iteration(rid, i, g, {"d": 1}, safety_ok=True)
+    store.finish_run(rid, "converged", "A")
+    return rid
+
+
+def test_prior_learnings_scoped_to_target(store):
+    a = store.create_run("targetA", "service", "g", "2026-06-20T00:00:00Z")
+    b = store.create_run("targetB", "service", "g", "2026-06-20T00:00:00Z")
+    store.record_learning(a, None, "A-lesson", grade_delta=2.0)
+    store.record_learning(b, None, "B-lesson", grade_delta=2.0)
+    # A second run on targetA should retrieve only targetA's prior learning.
+    assert store.prior_learnings(target="targetA") == ["A-lesson"]
+    assert store.prior_learnings(target="targetB") == ["B-lesson"]
+
+
+def test_prior_learnings_ranks_by_grade_delta_then_recency(store):
+    r = store.create_run("t", "service", "g", "2026-06-20T00:00:00Z")
+    store.record_learning(r, None, "small-gain", grade_delta=1.0)
+    store.record_learning(r, None, "big-gain", grade_delta=3.0)
+    store.record_learning(r, None, "no-delta")  # grade_delta NULL -> ranked last
+    got = store.prior_learnings(target="t")
+    assert got[0] == "big-gain" and got[1] == "small-gain"
+    assert got[-1] == "no-delta"
+
+
+def test_prior_learnings_limit_caps(store):
+    r = store.create_run("t", "service", "g", "2026-06-20T00:00:00Z")
+    for i in range(10):
+        store.record_learning(r, None, f"lesson-{i}", grade_delta=float(i))
+    assert len(store.prior_learnings(target="t", limit=3)) == 3
+
+
+def test_record_learning_sanitizes_at_write(store):
+    r = store.create_run("t", "service", "g", "2026-06-20T00:00:00Z")
+    store.record_learning(r, None, "do `rm -rf /`; $(whoami)\x00 and\r\nmore", grade_delta=1.0)
+    stored = store.prior_learnings(target="t")[0]
+    for bad in ("`", "$", ";", "\x00", "\r", "\n"):
+        assert bad not in stored
+
+
+def test_prior_learnings_empty_on_first_run(store):
+    assert store.prior_learnings(target="never-seen") == []
+
+
+def test_iterations_to_converge_series_oldest_first(store):
+    _conv_run(store, "t", "2026-06-18T00:00:00Z", n_iters=4)
+    _conv_run(store, "t", "2026-06-19T00:00:00Z", n_iters=2)
+    # a non-converged run is excluded
+    nr = store.create_run("t", "service", "g", "2026-06-20T00:00:00Z")
+    store.record_iteration(nr, 1, "C", {"d": 1}, safety_ok=True)
+    store.finish_run(nr, "stopped", "C")
+    series = store.iterations_to_converge_series("t")
+    assert [n for _, n in series] == [4, 2]  # oldest first, converged only
+
+
+def test_first_attempt_grade_series(store):
+    _conv_run(store, "t", "2026-06-18T00:00:00Z", n_iters=3, first_grade="D")
+    _conv_run(store, "t", "2026-06-19T00:00:00Z", n_iters=2, first_grade="B")
+    assert [g for _, g in store.first_attempt_grade_series("t")] == ["D", "B"]
+
+
+def test_compounding_summary_trend(store):
+    _conv_run(store, "t", "2026-06-18T00:00:00Z", n_iters=5)
+    _conv_run(store, "t", "2026-06-19T00:00:00Z", n_iters=2)
+    s = store.compounding_summary("t")
+    assert s["converged_runs"] == 2
+    assert s["converged_iters_trend"] == "improving"  # 5 -> 2
+
+
+# ----- U4 cross-target reuse (lane-scoped, demoted, redacted) --------------
+
+
+def test_cross_target_reuse_is_opt_in_and_demoted(store):
+    a = store.create_run("targetA", "service", "g", "2026-06-20T00:00:00Z")
+    store.record_learning(a, None, "use keyset pagination", grade_delta=3.0)
+    b = store.create_run("targetB", "service", "g", "2026-06-20T01:00:00Z")
+    store.record_learning(b, None, "B-own lesson", grade_delta=1.0)
+    # cross_target OFF -> only B's own.
+    assert store.prior_learnings(target="targetB", lane="service") == ["B-own lesson"]
+    # cross_target ON -> B's own first, then A's (demoted).
+    got = store.prior_learnings(target="targetB", lane="service", cross_target=True)
+    assert got[0] == "B-own lesson" and "use keyset pagination" in got[1]
+
+
+def test_cross_target_redacts_target_specifics(store):
+    a = store.create_run("targetA", "service", "g", "2026-06-20T00:00:00Z")
+    store.record_learning(a, None, "fix GET /v2/users/42 at api.go cache", grade_delta=3.0)
+    store.create_run("targetB", "service", "g", "2026-06-20T01:00:00Z")
+    got = store.prior_learnings(target="targetB", lane="service", cross_target=True)
+    assert got, "cross-target learning should be returned"
+    joined = " ".join(got)
+    assert "/v2/users/42" not in joined and "api.go" not in joined  # paths redacted
+    assert "<redacted>" in joined
+
+
+def test_cross_target_respects_lane_and_threshold(store):
+    a = store.create_run("targetA", "service", "g", "2026-06-20T00:00:00Z")
+    store.record_learning(a, None, "low-value", grade_delta=0.0)  # below threshold
+    c = store.create_run("targetC", "codebase", "g", "2026-06-20T00:30:00Z")
+    store.record_learning(c, None, "other-lane lesson", grade_delta=5.0)
+    store.create_run("targetB", "service", "g", "2026-06-20T01:00:00Z")
+    got = store.prior_learnings(target="targetB", lane="service", cross_target=True)
+    assert got == []  # A filtered by threshold; C excluded by lane
+
+
+# ----- U5 reuse instrumentation -------------------------------------------
+
+
+def test_record_injected_count_and_reuse_stats(store):
+    r1 = _conv_run(store, "t", "2026-06-18T00:00:00Z", n_iters=3)
+    store.record_injected_count(r1, 0)
+    r2 = _conv_run(store, "t", "2026-06-19T00:00:00Z", n_iters=2)
+    store.record_injected_count(r2, 4)
+    stats = store.reuse_stats("t")
+    assert [(inj, n) for _, inj, n, _ in stats] == [(0, 3), (4, 2)]  # oldest first

@@ -40,10 +40,13 @@ class StoreBackedCompounder:
         self.run_id = run_id
         self.inner = inner
 
-    def compound(self, summary: str, *, regression_test_ref: str | None = None) -> None:
-        self.store.record_learning(self.run_id, None, summary, regression_test_ref)
+    def compound(
+        self, summary: str, *, regression_test_ref: str | None = None, grade_delta: float | None = None
+    ) -> None:
+        # grade_delta ranks this learning for cross-run reuse (flywheel U2/U3).
+        self.store.record_learning(self.run_id, None, summary, regression_test_ref, grade_delta=grade_delta)
         if self.inner is not None:
-            self.inner.compound(summary, regression_test_ref=regression_test_ref)
+            self.inner.compound(summary, regression_test_ref=regression_test_ref, grade_delta=grade_delta)
 
 
 def _elapsed_seconds(started: str | None, finished: str | None) -> float | None:

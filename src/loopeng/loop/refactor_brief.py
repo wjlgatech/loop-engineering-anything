@@ -16,6 +16,7 @@ def build_refactor_brief(
     exclude_dims: list | None = None,
     upstream_outcomes: list | None = None,
     reflection: ReflectionContext | None = None,
+    reused_learnings: list | None = None,
 ) -> RefactorBrief:
     # Rank dimensions lowest-score-first; those are where the grade is bleeding.
     ranked = [name for name, _ in sorted(verdict.dims.items(), key=lambda kv: kv[1])]
@@ -49,4 +50,5 @@ def build_refactor_brief(
         recurring_failures=advisory,
         upstream_outcomes=list(upstream_outcomes or []),  # fleet routing (plan-006 U3)
         reflection=reflection,  # trace-driven ASI; None on first iteration (plan 2026-06-20 U2)
+        reused_learnings=list(reused_learnings or []),  # cross-run reuse flywheel (plan 2026-06-21 U3)
     )

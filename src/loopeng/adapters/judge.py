@@ -19,6 +19,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..util.sanitize import sanitize_text
 from .base import GenerateResult, Judge, Verdict
 from .safety import ProcResult, run_tool, within_workspace
 
@@ -114,19 +115,15 @@ def derive_safety_ok(data: dict, dims: dict, *, strict_unknown: bool = False) ->
 
 
 _FEEDBACK_MAX = 600  # bound the ASI text -- a dimension-level summary, not a transcript
-_SHELL_METACHARS = frozenset("`$;|&><\\\"'")
 
 
 def _sanitize_feedback(text: str) -> str:
     """Strip control characters + shell metacharacters and bound length, so the
     distilled ASI text is safe to render into *either* refiner's prompt with no
-    per-path asymmetry (plan 2026-06-20 U4 / R4). Sanitizing at the source means
-    the un-clipped ClaudeCodeRefiner path is as safe as the _clip'd LLM path."""
-    cleaned = "".join(
-        ch for ch in str(text)
-        if (ch == " " or ch.isprintable()) and ch not in _SHELL_METACHARS
-    )
-    return cleaned[:_FEEDBACK_MAX].strip()
+    per-path asymmetry (plan 2026-06-20 U4 / R4). Thin alias over the shared
+    ``util.sanitize.sanitize_text`` (extracted in plan 2026-06-21 R4 so the
+    learning-reuse write path shares it without a cycle)."""
+    return sanitize_text(text, max_len=_FEEDBACK_MAX)
 
 
 def _distill_feedback(data: dict, dims_raw: dict) -> str:

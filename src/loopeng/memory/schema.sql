@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS runs (
     status      TEXT NOT NULL DEFAULT 'running',  -- running|converged|blocked_safety|stopped
     final_grade TEXT,
     started     TEXT NOT NULL,                     -- ISO-8601, supplied by caller
-    finished    TEXT                               -- ISO-8601 wall-clock end (proof-pack elapsed); nullable
+    finished    TEXT,                              -- ISO-8601 wall-clock end (proof-pack elapsed); nullable
+    injected_learning_count INTEGER                -- reused prior learnings injected into this run's briefs (flywheel U5); nullable
 );
 
 CREATE TABLE IF NOT EXISTS iterations (
@@ -31,8 +32,9 @@ CREATE TABLE IF NOT EXISTS learnings (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     run_id              INTEGER NOT NULL REFERENCES runs(id),
     iteration_id        INTEGER REFERENCES iterations(id),
-    summary             TEXT NOT NULL,
-    regression_test_ref TEXT
+    summary             TEXT NOT NULL,                 -- sanitized at write (flywheel R4)
+    regression_test_ref TEXT,
+    grade_delta         REAL                           -- grade-rank gain of the accepted fix; ranks cross-run reuse (flywheel U2); nullable for legacy rows
 );
 
 -- Durable scheduler state (U14, R7): a registered target's cadence survives a

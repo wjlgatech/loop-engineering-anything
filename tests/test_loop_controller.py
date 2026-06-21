@@ -736,3 +736,106 @@ def test_persistent_split_uses_kept_lineage_not_store_rows(store):
     assert set(rc.persistent_fixtures) == {"F", "G"}  # both failed across kept states
     assert rc.new_fixtures == []
     assert "H" not in rc.persistent_fixtures and "H" not in rc.new_fixtures  # store-only row excluded
+
+
+# ----- U3 (plan 2026-06-21): cross-run learning reuse + maker != checker ----
+
+
+class RecordingJudge:
+    """ScriptedJudge that records every argument it receives, to prove the judge
+    never sees brief/reused-learnings (maker != checker, flywheel R2)."""
+
+    def __init__(self, verdicts):
+        self.inner = ScriptedJudge(verdicts)
+        self.seen_args = []
+
+    def judge(self, tool_path):
+        self.seen_args.append(tool_path)
+        return self.inner.judge(tool_path)
+
+
+def test_prior_run_learnings_injected_into_next_run_brief(store):
+    # Run 1 records a learning to the STORE (the real refine path wraps the
+    # compounder in StoreBackedCompounder so learnings persist across runs).
+    from loopeng.proof import StoreBackedCompounder
+    r1 = store.create_run("t", "service", "g", "2026-06-20T00:00:00Z")
+    c1 = LoopController(
+        judge=ScriptedJudge([v("C"), v("A")]), refiner=FakeRefiner(),
+        compounder=StoreBackedCompounder(store, r1), checkpoint=FakeCheckpoint(),
+        store=store, budget=Budget(target_grade="A"),
+    )
+    c1.run(r1, "tool/")
+    assert store.prior_learnings(target="t"), "run 1 should have compounded a learning"
+
+    # Run 2 on the same target: its brief must carry run 1's learning (the flywheel).
+    refiner = CapturingRefiner()
+    c2 = LoopController(
+        judge=ScriptedJudge([v("C"), v("A")]), refiner=refiner,
+        compounder=RecordingCompounder(), checkpoint=FakeCheckpoint(),
+        store=store, budget=Budget(target_grade="A"),
+    )
+    r2 = store.create_run("t", "service", "g", "2026-06-20T01:00:00Z")
+    c2.run(r2, "tool/")
+    assert refiner.briefs[0].reused_learnings, "run 2 brief should reuse prior learnings"
+
+
+def test_reused_learnings_never_reach_the_judge(store):
+    # Seed a prior learning, then assert the judge only ever receives tool_path.
+    seed = store.create_run("t", "service", "g", "2026-06-20T00:00:00Z")
+    store.record_learning(seed, None, "CANARY-LEARNING", grade_delta=3.0)
+    judge = RecordingJudge([v("C"), v("A")])
+    ctrl = LoopController(
+        judge=judge, refiner=CapturingRefiner(), compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(), store=store, budget=Budget(target_grade="A"),
+    )
+    rid = store.create_run("t", "service", "g", "2026-06-20T02:00:00Z")
+    ctrl.run(rid, "tool/")
+    # The judge only ever saw the tool path string -- never the brief or the canary.
+    assert all(a == "tool/" for a in judge.seen_args)
+    assert not any("CANARY" in str(a) for a in judge.seen_args)
+
+
+def test_accepted_fix_records_grade_delta(store):
+    judge = ScriptedJudge([v("C"), v("A")])
+    comp = RecordingCompounder()
+    ctrl = LoopController(
+        judge=judge, refiner=FakeRefiner(), compounder=comp,
+        checkpoint=FakeCheckpoint(), store=store, budget=Budget(target_grade="A"),
+    )
+    rid = store.create_run("t", "service", "g", "2026-06-20T00:00:00Z")
+    ctrl.run(rid, "tool/")
+    # C(3) -> A(5) is a grade-rank gain of 2.0, recorded for reuse ranking.
+    assert comp.entries[-1]["grade_delta"] == 2.0
+
+
+# ----- U6/U5 (plan 2026-06-21): ablation reuse-OFF + injected-count --------
+
+
+def test_disable_reuse_suppresses_injection_for_ablation(store):
+    # Seed a prior learning, then run with disable_reuse=True (the reuse-OFF leg).
+    seed = store.create_run("t", "service", "g", "2026-06-20T00:00:00Z")
+    store.record_learning(seed, None, "prior lesson", grade_delta=3.0)
+    refiner = CapturingRefiner()
+    ctrl = LoopController(
+        judge=ScriptedJudge([v("C"), v("A")]), refiner=refiner,
+        compounder=RecordingCompounder(), checkpoint=FakeCheckpoint(),
+        store=store, budget=Budget(target_grade="A"), disable_reuse=True,
+    )
+    rid = store.create_run("t", "service", "g", "2026-06-20T01:00:00Z")
+    ctrl.run(rid, "tool/")
+    assert refiner.briefs[0].reused_learnings == []  # reuse-OFF leg sees nothing
+    assert store.reuse_stats("t")[-1][1] == 0  # injected count recorded as 0
+
+
+def test_injected_count_recorded_when_reuse_on(store):
+    seed = store.create_run("t", "service", "g", "2026-06-20T00:00:00Z")
+    store.record_learning(seed, None, "prior lesson", grade_delta=3.0)
+    ctrl = LoopController(
+        judge=ScriptedJudge([v("C"), v("A")]), refiner=CapturingRefiner(),
+        compounder=RecordingCompounder(), checkpoint=FakeCheckpoint(),
+        store=store, budget=Budget(target_grade="A"),
+    )
+    rid = store.create_run("t", "service", "g", "2026-06-20T01:00:00Z")
+    ctrl.run(rid, "tool/")
+    # reuse ON -> the prior lesson was injected and the count recorded (>=1).
+    assert store.reuse_stats("t")[-1][1] >= 1
