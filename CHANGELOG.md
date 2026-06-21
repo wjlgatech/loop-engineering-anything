@@ -6,6 +6,22 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Spec-synthesis loop — the flywheel's entry stage (plan 2026-06-21, PR-2: U7–U9)** —
+  a vague idea can now enter the loop and be improved into a detailed spec, graded and
+  compounded by the *same* machinery as tool refinement. **U7:** a deterministic rubric
+  **spec-grader** (`adapters/spec_judge.py` + `spec/rubric.py`) scores a spec document on
+  completeness / testability / consistency (cross-reference resolution — a structural
+  proxy, not semantic contradiction detection) / scope-boundedness / grounding, returning
+  a `Verdict`; it reads **only the spec artifact**, so maker≠checker holds for specs (R9),
+  is fail-closed on a missing/unreadable spec, and is deterministic (same spec → same
+  grade). **U8:** `spec/synthesize.py` turns an idea into a first-draft spec (injectable
+  generator; live `ce-plan`/`ce-brainstorm` first-light-gated) and `adapters/spec_refiner.py`
+  rewrites it against the grader's brief — the loop runs through the existing
+  `LoopController` (SpecJudge in the Judge slot, SpecRefiner in the Refiner slot), so
+  convergence/rollback/compound/learning-reuse all apply unchanged. **U9:** the spec stage
+  reuses U6's `flywheel/ablation.py` harness (reuse-ON vs reuse-OFF) to prove compounding.
+  _Scope:_ the live `claude -p` synthesis/refiner wiring and the downstream-outcome oracle
+  proof are first-light-gated. Origin: `docs/plans/2026-06-21-001-feat-learning-reuse-flywheel-plan.md`.
 - **Learning-reuse flywheel — close the loop + measure compounding (plan 2026-06-21, PR-1: U1–U6)** —
   compounded `learnings` were write-only across runs (read back only within the same
   run); now they feed forward. `MemoryStore.prior_learnings(target=...)` retrieves a

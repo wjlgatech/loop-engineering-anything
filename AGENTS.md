@@ -141,6 +141,14 @@ protocol, so the refine engine is selectable:
   (`ablation_result`, `assert_valid_flywheel_proof`) gates a `live_verified` ablation on
   both legs + a matching held-out seed hash. **Instrumentation (U5):**
   `injected_learning_count` + `reuse_stats(target)` are observation-only — never a gate.
+- **Spec-synthesis loop (plan 2026-06-21 U7–U9):** the loop also runs one stage up —
+  idea → spec → grade → refine. `adapters/spec_judge.py` (`SpecJudge`, backed by the
+  deterministic `spec/rubric.py`) is the `Judge` for specs: it reads **only** the spec
+  artifact (maker≠checker for specs, R9), is deterministic + fail-closed. `spec/synthesize.py`
+  drafts the spec (injectable generator; live planning capability first-light-gated) and
+  `adapters/spec_refiner.py` (`SpecRefiner`, injectable `editor`) is the `Refiner`. The loop
+  drives the **existing `LoopController`** (no new engine); the spec stage reuses
+  `flywheel/ablation.py` for its proof.
 - Conventional commits. Run `pytest` before committing; CI runs it on every PR.
 
 ## Workflow
