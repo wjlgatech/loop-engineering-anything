@@ -31,8 +31,9 @@ CREATE TABLE IF NOT EXISTS learnings (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     run_id              INTEGER NOT NULL REFERENCES runs(id),
     iteration_id        INTEGER REFERENCES iterations(id),
-    summary             TEXT NOT NULL,
-    regression_test_ref TEXT
+    summary             TEXT NOT NULL,                 -- sanitized at write (flywheel R4)
+    regression_test_ref TEXT,
+    grade_delta         REAL                           -- grade-rank gain of the accepted fix; ranks cross-run reuse (flywheel U2); nullable for legacy rows
 );
 
 -- Durable scheduler state (U14, R7): a registered target's cadence survives a

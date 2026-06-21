@@ -37,7 +37,10 @@ from .fleet_state import (
     assert_item_transition,
 )
 
+from ..util.sanitize import sanitize_text
+
 _SCHEMA = Path(__file__).with_name("schema.sql")
+_LEARNING_MAX = 600  # bound a persisted learning summary (flywheel R4)
 
 # Grade ranking for trend/plateau math. CLI-Judge grades A-F (no E in the
 # standard scheme); E is mapped defensively in case a suite emits it.
@@ -141,6 +144,9 @@ class MemoryStore:
         it_cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(iterations)").fetchall()}
         if "score" not in it_cols:
             self._conn.execute("ALTER TABLE iterations ADD COLUMN score REAL")
+        ln_cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(learnings)").fetchall()}
+        if "grade_delta" not in ln_cols:  # flywheel U2: cross-run reuse ranking key
+            self._conn.execute("ALTER TABLE learnings ADD COLUMN grade_delta REAL")
 
     @classmethod
     def default(cls) -> "MemoryStore":
@@ -231,12 +237,22 @@ class MemoryStore:
     # ----- learnings ------------------------------------------------------
 
     def record_learning(
-        self, run_id: int, iteration_id: int | None, summary: str, regression_test_ref: str | None = None
+        self,
+        run_id: int,
+        iteration_id: int | None,
+        summary: str,
+        regression_test_ref: str | None = None,
+        grade_delta: float | None = None,
     ) -> int:
+        # Sanitize on the WRITE path (flywheel R4): a learning persists and is later
+        # reused across runs/targets, so it must never carry control/shell metachars
+        # that could forge prompt structure -- scrubbing here covers every reader.
+        clean = sanitize_text(summary, max_len=_LEARNING_MAX)
         with self._wlock:
             cur = self._conn.execute(
-                "INSERT INTO learnings (run_id, iteration_id, summary, regression_test_ref) VALUES (?, ?, ?, ?)",
-                (run_id, iteration_id, summary, regression_test_ref),
+                "INSERT INTO learnings (run_id, iteration_id, summary, regression_test_ref, grade_delta) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (run_id, iteration_id, clean, regression_test_ref, grade_delta),
             )
             self._conn.commit()
             return int(cur.lastrowid)
@@ -247,6 +263,32 @@ class MemoryStore:
                 "SELECT * FROM learnings WHERE run_id = ? ORDER BY id", (run_id,)
             ).fetchall()
         return [dict(r) for r in rows]
+
+    def prior_learnings(
+        self, *, target: str, lane: str | None = None, limit: int = 5
+    ) -> list[str]:
+        """Compounded learning summaries from PRIOR runs, for reuse in a new run's
+        brief (the learning-reuse flywheel, plan 2026-06-21 U2).
+
+        Mirrors ``recurring_failures`` scoping: joins ``learnings`` -> ``runs`` on
+        ``runs.target`` so same-target history is retrieved without leaking across
+        targets (the deliberate U1 isolation boundary). Ranked by ``grade_delta``
+        (the accepted fix's grade-rank gain) then recency (``learnings.id``), capped
+        at ``limit`` (<= the ERL 40-60 noise floor). Returns advisory summary
+        strings -- never grades, and read into the refiner brief only (maker != checker).
+
+        ``lane`` is accepted for the cross-target branch (U4) but unused here; this
+        unit retrieves same-target only.
+        """
+        with self._wlock:
+            rows = self._conn.execute(
+                "SELECT l.summary AS summary FROM learnings l JOIN runs r ON l.run_id = r.id "
+                "WHERE r.target = ? "
+                "ORDER BY (l.grade_delta IS NULL), l.grade_delta DESC, l.id DESC "
+                "LIMIT ?",
+                (target, limit),
+            ).fetchall()
+        return [row["summary"] for row in rows]
 
     # ----- confirmations (human-confirm gate audit, U5) -------------------
 
@@ -563,6 +605,56 @@ class MemoryStore:
                 counts.setdefault(fixture, set()).add(row["run_id"])
         result = [(fx, len(runs)) for fx, runs in counts.items() if len(runs) >= min_runs]
         return sorted(result, key=lambda x: (-x[1], x[0]))
+
+    # ----- flywheel instrumentation (plan 2026-06-21 U1) ------------------
+    # Cross-run trend queries that make compounding *measurable*: does a run
+    # converge faster / start higher because prior runs accumulated learnings?
+    # All read-only, metadata-only (counts/grades), ordered by runs.started so the
+    # series is a usage timeline. A stateless run cannot answer these.
+
+    def iterations_to_converge_series(self, target: str) -> list[tuple[int, int]]:
+        """For each CONVERGED run of ``target`` (oldest first), ``(run_id, n_iters)``
+        where ``n_iters`` is the iteration count. A downward trend over usage is the
+        core compounding signal."""
+        with self._wlock:
+            rows = self._conn.execute(
+                "SELECT r.id AS run_id, COUNT(i.id) AS n FROM runs r "
+                "JOIN iterations i ON i.run_id = r.id "
+                "WHERE r.target = ? AND r.status = 'converged' "
+                "GROUP BY r.id ORDER BY r.started ASC, r.id ASC",
+                (target,),
+            ).fetchall()
+        return [(row["run_id"], row["n"]) for row in rows]
+
+    def first_attempt_grade_series(self, target: str) -> list[tuple[int, str]]:
+        """For each run of ``target`` (oldest first), the grade of its FIRST
+        iteration (``n=1``). A rising trend means the loop starts from a better
+        place as learnings accumulate (pass@1-attempt)."""
+        with self._wlock:
+            rows = self._conn.execute(
+                "SELECT r.id AS run_id, i.grade AS grade FROM runs r "
+                "JOIN iterations i ON i.run_id = r.id AND i.n = 1 "
+                "WHERE r.target = ? ORDER BY r.started ASC, r.id ASC",
+                (target,),
+            ).fetchall()
+        return [(row["run_id"], row["grade"]) for row in rows]
+
+    def compounding_summary(self, target: str) -> dict:
+        """Metadata-only compounding snapshot for ``target`` (U1 report surface):
+        the two trend series plus a coarse ``converged_iters_trend`` direction so a
+        report/dashboard can show "faster with usage" without recomputing."""
+        iters = self.iterations_to_converge_series(target)
+        trend = "n/a"
+        if len(iters) >= 2:
+            first, last = iters[0][1], iters[-1][1]
+            trend = "improving" if last < first else "flat" if last == first else "regressing"
+        return {
+            "target": target,
+            "converged_runs": len(iters),
+            "iterations_to_converge": iters,
+            "converged_iters_trend": trend,
+            "first_attempt_grades": self.first_attempt_grade_series(target),
+        }
 
     # ----- row mappers ----------------------------------------------------
 
