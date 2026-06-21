@@ -161,3 +161,39 @@ def test_judge_fails_closed_on_wrong_shape_report(tmp_path, monkeypatch):
     v = CLIJudge(adapter_path="x").judge(str(tool))
     assert v.grade == "F"
     assert v.safety_ok is False
+
+
+# ----- U4 (plan 2026-06-20): dimension-level ASI feedback, sanitized at source -----
+
+from loopeng.adapters.base import Verdict as _Verdict  # noqa: E402
+
+
+def test_feedback_is_dimension_level_not_per_fixture():
+    data = {
+        "grade": "C", "score": 60,
+        "dimensions": {"D1": {"points": 7, "max_points": 30}, "D2": {"points": 18, "max_points": 20}},
+        "tasks": [{"id": "pagination_drift", "points": 0, "max_points": 5},
+                  {"id": "auth_header", "points": 5, "max_points": 5}],
+    }
+    fb = parse_report(data).feedback
+    assert fb  # non-empty
+    assert "D1" in fb and "7/30" in fb       # dimension-level
+    assert "1 of 2 checks lost points" in fb  # aggregate count
+    assert "pagination_drift" not in fb       # NOT a per-fixture gaming map
+
+
+def test_feedback_sanitized_at_source():
+    data = {"grade": "C", "score": 1, "dimensions": {"D`$;|x": {"points": 1, "max_points": 2}}}
+    fb = parse_report(data).feedback
+    assert "`" not in fb and "$" not in fb and ";" not in fb and "|" not in fb
+
+
+def test_feedback_empty_when_no_task_or_max_detail():
+    # Older scalar-dims shape -> no per-dimension max, no tasks -> graceful "".
+    v = parse_report({"grade": "B", "score": 80, "dimensions": {"correctness": 30}})
+    assert v.feedback == ""
+    assert v.grade == "B" and v.dims["correctness"] == 30  # existing behavior intact
+
+
+def test_verdict_constructs_without_feedback():
+    assert _Verdict(grade="A", score=1.0, dims={}, safety_ok=True).feedback == ""

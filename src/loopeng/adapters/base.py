@@ -30,6 +30,11 @@ class Verdict:
     dims: dict  # per-dimension scores, e.g. {"correctness": 30, "safety": 20, ...}
     safety_ok: bool
     failing_fixtures: list = field(default_factory=list)
+    # Bounded, dimension-level textual "why" distilled from the referee's per-task
+    # detail (plan 2026-06-20 U4), sanitized at source. Defaulted + not persisted to
+    # the NOT-NULL schema, so the fleet consumer and storage are unaffected (KTD1).
+    # The controller copies it into ``ReflectionContext.judge_feedback`` (U2).
+    feedback: str = ""
 
 
 @dataclass(frozen=True)
@@ -58,6 +63,43 @@ class Judge(Protocol):
 
 
 @dataclass(frozen=True)
+class ReflectionContext:
+    """Trace-driven "Actionable Side Information" carried across refine iterations
+    (plan 2026-06-20 U1).
+
+    The outer loop's analogue of a gradient (GEPA ``optimize_anything``): instead
+    of building each brief from the latest Verdict alone, the controller carries
+    *why* the last attempt scored what it did into the next brief so the refiner
+    reflects rather than blindly re-refactors. Every field is defaulted so
+    ``ReflectionContext()`` is valid and a brief without reflection is unchanged
+    (KTD1). It is **judge-sourced only** -- never the refiner's self-report
+    (maker != checker, KTD3).
+    """
+
+    prior_grade: str = ""
+    prior_score: float = 0.0
+    prior_dims: dict = field(default_factory=dict)
+    # Diff summary of the edit just tried; ``None`` on the first iteration and on a
+    # compression pass (verdict replaced with no refactor diff).
+    attempted: str | None = None
+    # What happened to the last attempt: "first" | "accepted" | "rolled_back" |
+    # "reversed" (a fork-resolver overrule -- the grade may have improved but the
+    # change was reversed). Drives whether the refiner is told to keep building or
+    # to try a *materially different* approach.
+    outcome: str = "first"
+    # Fixtures failing now AND in a prior KEPT iteration this run (computed over the
+    # loop-local accepted-verdict lineage, NOT raw store rows which also hold
+    # rejected attempts). These have resisted edits -- attack them differently.
+    persistent_fixtures: list = field(default_factory=list)
+    # Fixtures failing now but not seen earlier in this run.
+    new_fixtures: list = field(default_factory=list)
+    # Bounded, dimension-level textual "why" distilled from the judge's per-task
+    # detail (U4), sanitized at source. "" when the report carries no task detail
+    # (graceful degradation to scalar reflection).
+    judge_feedback: str = ""
+
+
+@dataclass(frozen=True)
 class RefactorBrief:
     """Instruction handed to the refinement engine (built from a Verdict)."""
 
@@ -73,6 +115,10 @@ class RefactorBrief:
     # store-derived fixture strings; this is structured cross-item outcome dicts
     # routed by the fleet coordinator. Empty for a non-fleet (single-target) run.
     upstream_outcomes: list = field(default_factory=list)
+    # Trace-driven reflective context for this iteration (plan 2026-06-20 U2);
+    # ``None`` on the first iteration and for refiners/callers that don't supply it.
+    # Read by refiners via ``getattr`` so an older refiner is harmless (KTD1).
+    reflection: "ReflectionContext | None" = None
 
 
 @runtime_checkable
