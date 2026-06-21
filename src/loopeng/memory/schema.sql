@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS runs (
     status      TEXT NOT NULL DEFAULT 'running',  -- running|converged|blocked_safety|stopped
     final_grade TEXT,
     started     TEXT NOT NULL,                     -- ISO-8601, supplied by caller
-    finished    TEXT                               -- ISO-8601 wall-clock end (proof-pack elapsed); nullable
+    finished    TEXT,                              -- ISO-8601 wall-clock end (proof-pack elapsed); nullable
+    injected_learning_count INTEGER                -- reused prior learnings injected into this run's briefs (flywheel U5); nullable
 );
 
 CREATE TABLE IF NOT EXISTS iterations (

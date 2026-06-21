@@ -806,3 +806,36 @@ def test_accepted_fix_records_grade_delta(store):
     ctrl.run(rid, "tool/")
     # C(3) -> A(5) is a grade-rank gain of 2.0, recorded for reuse ranking.
     assert comp.entries[-1]["grade_delta"] == 2.0
+
+
+# ----- U6/U5 (plan 2026-06-21): ablation reuse-OFF + injected-count --------
+
+
+def test_disable_reuse_suppresses_injection_for_ablation(store):
+    # Seed a prior learning, then run with disable_reuse=True (the reuse-OFF leg).
+    seed = store.create_run("t", "service", "g", "2026-06-20T00:00:00Z")
+    store.record_learning(seed, None, "prior lesson", grade_delta=3.0)
+    refiner = CapturingRefiner()
+    ctrl = LoopController(
+        judge=ScriptedJudge([v("C"), v("A")]), refiner=refiner,
+        compounder=RecordingCompounder(), checkpoint=FakeCheckpoint(),
+        store=store, budget=Budget(target_grade="A"), disable_reuse=True,
+    )
+    rid = store.create_run("t", "service", "g", "2026-06-20T01:00:00Z")
+    ctrl.run(rid, "tool/")
+    assert refiner.briefs[0].reused_learnings == []  # reuse-OFF leg sees nothing
+    assert store.reuse_stats("t")[-1][1] == 0  # injected count recorded as 0
+
+
+def test_injected_count_recorded_when_reuse_on(store):
+    seed = store.create_run("t", "service", "g", "2026-06-20T00:00:00Z")
+    store.record_learning(seed, None, "prior lesson", grade_delta=3.0)
+    ctrl = LoopController(
+        judge=ScriptedJudge([v("C"), v("A")]), refiner=CapturingRefiner(),
+        compounder=RecordingCompounder(), checkpoint=FakeCheckpoint(),
+        store=store, budget=Budget(target_grade="A"),
+    )
+    rid = store.create_run("t", "service", "g", "2026-06-20T01:00:00Z")
+    ctrl.run(rid, "tool/")
+    # reuse ON -> the prior lesson was injected and the count recorded (>=1).
+    assert store.reuse_stats("t")[-1][1] >= 1

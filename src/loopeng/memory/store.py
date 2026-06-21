@@ -37,7 +37,7 @@ from .fleet_state import (
     assert_item_transition,
 )
 
-from ..util.sanitize import sanitize_text
+from ..util.sanitize import redact_specifics, sanitize_text
 
 _SCHEMA = Path(__file__).with_name("schema.sql")
 _LEARNING_MAX = 600  # bound a persisted learning summary (flywheel R4)
@@ -147,6 +147,8 @@ class MemoryStore:
         ln_cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(learnings)").fetchall()}
         if "grade_delta" not in ln_cols:  # flywheel U2: cross-run reuse ranking key
             self._conn.execute("ALTER TABLE learnings ADD COLUMN grade_delta REAL")
+        if "injected_learning_count" not in cols:  # flywheel U5: reuse instrumentation
+            self._conn.execute("ALTER TABLE runs ADD COLUMN injected_learning_count INTEGER")
 
     @classmethod
     def default(cls) -> "MemoryStore":
@@ -265,30 +267,48 @@ class MemoryStore:
         return [dict(r) for r in rows]
 
     def prior_learnings(
-        self, *, target: str, lane: str | None = None, limit: int = 5
+        self,
+        *,
+        target: str,
+        lane: str | None = None,
+        limit: int = 5,
+        cross_target: bool = False,
+        min_cross_target_delta: float = 1.0,
     ) -> list[str]:
         """Compounded learning summaries from PRIOR runs, for reuse in a new run's
-        brief (the learning-reuse flywheel, plan 2026-06-21 U2).
+        brief (the learning-reuse flywheel, plan 2026-06-21 U2/U4).
 
         Mirrors ``recurring_failures`` scoping: joins ``learnings`` -> ``runs`` on
-        ``runs.target`` so same-target history is retrieved without leaking across
-        targets (the deliberate U1 isolation boundary). Ranked by ``grade_delta``
-        (the accepted fix's grade-rank gain) then recency (``learnings.id``), capped
-        at ``limit`` (<= the ERL 40-60 noise floor). Returns advisory summary
-        strings -- never grades, and read into the refiner brief only (maker != checker).
+        ``runs.target``. Ranked by ``grade_delta`` (the accepted fix's grade-rank
+        gain) then recency (``learnings.id``), capped at ``limit`` (<= the ERL 40-60
+        noise floor). Returns advisory summary strings -- never grades, read into the
+        refiner brief only (maker != checker).
 
-        ``lane`` is accepted for the cross-target branch (U4) but unused here; this
-        unit retrieves same-target only.
+        Same-target learnings are ALWAYS returned first. When ``cross_target`` and
+        ``lane`` are set (U4), same-``lane`` OTHER-target learnings are appended,
+        **demoted**, gated by ``min_cross_target_delta`` (relevance threshold), and
+        **redacted** of target-specific tokens (URLs/paths/ids) so one target's
+        specifics don't leak into another's brief (R7). Same-target stays unredacted.
+        Total is capped at ``limit``.
         """
         with self._wlock:
-            rows = self._conn.execute(
+            same = self._conn.execute(
                 "SELECT l.summary AS summary FROM learnings l JOIN runs r ON l.run_id = r.id "
                 "WHERE r.target = ? "
                 "ORDER BY (l.grade_delta IS NULL), l.grade_delta DESC, l.id DESC "
                 "LIMIT ?",
                 (target, limit),
             ).fetchall()
-        return [row["summary"] for row in rows]
+            out = [row["summary"] for row in same]
+            if cross_target and lane is not None and len(out) < limit:
+                cross = self._conn.execute(
+                    "SELECT l.summary AS summary FROM learnings l JOIN runs r ON l.run_id = r.id "
+                    "WHERE r.lane = ? AND r.target != ? AND l.grade_delta >= ? "
+                    "ORDER BY l.grade_delta DESC, l.id DESC LIMIT ?",
+                    (lane, target, min_cross_target_delta, limit - len(out)),
+                ).fetchall()
+                out.extend(redact_specifics(row["summary"]) for row in cross)
+        return out
 
     # ----- confirmations (human-confirm gate audit, U5) -------------------
 
@@ -638,6 +658,31 @@ class MemoryStore:
                 (target,),
             ).fetchall()
         return [(row["run_id"], row["grade"]) for row in rows]
+
+    def record_injected_count(self, run_id: int, count: int) -> None:
+        """Record how many reused prior learnings were injected into this run's
+        briefs (flywheel U5). Observation-only -- never read into convergence."""
+        with self._wlock:
+            self._conn.execute(
+                "UPDATE runs SET injected_learning_count = ? WHERE id = ?", (count, run_id)
+            )
+            self._conn.commit()
+
+    def reuse_stats(self, target: str) -> list[tuple[int, int | None, int, str]]:
+        """Per-run reuse instrumentation for ``target`` (oldest first):
+        ``(run_id, injected_learning_count, n_iters, status)``. Lets a report show
+        injection rate over usage and spot negative transfer (runs that injected
+        learnings yet did not converge faster). Observation-only (Goodhart guard,
+        grade-independent); never an acceptance gate."""
+        with self._wlock:
+            rows = self._conn.execute(
+                "SELECT r.id AS run_id, r.injected_learning_count AS inj, "
+                "COUNT(i.id) AS n, r.status AS status FROM runs r "
+                "LEFT JOIN iterations i ON i.run_id = r.id "
+                "WHERE r.target = ? GROUP BY r.id ORDER BY r.started ASC, r.id ASC",
+                (target,),
+            ).fetchall()
+        return [(row["run_id"], row["inj"], row["n"], row["status"]) for row in rows]
 
     def compounding_summary(self, target: str) -> dict:
         """Metadata-only compounding snapshot for ``target`` (U1 report surface):

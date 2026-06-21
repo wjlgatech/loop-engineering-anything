@@ -85,6 +85,8 @@ class LoopController:
         resolver=None,
         sleeper=time.sleep,
         upstream_context=None,
+        reuse_cross_target=False,
+        disable_reuse=False,
     ):
         self.judge = judge
         self.refiner = refiner
@@ -102,6 +104,12 @@ class LoopController:
         # Upstream fleet-item outcomes routed into this run's briefs (plan-006 U3).
         # Empty/None for a non-fleet single-target run -> identical to prior behavior.
         self.upstream_context = list(upstream_context or [])
+        # Learning-reuse flywheel knobs (plan 2026-06-21). ``reuse_cross_target``
+        # opts into same-lane other-target reuse (U4; off by default, gated on a
+        # positive same-target signal). ``disable_reuse`` suppresses reuse entirely
+        # for an ablation's reuse-OFF leg (U6) -- forced empty, not a store race.
+        self.reuse_cross_target = reuse_cross_target
+        self.disable_reuse = disable_reuse
 
     def run(self, run_id: int, tool_path: str, goal: str = "") -> LoopOutcome:
         # Initial grade.
@@ -124,13 +132,21 @@ class LoopController:
             if run is not None
             else []
         )
-        # Learning-reuse flywheel (plan 2026-06-21 U3): compounded learnings from
-        # PRIOR runs of this target, retrieved once and threaded into every brief.
-        # Feeds the refiner brief ONLY -- never self.judge (maker != checker). Empty
-        # on a target's first run, so behavior degrades to today's loop.
-        reused_learnings = (
-            self.store.prior_learnings(target=run.target) if run is not None else []
-        )
+        # Learning-reuse flywheel (plan 2026-06-21 U3/U4): compounded learnings from
+        # PRIOR runs of this target (and, when opted in, same-lane other targets),
+        # retrieved once and threaded into every brief. Feeds the refiner brief ONLY
+        # -- never self.judge (maker != checker). Empty on a target's first run, or
+        # when reuse is disabled for an ablation's reuse-OFF leg (U6), so behavior
+        # degrades to today's loop.
+        if run is not None and not self.disable_reuse:
+            reused_learnings = self.store.prior_learnings(
+                target=run.target, lane=run.lane, cross_target=self.reuse_cross_target
+            )
+        else:
+            reused_learnings = []
+        # Reuse instrumentation (U5): how many prior learnings this run injected.
+        # Observation-only -- never read into convergence/acceptance.
+        self.store.record_injected_count(run_id, len(reused_learnings))
 
         # Plateau-pivot state (U2): on a sole plateau, rotate to the next-lowest
         # dimension once (per pivot budget) before stopping. ``pivot_offset`` resets

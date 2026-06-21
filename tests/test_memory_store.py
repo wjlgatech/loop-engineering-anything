@@ -327,3 +327,51 @@ def test_compounding_summary_trend(store):
     s = store.compounding_summary("t")
     assert s["converged_runs"] == 2
     assert s["converged_iters_trend"] == "improving"  # 5 -> 2
+
+
+# ----- U4 cross-target reuse (lane-scoped, demoted, redacted) --------------
+
+
+def test_cross_target_reuse_is_opt_in_and_demoted(store):
+    a = store.create_run("targetA", "service", "g", "2026-06-20T00:00:00Z")
+    store.record_learning(a, None, "use keyset pagination", grade_delta=3.0)
+    b = store.create_run("targetB", "service", "g", "2026-06-20T01:00:00Z")
+    store.record_learning(b, None, "B-own lesson", grade_delta=1.0)
+    # cross_target OFF -> only B's own.
+    assert store.prior_learnings(target="targetB", lane="service") == ["B-own lesson"]
+    # cross_target ON -> B's own first, then A's (demoted).
+    got = store.prior_learnings(target="targetB", lane="service", cross_target=True)
+    assert got[0] == "B-own lesson" and "use keyset pagination" in got[1]
+
+
+def test_cross_target_redacts_target_specifics(store):
+    a = store.create_run("targetA", "service", "g", "2026-06-20T00:00:00Z")
+    store.record_learning(a, None, "fix GET /v2/users/42 at api.go cache", grade_delta=3.0)
+    store.create_run("targetB", "service", "g", "2026-06-20T01:00:00Z")
+    got = store.prior_learnings(target="targetB", lane="service", cross_target=True)
+    assert got, "cross-target learning should be returned"
+    joined = " ".join(got)
+    assert "/v2/users/42" not in joined and "api.go" not in joined  # paths redacted
+    assert "<redacted>" in joined
+
+
+def test_cross_target_respects_lane_and_threshold(store):
+    a = store.create_run("targetA", "service", "g", "2026-06-20T00:00:00Z")
+    store.record_learning(a, None, "low-value", grade_delta=0.0)  # below threshold
+    c = store.create_run("targetC", "codebase", "g", "2026-06-20T00:30:00Z")
+    store.record_learning(c, None, "other-lane lesson", grade_delta=5.0)
+    store.create_run("targetB", "service", "g", "2026-06-20T01:00:00Z")
+    got = store.prior_learnings(target="targetB", lane="service", cross_target=True)
+    assert got == []  # A filtered by threshold; C excluded by lane
+
+
+# ----- U5 reuse instrumentation -------------------------------------------
+
+
+def test_record_injected_count_and_reuse_stats(store):
+    r1 = _conv_run(store, "t", "2026-06-18T00:00:00Z", n_iters=3)
+    store.record_injected_count(r1, 0)
+    r2 = _conv_run(store, "t", "2026-06-19T00:00:00Z", n_iters=2)
+    store.record_injected_count(r2, 4)
+    stats = store.reuse_stats("t")
+    assert [(inj, n) for _, inj, n, _ in stats] == [(0, 3), (4, 2)]  # oldest first
