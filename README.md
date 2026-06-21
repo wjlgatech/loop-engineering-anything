@@ -183,6 +183,7 @@ One command, unattended. Wake up to a converged tool, a full grade trajectory, a
 | --- | --- |
 | **🔁 Multi-signal convergence** | Stops at the first of: target grade reached, plateau (no gain over N), iteration/token budget, or a safety block. No single "until Grade A" naïveté. |
 | **🪞 Reflective refinement** | Each refactor brief carries *why the last attempt scored what it did* — the referee's dimension-level feedback, which failures keep resisting, and whether the prior edit was kept or rolled back — so the refiner aims instead of re-guessing blind (the GEPA "actionable side information" idea, borrowed additively; judge-sourced only, so maker≠checker holds). |
+| **♻️ Learning-reuse flywheel** | Lessons compounded on *past* runs of a target are retrieved and fed into *future* runs' briefs (ranked by the grade gain they produced), so accumulated usage makes each run start less blind — and per-target trend queries make the compounding *measurable* (does it converge faster as history grows?). Reused lessons feed the refiner only, never the referee (maker≠checker), and are sanitized on the way into storage. |
 | **🛡️ Unbypassable safety gate** | A safety-failing verdict is a terminal `BLOCKED_SAFETY` state — the change is rolled back and the tool can never ship. |
 | **↩️ Regression rollback** | A refactor that doesn't raise the grade is reverted to the prior git checkpoint; the better verdict is kept. |
 | **📚 Compound-on-accept** | `/ce-compound` fires **only** on a kept improvement — never on a transient gain that's later rolled back. |

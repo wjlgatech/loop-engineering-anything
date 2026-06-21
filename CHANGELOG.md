@@ -6,6 +6,23 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Learning-reuse flywheel — close the loop + measure compounding (plan 2026-06-21, PR-1 core: U1–U3)** —
+  compounded `learnings` were write-only across runs (read back only within the same
+  run); now they feed forward. `MemoryStore.prior_learnings(target=...)` retrieves a
+  target's prior-run learnings (ranked by a new `grade_delta` column then recency,
+  capped at the ERL noise floor), and `LoopController` injects them once per run into
+  every `RefactorBrief` via a new defaulted `reused_learnings` field, rendered in both
+  refiners. So a lesson learned on run N makes run N+1 start less blind. **Maker≠checker
+  preserved:** reused learnings feed the refiner brief only — never the judge (a canary
+  test proves the judge receives only `tool_path`). Learning summaries are **sanitized
+  on the write path** (`record_learning`, via the new shared `util/sanitize.py`) so
+  unsanitized text never persists or crosses runs. Compounding is now **measurable**:
+  `iterations_to_converge_series` / `first_attempt_grade_series` / `compounding_summary`
+  give per-target trend queries (does a run converge faster because prior runs
+  accumulated?). The `Compounder.compound` protocol gains a defaulted `grade_delta`.
+  _Scope:_ cross-target reuse (U4), reuse-rate metrics (U5), the anti-gaming proof
+  harness (U6), and the spec-synthesis loop (U7–U9) follow; U6's live proof is
+  first-light-gated. Origin: `docs/plans/2026-06-21-001-feat-learning-reuse-flywheel-plan.md`.
 - **Reflective refine loop — trace-driven mutation (GEPA `optimize_anything` borrow, additive)** —
   the refine loop no longer builds each brief from the latest `Verdict` alone. The
   controller now carries a **`ReflectionContext`** (`adapters/base.py`) across

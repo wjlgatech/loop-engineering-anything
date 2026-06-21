@@ -125,6 +125,15 @@ protocol, so the refine engine is selectable:
   self-report (maker≠checker). `Verdict.feedback` is dimension-level and
   **sanitized at source** (`judge._sanitize_feedback`) so it is safe to render into
   either refiner prompt; renderers share `adapters/reflection_render.py`.
+- **Learning-reuse flywheel (plan 2026-06-21):** `RefactorBrief.reused_learnings`
+  carries a target's prior-run compounded learnings, retrieved once per run by
+  `MemoryStore.prior_learnings(target=...)` (ranked by the `learnings.grade_delta`
+  column, then recency). It feeds the **refiner brief only — never the `Judge`**
+  (maker≠checker; a canary test enforces this). Learning summaries are sanitized on
+  the **write path** (`record_learning` → shared `util/sanitize.py`), so unsanitized
+  text never persists or crosses runs. `Compounder.compound` takes a defaulted
+  `grade_delta`. Cross-run compounding is measurable via the `*_series` /
+  `compounding_summary` store queries.
 - Conventional commits. Run `pytest` before committing; CI runs it on every PR.
 
 ## Workflow
