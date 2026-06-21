@@ -139,6 +139,13 @@ loop-anything preflight
 Per change that alters behavior: add a `CHANGELOG.md` entry under `[Unreleased]`
 and sync the docs the change touches (README, this file, the plan's tables).
 
+**Doc-sync is enforced, not optional.** A `pre-push` guard
+(`scripts/doc-sync-prepush.sh`) blocks pushing a branch whose diff vs the default
+branch changes feature code without (1) a `CHANGELOG.md` entry, (2) a human doc
+(`README.md` or `docs/**`), and (3) an agent guide (`CLAUDE.md`/`AGENTS.md`).
+Enable it once per clone: `~/.claude/scripts/install-doc-sync.sh`. Conscious
+bypass for genuinely doc-free changes: `SKIP_DOC_SYNC=1 git push …`.
+
 ## Feasibility gates (mechanism resolved; empirical validation pending)
 
 1. **Headless refinement** — `/ce-work` and `/ce-compound` are driven via
