@@ -81,3 +81,24 @@ def test_no_upstream_outcomes_defaults_empty():
     v = _verdict(failing=["x"])
     brief = build_refactor_brief(v, "g")
     assert brief.upstream_outcomes == []
+
+
+# ----- U2 (plan 2026-06-20): reflection threading (pure) -------------------
+
+from loopeng.adapters.base import ReflectionContext  # noqa: E402
+
+
+def test_brief_without_reflection_is_unchanged():
+    # build_refactor_brief(..., reflection=None) attaches no reflection and keeps
+    # every prior field exactly as before (no regression to the U1 contract).
+    v = _verdict(dims={"a": 10, "b": 5}, failing=["fx1"])
+    brief = build_refactor_brief(v, "goal")
+    assert brief.reflection is None
+    assert brief.goal == "goal"
+    assert brief.failing_fixtures == ["fx1"]
+
+
+def test_brief_threads_reflection_through():
+    rc = ReflectionContext(prior_grade="C", outcome="rolled_back")
+    brief = build_refactor_brief(_verdict(), "goal", reflection=rc)
+    assert brief.reflection is rc

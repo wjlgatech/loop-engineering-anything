@@ -113,6 +113,55 @@ def derive_safety_ok(data: dict, dims: dict, *, strict_unknown: bool = False) ->
     return not strict_unknown
 
 
+_FEEDBACK_MAX = 600  # bound the ASI text -- a dimension-level summary, not a transcript
+_SHELL_METACHARS = frozenset("`$;|&><\\\"'")
+
+
+def _sanitize_feedback(text: str) -> str:
+    """Strip control characters + shell metacharacters and bound length, so the
+    distilled ASI text is safe to render into *either* refiner's prompt with no
+    per-path asymmetry (plan 2026-06-20 U4 / R4). Sanitizing at the source means
+    the un-clipped ClaudeCodeRefiner path is as safe as the _clip'd LLM path."""
+    cleaned = "".join(
+        ch for ch in str(text)
+        if (ch == " " or ch.isprintable()) and ch not in _SHELL_METACHARS
+    )
+    return cleaned[:_FEEDBACK_MAX].strip()
+
+
+def _distill_feedback(data: dict, dims_raw: dict) -> str:
+    """Compose a deterministic, DIMENSION-LEVEL 'why' from the referee's per-task
+    detail -- the GEPA "Actionable Side Information" gradient (U4).
+
+    Deliberately NOT a per-fixture point map: naming the exact lossiest fixtures by
+    score would hand the refiner a precise gaming target and risk amplifying the
+    OPEN-P0 cosmetic-edit risk. Returns "" when no usable detail exists (older
+    report shape) -> graceful degradation to scalar reflection.
+    """
+    parts: list[str] = []
+    losses: list[tuple[str, float, float]] = []
+    for name, val in dims_raw.items():
+        if isinstance(val, dict) and ("max_points" in val or "max" in val):
+            pts = float(val.get("points", val.get("score", 0)) or 0)
+            mx = float(val.get("max_points", val.get("max", 0)) or 0)
+            if mx > 0:
+                losses.append((str(name), pts, mx))
+    if losses:
+        losses.sort(key=lambda t: t[1] / t[2])
+        worst = "; ".join(f"{n} {_num(p)}/{_num(m)}" for n, p, m in losses[:3])
+        parts.append(f"weakest dimensions: {worst}")
+    tasks = data.get("tasks") or []
+    if isinstance(tasks, list) and tasks:
+        lost = sum(1 for t in tasks if isinstance(t, dict) and t.get("points", 0) < t.get("max_points", 0))
+        if lost:
+            parts.append(f"{lost} of {len(tasks)} checks lost points")
+    return _sanitize_feedback(". ".join(parts)) if parts else ""
+
+
+def _num(x: float) -> str:
+    return str(int(x)) if x == int(x) else str(x)
+
+
 def parse_report(data: dict, *, strict_unknown: bool = False) -> Verdict:
     grade = (data.get("grade") or data.get("final_grade") or "").strip().upper()
     score = float(data.get("score", data.get("total", 0)) or 0)
@@ -138,7 +187,11 @@ def parse_report(data: dict, *, strict_unknown: bool = False) -> Verdict:
             for t in data.get("tasks", [])
             if t.get("points", 0) < t.get("max_points", 0)
         ]
-    return Verdict(grade=grade, score=score, dims=dims, safety_ok=safety_ok, failing_fixtures=list(failing))
+    feedback = _distill_feedback(data, dims_raw)
+    return Verdict(
+        grade=grade, score=score, dims=dims, safety_ok=safety_ok,
+        failing_fixtures=list(failing), feedback=feedback,
+    )
 
 
 class CLIJudge:

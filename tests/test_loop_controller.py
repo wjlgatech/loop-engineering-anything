@@ -635,3 +635,104 @@ def test_controller_without_fork_cards_behaves_as_before(store):
     outcome = ctrl.run(run_id, "tool/")
     assert outcome.final_state is LoopState.CONVERGED
     assert outcome.fork_cards == []
+
+
+# ----- U2 (plan 2026-06-20): reflective context across iterations ----------
+
+
+class CapturingForkRefiner(CapturingRefiner):
+    """CapturingRefiner that also emits fork cards on the first refactor (for the
+    reversed-outcome path)."""
+
+    def __init__(self, cards):
+        super().__init__()
+        self.cards = cards
+        self.last_fork_cards: list = []
+
+    def refactor(self, tool_path, brief):
+        self.last_fork_cards = list(self.cards) if not self.briefs else []
+        return super().refactor(tool_path, brief)
+
+
+def _reflect_ctrl(store, judge, refiner, budget=None, **kw):
+    return LoopController(
+        judge=judge, refiner=refiner, compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(), store=store,
+        budget=budget or Budget(target_grade="A"), **kw,
+    )
+
+
+def test_first_brief_has_no_reflection(store):
+    judge = ScriptedJudge([v("C"), v("A")])
+    refiner = CapturingRefiner()
+    _reflect_ctrl(store, judge, refiner).run(
+        store.create_run("t", "service", "g", "2026-06-20T00:00:00Z"), "tool/"
+    )
+    assert refiner.briefs[0].reflection is None  # nothing tried yet
+
+
+def test_rolled_back_outcome_carries_kept_verdict(store):
+    judge = ScriptedJudge([v("C"), v("C"), v("A")])  # no-gain -> rollback, then A
+    refiner = CapturingRefiner()
+    _reflect_ctrl(store, judge, refiner, Budget(target_grade="A", plateau_patience=99)).run(
+        store.create_run("t", "service", "g", "2026-06-20T00:00:00Z"), "tool/"
+    )
+    rc = refiner.briefs[1].reflection
+    assert rc is not None and rc.outcome == "rolled_back"
+    assert rc.prior_grade == "C"  # the KEPT verdict, not the rejected attempt
+    assert rc.attempted is not None
+
+
+def test_accepted_outcome_reflects_new_kept_verdict(store):
+    judge = ScriptedJudge([v("C"), v("B"), v("A")])
+    refiner = CapturingRefiner()
+    _reflect_ctrl(store, judge, refiner, Budget(target_grade="A")).run(
+        store.create_run("t", "service", "g", "2026-06-20T00:00:00Z"), "tool/"
+    )
+    rc = refiner.briefs[1].reflection
+    assert rc.outcome == "accepted"
+    assert rc.prior_grade == "B"  # the newly-kept verdict
+
+
+def test_reversed_outcome_even_when_grade_improved(store):
+    judge = ScriptedJudge([v("C"), v("A")])
+    refiner = CapturingForkRefiner([_fc(chosen_default="a")])
+    resolver = Resolver(FakeGroundedOracle("b"))  # overrules default -> reverse
+    _reflect_ctrl(store, judge, refiner, Budget(max_iterations=3), resolver=resolver).run(
+        store.create_run("t", "service", None, "2026-06-20T00:00:00Z"), "tool/"
+    )
+    rc = refiner.briefs[1].reflection
+    assert rc.outcome == "reversed"  # grade went C->A but the fork reversal won
+
+
+def test_compression_pass_carries_attempted_none(store):
+    judge = ScriptedJudge([v("C"), v("B"), v("A")])
+    refiner = CapturingRefiner()
+    compressor = RecordingCompressor(after_verdict=v("B"))
+    LoopController(
+        judge=judge, refiner=refiner, compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(), store=store,
+        budget=Budget(target_grade="A", compression_interval=1), compressor=compressor,
+    ).run(store.create_run("t", "service", None, "2026-06-20T00:00:00Z"), "tool/")
+    # The iteration after a compression pass must not claim a diff produced the grade.
+    rc = refiner.briefs[1].reflection
+    assert rc is not None and rc.attempted is None
+
+
+def test_persistent_split_uses_kept_lineage_not_store_rows(store):
+    # Baseline fails F,G (kept across rollbacks). Rejected attempts carry an extra
+    # H that never enters a kept verdict, so H must appear in neither bucket.
+    judge = ScriptedJudge([
+        v("C", fixtures=["F", "G"]),
+        v("C", fixtures=["F", "H"]),  # rejected attempt (no gain) -> rolled back
+        v("C", fixtures=["F", "H"]),  # rejected again
+        v("A"),
+    ])
+    refiner = CapturingRefiner()
+    _reflect_ctrl(store, judge, refiner, Budget(target_grade="A", plateau_patience=99)).run(
+        store.create_run("t", "service", "g", "2026-06-20T00:00:00Z"), "tool/"
+    )
+    rc = refiner.briefs[2].reflection  # third brief, after two kept iterations
+    assert set(rc.persistent_fixtures) == {"F", "G"}  # both failed across kept states
+    assert rc.new_fixtures == []
+    assert "H" not in rc.persistent_fixtures and "H" not in rc.new_fixtures  # store-only row excluded

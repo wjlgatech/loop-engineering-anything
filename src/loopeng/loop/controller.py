@@ -23,7 +23,7 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 
-from ..adapters.base import Checkpoint, Compounder, Judge, Refiner, Verdict
+from ..adapters.base import Checkpoint, Compounder, Judge, ReflectionContext, Refiner, Verdict
 from ..config import Budget
 from ..memory.store import MemoryStore
 from . import convergence as cv
@@ -134,6 +134,14 @@ class LoopController:
         active_exclude: set[str] = set()
         targeted_since_pivot: list[str] = []
 
+        # Reflective state (plan 2026-06-20 U2): ``reflection_ctx`` is the trace-driven
+        # ASI handed to the NEXT brief -- None on the first iteration. ``prior_kept_fixtures``
+        # accumulates the failing fixtures of KEPT verdicts so the persistent/new split is
+        # computed over the kept lineage, never raw store rows (which also hold rejected
+        # attempts). Always populated; refiners read it protocol-bound so this is additive.
+        reflection_ctx: ReflectionContext | None = None
+        prior_kept_fixtures: set[str] = set()
+
         while True:
             plateaued = self.store.is_plateaued(
                 run_id,
@@ -168,6 +176,7 @@ class LoopController:
                 recurring_failures=recurring_fixtures,
                 exclude_dims=list(active_exclude) or None,
                 upstream_outcomes=self.upstream_context,
+                reflection=reflection_ctx,  # trace-driven ASI from the prior attempt (U2)
             )
             if brief.target_dimensions:
                 targeted_since_pivot.append(brief.target_dimensions[0])
@@ -209,11 +218,16 @@ class LoopController:
                     n,
                 )
 
+            # ``last_attempt`` / ``last_outcome`` feed the reflection handed to the
+            # NEXT brief (plan 2026-06-20 U2). The safety-halt path above already
+            # returned, so only the three keep/reverse/rollback branches reach here.
+            last_attempt: str | None = diff_ref
             if fork_reversal:
                 # The resolver overruled the agent's chosen default for a fork on
                 # this iteration -> reverse via the existing rollback, even when
                 # the grade improved (KTD2). Keep the prior verdict; do not compound.
                 self.checkpoint.restore(token)
+                last_outcome = "reversed"
             elif cv.is_improvement(verdict, new_verdict, self.budget):
                 # Improvement accepted and kept -> compound (never on rollback).
                 self.compounder.compound(
@@ -223,17 +237,52 @@ class LoopController:
                 )
                 verdict = new_verdict
                 accepted += 1
+                last_outcome = "accepted"
                 # Periodic System-2 compression pass (U7), on accepted-fix cadence.
                 if self.compressor is not None and accepted % self.budget.compression_interval == 0:
                     result = self.compressor.run(run_id, tool_path)
                     verdict = result.after
                     n += 1
                     self._record(run_id, n, verdict, diff_ref="compression")
+                    # The kept verdict now came from compression, not the refactor diff;
+                    # don't tell the next refiner "your edit produced this" (U2).
+                    last_attempt = None
             else:
                 # Regression or no gain -> roll back; keep the prior verdict.
                 self.checkpoint.restore(token)
+                last_outcome = "rolled_back"
+
+            # Assemble the reflection for the next iteration from the KEPT verdict
+            # (judge-sourced only -- maker != checker, KTD3) and advance the kept
+            # lineage so persistence is measured against prior kept states.
+            reflection_ctx = self._build_reflection(verdict, last_attempt, last_outcome, prior_kept_fixtures)
+            prior_kept_fixtures |= set(verdict.failing_fixtures)
 
     # ----- helpers --------------------------------------------------------
+
+    @staticmethod
+    def _build_reflection(
+        kept: Verdict, attempted: str | None, outcome: str, prior_kept_fixtures: set[str]
+    ) -> ReflectionContext:
+        """Compose the trace-driven ASI for the next brief (plan 2026-06-20 U2).
+
+        ``kept`` is the verdict that survived this iteration (judge-sourced only).
+        ``persistent`` fixtures fail now AND failed in a prior kept verdict (they
+        resisted edits); ``new`` fixtures are first-seen. Pure -- no I/O.
+        """
+        live = list(kept.failing_fixtures)
+        persistent = [fx for fx in live if fx in prior_kept_fixtures]
+        new = [fx for fx in live if fx not in prior_kept_fixtures]
+        return ReflectionContext(
+            prior_grade=kept.grade,
+            prior_score=kept.score,
+            prior_dims=dict(kept.dims),
+            attempted=attempted,
+            outcome=outcome,
+            persistent_fixtures=persistent,
+            new_fixtures=new,
+            judge_feedback=getattr(kept, "feedback", "") or "",
+        )
 
     def _refactor_with_retry(self, tool_path: str, brief) -> str | None:
         """Run the refiner, retrying only a *transient infra* failure (U3).

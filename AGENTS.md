@@ -116,6 +116,15 @@ protocol, so the refine engine is selectable:
 - Python ≥3.11, Click CLI, `pytest`, stdlib `sqlite3`, dataclasses for contracts.
 - Subprocess calls MUST use an args list (never `shell=True` / f-string commands)
   and target input MUST be validated before reaching an adapter.
+- **Additive contract fields are defaulted + `getattr`-read** (KTD1): cross-iteration
+  signals on `RefactorBrief` (`recurring_failures`, `upstream_outcomes`,
+  `reflection`) and `Verdict.feedback` default to empty/`None` and are read
+  protocol-bound, so an older refiner/judge stays valid and the NOT-NULL schema is
+  untouched. `RefactorBrief.reflection` is a `ReflectionContext` (trace-driven ASI)
+  the **controller** assembles from judge output only — never the refiner's
+  self-report (maker≠checker). `Verdict.feedback` is dimension-level and
+  **sanitized at source** (`judge._sanitize_feedback`) so it is safe to render into
+  either refiner prompt; renderers share `adapters/reflection_render.py`.
 - Conventional commits. Run `pytest` before committing; CI runs it on every PR.
 
 ## Workflow

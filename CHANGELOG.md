@@ -6,6 +6,29 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Reflective refine loop — trace-driven mutation (GEPA `optimize_anything` borrow, additive)** —
+  the refine loop no longer builds each brief from the latest `Verdict` alone. The
+  controller now carries a **`ReflectionContext`** (`adapters/base.py`) across
+  iterations — prior grade/score/dims, the diff just tried, the outcome
+  (`accepted` / `rolled_back` / `reversed` / `first`), and a persistent-vs-new
+  fixture split computed over the **kept-verdict lineage** (not raw store rows,
+  which also hold rejected attempts) — and threads it onto `RefactorBrief.reflection`
+  (defaulted, `getattr`-read, backward-compatible per KTD1). Both refiners render it
+  via a shared `adapters/reflection_render.py`, and a `rolled_back`/`reversed`
+  outcome steers the model to try a *materially different* approach (anti
+  exploration-collapse). The judge now distills a bounded, **dimension-level**
+  `Verdict.feedback` (the "Actionable Side Information" gradient) from the per-task
+  detail `parse_report` previously discarded — deliberately not a per-fixture point
+  map (which would hand the refiner a gaming target), **sanitized at source** (control
+  chars + shell metacharacters stripped) so both the `_clip`'d LLM path and the
+  un-clipped Claude path are safe. _Why:_ blind greedy mutation could repeat a
+  just-rejected approach and threw away the judge's "why"; reflection adds the
+  gradient additively without touching the hill-climb, rollback, maker≠checker, or
+  human-confirm gate. Scope: GEPA's Pareto frontier is deferred — this slice tests
+  the reflection lever within single-path greedy and does not reproduce GEPA's
+  frontier-driven headline numbers. Origin:
+  `docs/plans/2026-06-20-001-feat-reflective-refine-loop-plan.md` (U1–U4; U5
+  invocation-hardening and U6 reflective-vs-blind validation gated on first-light).
 - **`run` and `fleet run` now execute real loops (loop adapters wired)** — the
   loop engine was built and tested but unplugged from the CLI; both entrypoints
   previously stopped at a "not yet wired" raise / materialize-only. `loopeng run`
