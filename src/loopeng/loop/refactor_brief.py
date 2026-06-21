@@ -6,7 +6,7 @@ whole report -- so the refinement engine works on what actually moves the grade.
 
 from __future__ import annotations
 
-from ..adapters.base import RefactorBrief, Verdict
+from ..adapters.base import ReflectionContext, RefactorBrief, Verdict
 
 
 def build_refactor_brief(
@@ -15,6 +15,7 @@ def build_refactor_brief(
     recurring_failures: list | None = None,
     exclude_dims: list | None = None,
     upstream_outcomes: list | None = None,
+    reflection: ReflectionContext | None = None,
 ) -> RefactorBrief:
     # Rank dimensions lowest-score-first; those are where the grade is bleeding.
     ranked = [name for name, _ in sorted(verdict.dims.items(), key=lambda kv: kv[1])]
@@ -47,4 +48,5 @@ def build_refactor_brief(
         failing_fixtures=live,
         recurring_failures=advisory,
         upstream_outcomes=list(upstream_outcomes or []),  # fleet routing (plan-006 U3)
+        reflection=reflection,  # trace-driven ASI; None on first iteration (plan 2026-06-20 U2)
     )
