@@ -156,10 +156,16 @@ def _build_messages(tool_path: str, brief: RefactorBrief) -> list[dict]:
     # through _clip as defense-in-depth (R4), even though judge_feedback is already
     # sanitized at source (U4).
     reflection = "".join(f"\n{line}" for line in _reflection_lines(getattr(brief, "reflection", None), sanitize=_clip))
+    # Learning-reuse flywheel (plan 2026-06-21 U3): prior-run lessons, clipped as
+    # defense-in-depth even though they are sanitized at the store write path.
+    reused_list = [_clip(s) for s in (getattr(brief, "reused_learnings", []) or [])]
+    reused = (
+        f"\nLessons from prior runs (reuse what worked): {'; '.join(reused_list)}." if reused_list else ""
+    )
     user = (
         f"Goal: {_clip(brief.goal)}\n"
         f"Prioritize these dimensions: {dims}.\n"
-        f"Failing fixtures to address: {fixtures}.{reflection}\n\n"
+        f"Failing fixtures to address: {fixtures}.{reflection}{reused}\n\n"
         f"Current files:\n{listing}"
     )
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]

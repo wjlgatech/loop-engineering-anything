@@ -119,6 +119,11 @@ class RefactorBrief:
     # ``None`` on the first iteration and for refiners/callers that don't supply it.
     # Read by refiners via ``getattr`` so an older refiner is harmless (KTD1).
     reflection: "ReflectionContext | None" = None
+    # Compounded learning summaries from PRIOR runs of this target, retrieved for
+    # reuse (the learning-reuse flywheel, plan 2026-06-21 U3). Advisory, store-derived,
+    # sanitized at write; computed once at run start and read by refiners via
+    # ``getattr``. Feeds the refiner brief ONLY -- never the judge (maker != checker).
+    reused_learnings: list = field(default_factory=list)
 
 
 @runtime_checkable
@@ -193,7 +198,9 @@ class Oracle(Protocol):
 class Compounder(Protocol):
     """Records a learning + regression test on an accepted fix (/ce-compound)."""
 
-    def compound(self, summary: str, *, regression_test_ref: str | None = None) -> None: ...
+    def compound(
+        self, summary: str, *, regression_test_ref: str | None = None, grade_delta: float | None = None
+    ) -> None: ...
 
 
 @runtime_checkable

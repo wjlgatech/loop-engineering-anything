@@ -208,3 +208,23 @@ def test_claude_prompt_neutralizes_injection_in_feedback():
     brief = RefactorBrief(goal="g", target_dimensions=["d"], failing_fixtures=[], reflection=rc)
     prompt = ce.ClaudeCodeRefiner()._build_prompt(brief)
     assert "`" not in prompt and "$(" not in prompt and ";" not in prompt
+
+
+# ----- U3 (plan 2026-06-21): reused-learnings rendering --------------------
+
+
+def test_build_prompt_renders_reused_learnings():
+    brief = RefactorBrief(goal="g", target_dimensions=["d"], failing_fixtures=[],
+                          reused_learnings=["prefer pagination cursors", "avoid N+1"])
+    prompt = ce.ClaudeCodeRefiner()._build_prompt(brief)
+    assert "Lessons from prior runs" in prompt
+    assert "prefer pagination cursors" in prompt
+
+
+def test_build_prompt_without_reused_learnings_unchanged():
+    base = ce.ClaudeCodeRefiner()._build_prompt(_brief())
+    same = ce.ClaudeCodeRefiner()._build_prompt(
+        RefactorBrief(goal="raise correctness", target_dimensions=["correctness"],
+                      failing_fixtures=["fx1"], reused_learnings=[])
+    )
+    assert base == same

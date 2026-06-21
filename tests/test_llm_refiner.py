@@ -251,3 +251,24 @@ def test_llm_messages_no_reflection_unchanged(tool):
     none = lr._build_messages(str(tool), _RB(goal="raise correctness",
             target_dimensions=["D1"], failing_fixtures=["fx1"], reflection=None))
     assert base == none
+
+
+# ----- U3 (plan 2026-06-21): reused-learnings rendering (LLM path) ---------
+
+
+def test_llm_messages_render_and_clip_reused_learnings(tool):
+    # reused_learnings reaching the refiner are already store-sanitized (shell
+    # metachars stripped at write, tested in test_memory_store); the LLM path's
+    # _clip is defense-in-depth against control chars + length. Assert both.
+    brief = _RB(goal="g", target_dimensions=["d"], failing_fixtures=[],
+                reused_learnings=["use cursors", "drop\x00 the\r\n null bytes"])
+    user = lr._build_messages(str(tool), brief)[1]["content"]
+    assert "Lessons from prior runs" in user and "use cursors" in user
+    assert "\x00" not in user  # control chars clipped (defense-in-depth)
+
+
+def test_llm_messages_no_reused_learnings_unchanged(tool):
+    base = lr._build_messages(str(tool), _brief())
+    same = lr._build_messages(str(tool), _RB(goal="raise correctness",
+            target_dimensions=["D1"], failing_fixtures=["fx1"], reused_learnings=[]))
+    assert base == same

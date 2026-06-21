@@ -17,5 +17,9 @@ class RecordingCompounder:
 
     entries: list = field(default_factory=list)
 
-    def compound(self, summary: str, *, regression_test_ref: str | None = None) -> None:
-        self.entries.append({"summary": summary, "regression_test_ref": regression_test_ref})
+    def compound(
+        self, summary: str, *, regression_test_ref: str | None = None, grade_delta: float | None = None
+    ) -> None:
+        self.entries.append(
+            {"summary": summary, "regression_test_ref": regression_test_ref, "grade_delta": grade_delta}
+        )

@@ -138,6 +138,15 @@ class ClaudeCodeRefiner:
         # consistent with the un-clipped recurring/upstream rendering above.
         for line in _reflection_lines(getattr(brief, "reflection", None)):
             prompt += f"\n{line}"
+        # Learning-reuse flywheel (plan 2026-06-21 U3): lessons compounded on PRIOR
+        # runs of this target. Sanitized at write, so rendered un-clipped like the
+        # recurring/upstream blocks. Advisory context -- never a quality signal.
+        reused = getattr(brief, "reused_learnings", []) or []
+        if reused:
+            prompt += (
+                "\nLessons from prior runs of this target (reuse what worked, avoid past "
+                f"dead-ends): {'; '.join(reused)}."
+            )
         # Fork-Card emission convention (plan 2026-06-17 U4): the supervised loop
         # needs undetermined decisions to be visible, not silently defaulted. Do
         # NOT stop to ask -- emit the decision as data and keep building.
@@ -184,7 +193,11 @@ class ClaudeCodeCompounder:
         self.timeout = timeout
         self.extra_args = tuple(extra_args)
 
-    def compound(self, summary: str, *, regression_test_ref: str | None = None) -> None:
+    def compound(
+        self, summary: str, *, regression_test_ref: str | None = None, grade_delta: float | None = None
+    ) -> None:
+        # grade_delta is advisory metadata for the store-backed wrapper (flywheel U2);
+        # the /ce-compound documentation step itself does not use it.
         prompt = (
             f"/ce-compound Document this learning and add a regression test so it "
             f"never recurs: {summary}"

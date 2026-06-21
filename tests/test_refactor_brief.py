@@ -102,3 +102,16 @@ def test_brief_threads_reflection_through():
     rc = ReflectionContext(prior_grade="C", outcome="rolled_back")
     brief = build_refactor_brief(_verdict(), "goal", reflection=rc)
     assert brief.reflection is rc
+
+
+# ----- U3 (plan 2026-06-21): reused-learnings threading (pure) -------------
+
+
+def test_brief_without_reused_learnings_is_empty_list():
+    brief = build_refactor_brief(_verdict(), "g")
+    assert brief.reused_learnings == []
+
+
+def test_brief_threads_reused_learnings():
+    brief = build_refactor_brief(_verdict(), "g", reused_learnings=["lesson A", "lesson B"])
+    assert brief.reused_learnings == ["lesson A", "lesson B"]

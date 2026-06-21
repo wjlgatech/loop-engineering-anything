@@ -25,7 +25,7 @@ from enum import Enum
 
 from ..adapters.base import Checkpoint, Compounder, Judge, ReflectionContext, Refiner, Verdict
 from ..config import Budget
-from ..memory.store import MemoryStore
+from ..memory.store import MemoryStore, grade_rank
 from . import convergence as cv
 from .refactor_brief import build_refactor_brief
 
@@ -124,6 +124,13 @@ class LoopController:
             if run is not None
             else []
         )
+        # Learning-reuse flywheel (plan 2026-06-21 U3): compounded learnings from
+        # PRIOR runs of this target, retrieved once and threaded into every brief.
+        # Feeds the refiner brief ONLY -- never self.judge (maker != checker). Empty
+        # on a target's first run, so behavior degrades to today's loop.
+        reused_learnings = (
+            self.store.prior_learnings(target=run.target) if run is not None else []
+        )
 
         # Plateau-pivot state (U2): on a sole plateau, rotate to the next-lowest
         # dimension once (per pivot budget) before stopping. ``pivot_offset`` resets
@@ -177,6 +184,7 @@ class LoopController:
                 exclude_dims=list(active_exclude) or None,
                 upstream_outcomes=self.upstream_context,
                 reflection=reflection_ctx,  # trace-driven ASI from the prior attempt (U2)
+                reused_learnings=reused_learnings,  # cross-run reuse flywheel (plan 2026-06-21 U3)
             )
             if brief.target_dimensions:
                 targeted_since_pivot.append(brief.target_dimensions[0])
@@ -234,6 +242,7 @@ class LoopController:
                     f"iteration {n}: grade {verdict.grade} -> {new_verdict.grade} "
                     f"by targeting {brief.target_dimensions[:2]}",
                     regression_test_ref=diff_ref,
+                    grade_delta=float(grade_rank(new_verdict.grade) - grade_rank(verdict.grade)),
                 )
                 verdict = new_verdict
                 accepted += 1
