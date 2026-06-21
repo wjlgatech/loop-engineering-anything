@@ -133,7 +133,14 @@ protocol, so the refine engine is selectable:
   the **write path** (`record_learning` → shared `util/sanitize.py`), so unsanitized
   text never persists or crosses runs. `Compounder.compound` takes a defaulted
   `grade_delta`. Cross-run compounding is measurable via the `*_series` /
-  `compounding_summary` store queries.
+  `compounding_summary` store queries. **Cross-target (U4):**
+  `prior_learnings(cross_target=True, lane=...)` adds same-lane other-target learnings,
+  demoted + threshold-gated + **redacted** (`util.sanitize.redact_specifics`); opt-in via
+  `LoopController(reuse_cross_target=True)`. **Ablation/proof (U6):**
+  `LoopController(disable_reuse=True)` is the reuse-OFF leg; `flywheel/ablation.py`
+  (`ablation_result`, `assert_valid_flywheel_proof`) gates a `live_verified` ablation on
+  both legs + a matching held-out seed hash. **Instrumentation (U5):**
+  `injected_learning_count` + `reuse_stats(target)` are observation-only — never a gate.
 - Conventional commits. Run `pytest` before committing; CI runs it on every PR.
 
 ## Workflow
