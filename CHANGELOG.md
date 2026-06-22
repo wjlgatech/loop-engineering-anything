@@ -6,6 +6,20 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Flywheel live wiring — first-light-ready (plan 2026-06-21, the gated remainder, mock-tested)** —
+  the parts that were stubbed behind injectable seams are now wired to real calls, so the
+  July-quota opening is "run + record", not "still coding". **Live spec editors:**
+  `synthesize_spec(live=True)` and `SpecRefiner(live=True)` shell to the planning capability
+  (`ce-plan`) via `run_tool` — synthesis falls back to the scaffold on infra failure; the
+  refiner reports `last_infra_failure` on a non-zero/timeout exit (retryable) and detects a
+  real edit by content hash (clean no-change otherwise). **Ablation driver:**
+  `flywheel.ablation.run_ablation_pair(run_leg, …)` drives the reuse-ON then reuse-OFF legs
+  and returns a validated proof; `record_flywheel_proof` is record-only (validates *before*
+  writing, so a fabricated/partial proof can't be persisted). **Downstream-outcome oracle:**
+  `flywheel.oracle.downstream_oracle` checks — grade-independently of the rubric — whether
+  higher-rubric specs yield better downstream tool first-attempt grades (the
+  rubric-circularity guard). Every external call is mocked in tests; the actual `claude -p`
+  run remains the only deferred item. Origin: `docs/plans/2026-06-21-001-feat-learning-reuse-flywheel-plan.md`.
 - **Spec-synthesis loop — the flywheel's entry stage (plan 2026-06-21, PR-2: U7–U9)** —
   a vague idea can now enter the loop and be improved into a detailed spec, graded and
   compounded by the *same* machinery as tool refinement. **U7:** a deterministic rubric

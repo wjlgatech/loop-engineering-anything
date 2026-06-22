@@ -18,7 +18,10 @@ mechanics are exercised against scripted verdicts.
 
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass
+from typing import Callable
 
 
 class FlywheelProofError(ValueError):
@@ -68,3 +71,31 @@ def assert_valid_flywheel_proof(proof: dict) -> None:
             raise FlywheelProofError(f"missing or malformed leg: {leg}")
     if proof["reuse_on"]["run_id"] == proof["reuse_off"]["run_id"]:
         raise FlywheelProofError("both legs reference the same run_id -- not a real pair")
+
+
+def run_ablation_pair(
+    run_leg: Callable[[bool], AblationLeg], *, heldout_seed_hash: str
+) -> dict:
+    """Drive an interleaved ablation: run the SAME target reuse-ON then reuse-OFF and
+    return a validated flywheel proof (U6 live driver). ``run_leg(disable_reuse)`` runs
+    one leg and returns its ``AblationLeg`` -- the caller wires it to a real
+    ``LoopController`` (with ``disable_reuse`` toggling the reuse-OFF leg) or, for
+    tests, a stub. The result is validated before return, so a half-recorded pair
+    raises rather than passing as proof."""
+    on = run_leg(False)   # reuse ON
+    off = run_leg(True)   # reuse OFF (disable_reuse=True)
+    result = ablation_result(on, off, heldout_seed_hash=heldout_seed_hash)
+    assert_valid_flywheel_proof(result)
+    return result
+
+
+def record_flywheel_proof(proof: dict, dest_path: str) -> str:
+    """Record-only write of a flywheel proof: validate FIRST (so only a real, complete
+    ablation is ever persisted), then write JSON to ``dest_path``. Mirrors the
+    provenance-honesty discipline -- a proof artifact can't be hand-faked into
+    existence because ``assert_valid_flywheel_proof`` gates the write."""
+    assert_valid_flywheel_proof(proof)
+    os.makedirs(os.path.dirname(dest_path) or ".", exist_ok=True)
+    with open(dest_path, "w", encoding="utf-8") as fh:
+        json.dump(proof, fh, indent=2, sort_keys=True)
+    return dest_path
