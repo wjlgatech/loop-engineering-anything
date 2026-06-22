@@ -149,6 +149,13 @@ protocol, so the refine engine is selectable:
   `adapters/spec_refiner.py` (`SpecRefiner`, injectable `editor`) is the `Refiner`. The loop
   drives the **existing `LoopController`** (no new engine); the spec stage reuses
   `flywheel/ablation.py` for its proof.
+- **Flywheel live wiring (first-light-ready):** `synthesize_spec(live=True)` /
+  `SpecRefiner(live=True)` shell to `ce-plan` via `run_tool` (scaffold / no-change /
+  infra-failure fallbacks). `flywheel.ablation.run_ablation_pair(run_leg)` drives the
+  reuse-ON/OFF legs; `record_flywheel_proof` validates **before** writing (record-only).
+  `flywheel.oracle.downstream_oracle` is the rubric-circularity guard (does a higher-rubric
+  spec yield a better downstream tool grade?). Only the real `claude -p` quota run (~Jul 1)
+  is deferred; all wiring is mock-tested.
 - Conventional commits. Run `pytest` before committing; CI runs it on every PR.
 
 ## Workflow
