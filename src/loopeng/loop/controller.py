@@ -25,7 +25,8 @@ from enum import Enum
 
 from ..adapters.base import Checkpoint, Compounder, Judge, ReflectionContext, Refiner, Verdict
 from ..config import Budget
-from ..memory.store import MemoryStore, grade_rank
+from ..memory.store import MemoryStore
+from ..grades import grade_rank
 from . import convergence as cv
 from .refactor_brief import build_refactor_brief
 

@@ -23,7 +23,8 @@ from datetime import datetime
 from typing import Any
 
 from .adapters.base import Compounder
-from .memory.store import MemoryStore, grade_rank
+from .memory.store import MemoryStore
+from .grades import grade_rank
 
 
 class StoreBackedCompounder:

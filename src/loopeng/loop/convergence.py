@@ -23,7 +23,7 @@ from dataclasses import dataclass
 
 from ..adapters.base import Verdict
 from ..config import Budget
-from ..memory.store import grade_rank
+from ..grades import grade_rank
 
 CONTINUE = "continue"
 CONVERGED = "converged"
