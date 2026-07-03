@@ -306,6 +306,27 @@ class MemoryStore:
                 out.extend(redact_specifics(row["summary"]) for row in cross)
         return out
 
+    def learnings_with_context(self, target: str | None = None) -> list[dict]:
+        """Every learning joined with its run's target/lane (portability U1).
+
+        Read-only feed for ``memory/portability.py``: export renders these rows
+        to JSONL, import uses the same rows as its dedupe set. Ordered by
+        ``learnings.id`` so an export is stable and diff-able across runs.
+        """
+        sql = (
+            "SELECT r.target AS target, r.lane AS lane, l.summary AS summary, "
+            "l.regression_test_ref AS regression_test_ref, l.grade_delta AS grade_delta "
+            "FROM learnings l JOIN runs r ON l.run_id = r.id "
+        )
+        params: tuple = ()
+        if target is not None:
+            sql += "WHERE r.target = ? "
+            params = (target,)
+        sql += "ORDER BY l.id"
+        with self._wlock:
+            rows = self._conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+
     # ----- confirmations (human-confirm gate audit, U5) -------------------
 
     def record_confirmation(

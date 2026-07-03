@@ -6,6 +6,7 @@ Subcommands:
   status     Show recorded runs from the memory store.
   report     Render the research report for a run.
   fleet      Coordinate a fleet of self-improving loops.
+  learnings  Export / import the compounded learning corpus (portability U1).
 
 The skill (skills/loop-anything/SKILL.md) and this CLI are the two agent-native
 surfaces (R10). ``run`` gates on preflight, generates via the routed factory,
@@ -754,6 +755,52 @@ def schedule_tick_cmd() -> None:
     click.echo(f"{len(due)} target(s) due:")
     for e in due:
         click.echo(f"  {e.target}  (goal={e.goal or '-'})")
+
+
+@main.group("learnings")
+def learnings_grp() -> None:
+    """Export / import the compounded learning corpus (portability, plan 2026-07-02 U1)."""
+
+
+@learnings_grp.command("export")
+@click.option("--target", default=None, help="Only learnings from runs on this target.")
+@click.option(
+    "--redact", is_flag=True,
+    help="Strip target-specific tokens (URLs/paths/long ids) so the corpus is shareable.",
+)
+@click.option("--out", "-o", default="-", help="Output file (default '-' = stdout).")
+def learnings_export_cmd(target: str | None, redact: bool, out: str) -> None:
+    """Dump the learning corpus as stable JSONL a repo can commit and diff."""
+    from pathlib import Path
+
+    from .memory.portability import dump_jsonl, export_learnings
+    from .memory.store import MemoryStore
+
+    text = dump_jsonl(export_learnings(MemoryStore.default(), target=target, redact=redact))
+    if out == "-":
+        click.echo(text, nl=False)
+        return
+    Path(out).write_text(text)
+    click.echo(f"wrote {text.count(chr(10))} learning(s) -> {out}")
+
+
+@learnings_grp.command("import")
+@click.argument("path")
+def learnings_import_cmd(path: str) -> None:
+    """Merge a JSONL corpus at PATH into the local store (idempotent, sanitized on write)."""
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    from .memory.portability import import_learnings, parse_jsonl
+    from .memory.store import MemoryStore
+
+    try:
+        records = parse_jsonl(Path(path).read_text())
+    except (OSError, ValueError) as e:
+        raise click.ClickException(str(e)) from e
+    started = datetime.now(timezone.utc).isoformat()
+    result = import_learnings(MemoryStore.default(), records, started=started)
+    click.echo(f"imported {result.imported}, skipped {result.skipped} (already present)")
 
 
 if __name__ == "__main__":  # pragma: no cover
