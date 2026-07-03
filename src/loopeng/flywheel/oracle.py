@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..memory.store import grade_rank
+from ..grades import grade_rank
 
 
 @dataclass(frozen=True)

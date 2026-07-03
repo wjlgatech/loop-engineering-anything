@@ -42,14 +42,10 @@ from ..util.sanitize import redact_specifics, sanitize_text
 _SCHEMA = Path(__file__).with_name("schema.sql")
 _LEARNING_MAX = 600  # bound a persisted learning summary (flywheel R4)
 
-# Grade ranking for trend/plateau math. CLI-Judge grades A-F (no E in the
-# standard scheme); E is mapped defensively in case a suite emits it.
-GRADE_RANK = {"A": 5, "B": 4, "C": 3, "D": 2, "E": 1, "F": 0}
-
-
-def grade_rank(grade: str) -> int:
-    """Numeric rank for a letter grade; unknown grades rank lowest."""
-    return GRADE_RANK.get((grade or "").strip().upper(), -1)
+# Grade ranking lives in the pure top-level leaf module ``loopeng/grades.py``
+# (flywheel U2/KTD6) so the pure core can rank grades without importing this
+# sqlite-owning module. Re-exported here for backward compatibility.
+from ..grades import GRADE_RANK, grade_rank  # noqa: F401  (re-export)
 
 
 @dataclass

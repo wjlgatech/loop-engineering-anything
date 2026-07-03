@@ -19,7 +19,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .adapters.base import Checkpoint, Judge, RefactorBrief, Refiner, Verdict
-from .memory.store import MemoryStore, grade_rank
+from .memory.store import MemoryStore
+from .grades import grade_rank
 
 # Don't bother compressing until there's enough accumulated history to consolidate.
 DEFAULT_MIN_LEARNINGS = 3

@@ -65,6 +65,71 @@ def preflight_cmd(as_json: bool, lane: str | None) -> None:
             sys.exit(1)
 
 
+def _execute_run(
+    target: str, goal: str, lane: str | None, judge_adapter: str | None,
+    judge_registry: str | None, refiner_kind: str, workspace: str, confirm: bool,
+    scheduled: bool, max_iterations: int | None, *, store, echo,
+):
+    """Orchestrate route -> generate -> resolve -> deps -> refine loop (plan 2026-06-22 U3).
+
+    Pure of Click: raises domain errors (`ValueError` from route, `JudgeAdapterError`
+    from adapter resolution, `RuntimeError` from generation/missing-tools/the loop) for
+    the command to map to `ClickException`, and emits progress via the injected ``echo``.
+    Returns ``(result, refiner_used)`` for the command to format. Directly callable
+    without a `CliRunner`.
+    """
+    import dataclasses
+    import os
+
+    from .adapters.judge import resolve_judge_adapter
+    from .autonomous import runner as _runner
+    from .bindings import build_loop_deps
+    from .config import Config
+
+    decision = route(target, forced_lane=Lane(lane) if lane else None)  # ValueError on bad target
+    echo(f"Lane: {decision.lane.value} ({decision.reason})")
+
+    missing = missing_for_lane(decision.lane)
+    if missing:
+        raise RuntimeError(f"Cannot run -- missing required tools: {', '.join(m.label for m in missing)}")
+
+    # Generate, then resolve the judge adapter against the produced tool and drive the
+    # EXISTING run_refine_loop (KTD2: adapter only knowable post-generate).
+    os.makedirs(workspace, exist_ok=True)
+    factory = _runner._default_factories()[decision.factory]
+    gen = factory.generate(decision.normalized_target, goal, workspace)
+    if not gen.ok:
+        raise RuntimeError(
+            f"factory generation failed on the {decision.lane.value} lane: "
+            f"{(gen.logs or '').strip()[:300] or 'no logs'}"
+        )
+
+    adapter = resolve_judge_adapter(gen, override=judge_adapter, registry_dir=judge_registry)  # JudgeAdapterError
+
+    deps = build_loop_deps(tool_path=gen.tool_path, judge_adapter=adapter, refiner_kind=refiner_kind)
+    if deps.provider_env_keys and not any(os.environ.get(k) for k in deps.provider_env_keys):
+        echo(
+            f"warning: no LLM provider key set ({', '.join(deps.provider_env_keys)}); "
+            "the fallback refiner will degrade to a local (Ollama) rung.",
+            err=True,
+        )
+
+    config = Config()
+    if max_iterations is not None:
+        config = dataclasses.replace(
+            config, budget=dataclasses.replace(config.budget, max_iterations=max_iterations)
+        )
+
+    result = _runner.run_refine_loop(  # RuntimeError on preflight/credential/integrity
+        gen.tool_path, goal,
+        judge=deps.judge, refiner=deps.refiner, compounder=deps.compounder,
+        store=store, workspace_root=workspace, lane=decision.lane, config=config,
+        referee_paths=[adapter], maker_write_paths=[gen.tool_path],
+        scheduled=scheduled, confirmed=confirm,
+    )
+    return result, getattr(deps.refiner, "last_refiner", None)
+
+
 @main.command("run")
 @click.argument("target")
 @click.option("--goal", required=True, help="High-level goal for the loop.")
@@ -99,90 +164,25 @@ def run_cmd(
             "come from an attended human after the run completes."
         )
 
-    import dataclasses
-
-    from .adapters.judge import JudgeAdapterError, resolve_judge_adapter
-    from .autonomous import runner as _runner
-    from .bindings import build_loop_deps
-    from .config import Config
+    from .adapters.judge import JudgeAdapterError
     from .loop.controller import LoopState
     from .memory.store import MemoryStore
 
     try:
-        decision = route(target, forced_lane=Lane(lane) if lane else None)
-    except ValueError as e:  # unclassifiable target -> actionable message, not a traceback
-        raise click.ClickException(str(e))
-    click.echo(f"Lane: {decision.lane.value} ({decision.reason})")
-
-    missing = missing_for_lane(decision.lane)
-    if missing:
-        names = ", ".join(m.label for m in missing)
-        raise click.ClickException(f"Cannot run -- missing required tools: {names}")
-
-    # Generate the tool, then resolve the judge adapter against the produced tool
-    # and drive the EXISTING run_refine_loop (KTD2: no run_loop changes; the
-    # adapter is only knowable post-generate).
-    import os
-
-    os.makedirs(workspace, exist_ok=True)
-    factory = _runner._default_factories()[decision.factory]
-    gen = factory.generate(decision.normalized_target, goal, workspace)
-    if not gen.ok:
-        raise click.ClickException(
-            f"factory generation failed on the {decision.lane.value} lane: "
-            f"{(gen.logs or '').strip()[:300] or 'no logs'}"
+        result, refiner_used = _execute_run(
+            target, goal, lane, judge_adapter, judge_registry, refiner_kind, workspace,
+            confirm, scheduled, max_iterations, store=MemoryStore.default(), echo=click.echo,
         )
-
-    try:
-        adapter = resolve_judge_adapter(gen, override=judge_adapter, registry_dir=judge_registry)
-    except JudgeAdapterError as e:
-        raise click.ClickException(str(e))
-
-    deps = build_loop_deps(
-        tool_path=gen.tool_path, judge_adapter=adapter, refiner_kind=refiner_kind
-    )
-    if deps.provider_env_keys and not any(os.environ.get(k) for k in deps.provider_env_keys):
-        click.echo(
-            f"warning: no LLM provider key set ({', '.join(deps.provider_env_keys)}); "
-            "the fallback refiner will degrade to a local (Ollama) rung.",
-            err=True,
-        )
-
-    config = Config()
-    if max_iterations is not None:
-        config = dataclasses.replace(
-            config, budget=dataclasses.replace(config.budget, max_iterations=max_iterations)
-        )
-
-    store = MemoryStore.default()
-    try:
-        result = _runner.run_refine_loop(
-            gen.tool_path,
-            goal,
-            judge=deps.judge,
-            refiner=deps.refiner,
-            compounder=deps.compounder,
-            store=store,
-            workspace_root=workspace,
-            lane=decision.lane,
-            config=config,
-            referee_paths=[adapter],
-            maker_write_paths=[gen.tool_path],
-            scheduled=scheduled,
-            confirmed=confirm,
-        )
-    except RuntimeError as e:  # preflight / credential / integrity failures
+    except (ValueError, JudgeAdapterError, RuntimeError) as e:  # domain errors -> actionable message
         raise click.ClickException(str(e))
 
     o = result.outcome
-    refiner_used = getattr(deps.refiner, "last_refiner", None)
-    converged = o.final_state is LoopState.CONVERGED
     click.echo(
         f"Run #{result.run_id}: {o.final_state.value} grade={o.grade or '-'} "
         f"over {o.iterations} iter(s)"
         + (f" via {refiner_used}" if refiner_used else "")
     )
-    if converged:
+    if o.final_state is LoopState.CONVERGED:
         click.echo(
             f"shippable={result.shippable}"
             + (f" -- gate: {result.gate_reason}" if result.gate_reason else "")
@@ -263,10 +263,9 @@ def fleet_run_cmd(
     Executes by default (topological waves over per-item worktrees). Pass
     ``--dry-run`` to only materialize the fleet rows (the pre-wiring behavior)."""
     import json
-    from datetime import datetime, timezone
 
     from .memory.store import MemoryStore
-    from .orchestration.spec import FleetSpecError, materialize_fleet, parse_fleet_spec
+    from .orchestration.spec import FleetSpecError, parse_fleet_spec
 
     with open(spec_path, encoding="utf-8") as fh:
         data = json.load(fh)
@@ -275,51 +274,14 @@ def fleet_run_cmd(
     except FleetSpecError as exc:
         raise click.ClickException(str(exc)) from exc
 
-    store = MemoryStore.default()
-    started = datetime.now(timezone.utc).isoformat()
-    fleet_goal = goal or data.get("goal")
-
-    # For an execute run, route + preflight BEFORE materializing any fleet rows, so
-    # a bad target or a missing tool fails cleanly without orphaning a pending fleet.
-    if not dry_run:
-        try:
-            lanes = {
-                route(it["target"], forced_lane=Lane(it["lane"]) if it.get("lane") else None).lane
-                for it in items
-            }
-        except ValueError as e:  # unclassifiable per-item target
-            raise click.ClickException(str(e))
-        missing = [m for ln in lanes for m in missing_for_lane(ln)]
-        if missing:
-            names = ", ".join(sorted({m.label for m in missing}))
-            raise click.ClickException(f"Cannot run fleet -- missing required tools: {names}")
-
-    fleet_id = materialize_fleet(store, fleet_goal, items, started)
-    click.echo(f"Fleet #{fleet_id} created with {len(items)} items.")
-
-    if dry_run:
-        click.echo("Materialized only (--dry-run). Inspect with `fleet status` / `fleet report`.")
-        return
-
-    # Behavior-change notice (KTD6): fleet run now executes by default.
-    click.echo("Executing fleet (use --dry-run to only materialize) ...")
-
-    from .orchestration.coordinator import default_fleet_runner, run_fleet
-    from .orchestration.escalation import classify_with_escalation
-    from .orchestration.fleet_report import build_fleet_report, render_fleet_report
-
-    item_runner = default_fleet_runner(
-        store=store, fleet_goal=fleet_goal,
-        judge_adapter_override=judge_adapter, judge_registry=judge_registry,
-        refiner_kind=refiner_kind,
-    )
-    status = run_fleet(
-        store, fleet_id, item_runner,
-        repo_dir=repo, worktrees_root=worktrees_root,
-        classify=classify_with_escalation,
-    )
-    click.echo(f"\nFleet terminal status: {status.value}")
-    click.echo(render_fleet_report(build_fleet_report(store, fleet_id)))
+    try:
+        _execute_fleet(
+            items, store=MemoryStore.default(), fleet_goal=goal or data.get("goal"),
+            dry_run=dry_run, judge_adapter=judge_adapter, judge_registry=judge_registry,
+            refiner_kind=refiner_kind, repo=repo, worktrees_root=worktrees_root, echo=click.echo,
+        )
+    except (ValueError, RuntimeError) as e:  # bad per-item target / missing tools
+        raise click.ClickException(str(e))
 
 
 @fleet_grp.command("status")
@@ -796,3 +758,60 @@ def schedule_tick_cmd() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     main()
+
+
+def _execute_fleet(
+    items, *, store, fleet_goal, dry_run, judge_adapter, judge_registry,
+    refiner_kind, repo, worktrees_root, echo,
+):
+    """Orchestrate fleet preflight -> materialize -> execute (plan 2026-06-22 U3).
+
+    Pure of Click: raises `ValueError` (unclassifiable per-item target) / `RuntimeError`
+    (missing tools) for the command to map; emits progress via ``echo``. Returns
+    ``(fleet_id, status_or_None)``. Directly callable without a `CliRunner`.
+    """
+    from datetime import datetime, timezone
+
+    from .orchestration.spec import materialize_fleet
+
+    started = datetime.now(timezone.utc).isoformat()
+
+    # Execute run: route + preflight BEFORE materializing any rows, so a bad target
+    # or missing tool fails cleanly without orphaning a pending fleet.
+    if not dry_run:
+        lanes = {
+            route(it["target"], forced_lane=Lane(it["lane"]) if it.get("lane") else None).lane
+            for it in items
+        }  # ValueError on an unclassifiable target
+        missing = [m for ln in lanes for m in missing_for_lane(ln)]
+        if missing:
+            names = ", ".join(sorted({m.label for m in missing}))
+            raise RuntimeError(f"Cannot run fleet -- missing required tools: {names}")
+
+    fleet_id = materialize_fleet(store, fleet_goal, items, started)
+    echo(f"Fleet #{fleet_id} created with {len(items)} items.")
+
+    if dry_run:
+        echo("Materialized only (--dry-run). Inspect with `fleet status` / `fleet report`.")
+        return fleet_id, None
+
+    # Behavior-change notice (KTD6): fleet run executes by default.
+    echo("Executing fleet (use --dry-run to only materialize) ...")
+
+    from .orchestration.coordinator import default_fleet_runner, run_fleet
+    from .orchestration.escalation import classify_with_escalation
+    from .orchestration.fleet_report import build_fleet_report, render_fleet_report
+
+    item_runner = default_fleet_runner(
+        store=store, fleet_goal=fleet_goal,
+        judge_adapter_override=judge_adapter, judge_registry=judge_registry,
+        refiner_kind=refiner_kind,
+    )
+    status = run_fleet(
+        store, fleet_id, item_runner,
+        repo_dir=repo, worktrees_root=worktrees_root,
+        classify=classify_with_escalation,
+    )
+    echo(f"\nFleet terminal status: {status.value}")
+    echo(render_fleet_report(build_fleet_report(store, fleet_id)))
+    return fleet_id, status

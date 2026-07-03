@@ -183,7 +183,7 @@ def default_fleet_runner(
     return _run
 
 
-def run_fleet(
+def run_fleet(  # noqa: C901  # deferred: fleet coordinator (own refactor unit)
     store: MemoryStore,
     fleet_id: int,
     runner: Callable[[FleetItem, str, list[dict]], RunResult],

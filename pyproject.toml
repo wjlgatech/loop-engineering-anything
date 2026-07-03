@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "ruff==0.15.18"]
 
 [project.scripts]
 loop-anything = "loopeng.cli:main"
@@ -31,3 +31,20 @@ loopeng = ["memory/*.sql"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+# Design-fitness complexity budget (plan 2026-06-22 U5). Scoped to the budget
+# rule-set ONLY (not ruff's default lint) so the gate stays high-signal; pinned
+# above for matrix reproducibility. C901 (cyclomatic) catches god-methods;
+# PLR0915 (statements) catches length. PLR0913 (max-args) is deliberately
+# EXCLUDED -- wide keyword-only constructors are the protocol-injection idiom.
+[tool.ruff]
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["C901", "PLR0915"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-statements = 60

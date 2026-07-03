@@ -44,7 +44,7 @@ def _grade_for(score: float) -> str:
     return "F"
 
 
-def score_spec(text: str) -> dict:
+def score_spec(text: str) -> dict:  # noqa: C901  # deferred: heavy pure scorer (own refactor unit)
     """Score a spec document. Returns ``{grade, score, dims, failing_fixtures, feedback}``.
     Fail-closed: empty / non-string input -> grade F, score 0 (never raises)."""
     if not isinstance(text, str) or not text.strip():

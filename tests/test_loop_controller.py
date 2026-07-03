@@ -839,3 +839,61 @@ def test_injected_count_recorded_when_reuse_on(store):
     ctrl.run(rid, "tool/")
     # reuse ON -> the prior lesson was injected and the count recorded (>=1).
     assert store.reuse_stats("t")[-1][1] >= 1
+
+
+# ----- U2 (plan 2026-06-22): characterization-gap tests (pin behavior the ----
+# design-fitness refactor of controller.run must preserve) -------------------
+
+
+def test_compression_cadence_interval_two_fires_once(store):
+    # 2 accepted improvements (C->B->A); interval=2 -> compressor fires once (at accepted=2).
+    judge = ScriptedJudge([v("C"), v("B"), v("A")])
+    compressor = RecordingCompressor(after_verdict=v("A"))
+    LoopController(
+        judge=judge, refiner=FakeRefiner(), compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(), store=store,
+        budget=Budget(target_grade="A", compression_interval=2), compressor=compressor,
+    ).run(store.create_run("t", "service", None, "2026-06-22T00:00:00Z"), "tool/")
+    assert compressor.runs == 1  # pins the accepted%interval ordering
+
+
+def test_compression_cadence_interval_three_does_not_fire(store):
+    # Same 2 accepted improvements; interval=3 -> never reaches a multiple -> no fire.
+    judge = ScriptedJudge([v("C"), v("B"), v("A")])
+    compressor = RecordingCompressor(after_verdict=v("A"))
+    LoopController(
+        judge=judge, refiner=FakeRefiner(), compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(), store=store,
+        budget=Budget(target_grade="A", compression_interval=3), compressor=compressor,
+    ).run(store.create_run("t", "service", None, "2026-06-22T00:00:00Z"), "tool/")
+    assert compressor.runs == 0  # interval>accepts -> the modulo branch never trips
+
+
+def test_plateau_pivot_and_reflection_coexist(store):
+    # A plateau that pivots once AND carries reflection: the refactor splits these
+    # into separate phases, so pin that both happen on the same run.
+    judge = ScriptedJudge([v("C", fixtures=["fx"])])  # flat -> plateau
+    refiner = CapturingRefiner()
+    LoopController(
+        judge=judge, refiner=refiner, compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(), store=store,
+        budget=Budget(plateau_patience=2, max_iterations=99, plateau_pivots=1),
+    ).run(store.create_run("t", "service", "g", "2026-06-22T00:00:00Z"), "tool/")
+    leads = [b.target_dimensions[0] for b in refiner.briefs]
+    assert "safety" in leads and "correctness" in leads  # pivot rotated the lead dim
+    # reflection is carried on post-first briefs and reflects the kept (rolled-back) verdict
+    post = [b.reflection for b in refiner.briefs if b.reflection is not None]
+    assert post and all(r.outcome == "rolled_back" and r.prior_grade == "C" for r in post)
+
+
+def test_reuse_cross_target_injects_same_lane_learning(store):
+    # Pin the cross-target reuse branch (reuse_cross_target=True) the refactor touches.
+    a = store.create_run("targetA", "service", "g", "2026-06-22T00:00:00Z")
+    store.record_learning(a, None, "prefer keyset pagination", grade_delta=3.0)
+    refiner = CapturingRefiner()
+    LoopController(
+        judge=ScriptedJudge([v("C"), v("A")]), refiner=refiner, compounder=RecordingCompounder(),
+        checkpoint=FakeCheckpoint(), store=store, budget=Budget(target_grade="A"),
+        reuse_cross_target=True,
+    ).run(store.create_run("targetB", "service", "g", "2026-06-22T01:00:00Z"), "tool/")
+    assert any("keyset pagination" in s for s in refiner.briefs[0].reused_learnings)
