@@ -6,6 +6,18 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Learnings portability — the corpus as a versioned artifact (plan 2026-07-02 U1)** —
+  the engine's compounding memory (the `learnings` table) lived only in the gitignored,
+  machine-local `loopeng.db`, the exact "workspace drift" failure the loop prevents for
+  its targets. `loop-anything learnings export [--target] [--redact] [-o file]` renders
+  the corpus as stable, diff-able JSONL a repo can commit and a PR can review (`--redact`
+  reuses the cross-target `redact_specifics` so a shared corpus leaks no target URLs/
+  paths/ids); `loop-anything learnings import <file>` merges a corpus idempotently
+  through `record_learning` — the single sanitize-on-write path — anchored to one
+  synthetic `imported`-status run per (target, lane) so `prior_learnings` reuse works
+  unchanged and trend/plateau queries are unaffected. New `memory/portability.py` +
+  `MemoryStore.learnings_with_context`. Why: learnings now survive machine failure and
+  can be shared as a team asset (the GitHub-for-PMs alignment, Repo-1/Repo-2 tiers).
 - **Flywheel live wiring — first-light-ready (plan 2026-06-21, the gated remainder, mock-tested)** —
   the parts that were stubbed behind injectable seams are now wired to real calls, so the
   July-quota opening is "run + record", not "still coding". **Live spec editors:**

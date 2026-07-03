@@ -175,6 +175,25 @@ One command, unattended. Wake up to a converged tool, a full grade trajectory, a
 </tr>
 </table>
 
+### 🎒 Your loop's memory travels with you
+
+Every accepted fix is compounded into a **learning** the next run reuses. Those learnings
+used to live only in a machine-local database (`loopeng.db`, gitignored) — training notes
+locked in one gym. Now the corpus is a **versioned artifact**: export it as diff-able
+JSONL, commit it, review it in a PR, import it on any machine — the learning-reuse
+flywheel keeps compounding across laptops and teammates.
+
+```bash
+loop-anything learnings export --redact -o learnings/corpus.jsonl   # commit this file
+loop-anything learnings import learnings/corpus.jsonl               # idempotent merge
+```
+
+`--redact` strips target-specific tokens (URLs, paths, long ids) so a shared corpus
+carries the transferable lesson, not your target's internals. Imports flow through the
+same sanitize-on-write path as recorded learnings (`MemoryStore.record_learning`), so a
+hostile line in a corpus file can't forge prompt structure — and re-importing the same
+file inserts nothing.
+
 ---
 
 ## ⚙️ How it works
