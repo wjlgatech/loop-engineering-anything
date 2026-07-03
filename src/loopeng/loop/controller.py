@@ -124,30 +124,8 @@ class LoopController:
         start = time.monotonic()  # controller owns the clock; evaluate stays pure (U4)
         warned_no_cost = False  # one-time warning when token_budget set but cost unreported
 
-        # Cross-run history (U1): fixtures that have failed across prior runs of
-        # THIS target. Scoped to the target so an unrelated target's history never
-        # leaks in. Computed once -- prior-run history does not change mid-run.
-        run = self.store.get_run(run_id)
-        recurring_fixtures = (
-            [fx for fx, _ in self.store.recurring_failures(target=run.target)]
-            if run is not None
-            else []
-        )
-        # Learning-reuse flywheel (plan 2026-06-21 U3/U4): compounded learnings from
-        # PRIOR runs of this target (and, when opted in, same-lane other targets),
-        # retrieved once and threaded into every brief. Feeds the refiner brief ONLY
-        # -- never self.judge (maker != checker). Empty on a target's first run, or
-        # when reuse is disabled for an ablation's reuse-OFF leg (U6), so behavior
-        # degrades to today's loop.
-        if run is not None and not self.disable_reuse:
-            reused_learnings = self.store.prior_learnings(
-                target=run.target, lane=run.lane, cross_target=self.reuse_cross_target
-            )
-        else:
-            reused_learnings = []
-        # Reuse instrumentation (U5): how many prior learnings this run injected.
-        # Observation-only -- never read into convergence/acceptance.
-        self.store.record_injected_count(run_id, len(reused_learnings))
+        # Cross-run history + learning-reuse, computed once at run start (U2/U3 helper).
+        recurring_fixtures, reused_learnings = self._init_run_context(run_id)
 
         # Plateau-pivot state (U2): on a sole plateau, rotate to the next-lowest
         # dimension once (per pivot budget) before stopping. ``pivot_offset`` resets
@@ -208,20 +186,8 @@ class LoopController:
             diff_ref = self._refactor_with_retry(tool_path, brief)
 
             # Cost accounting (U4): thread the refiner's reported per-refactor cost
-            # into the budget gate, protocol-bound (getattr tolerates refiners that
-            # don't implement it). A refiner that reports no cost cannot advance the
-            # token gate -- warn once if a token_budget was set against it.
-            cost = getattr(self.refiner, "last_token_cost", None)
-            if cost is not None:
-                tokens_spent += cost
-            elif self.budget.token_budget is not None and not warned_no_cost:
-                warned_no_cost = True
-                _log.warning(
-                    "token_budget=%s is set but the refiner reports no token cost; "
-                    "the token gate cannot fire -- relying on max_wall_seconds=%s.",
-                    self.budget.token_budget,
-                    self.budget.max_wall_seconds,
-                )
+            # into the budget gate (helper keeps run() flat).
+            cost, tokens_spent, warned_no_cost = self._account_token_cost(tokens_spent, warned_no_cost)
 
             new_verdict = self.judge.judge(tool_path)
             n += 1
@@ -243,40 +209,10 @@ class LoopController:
                     n,
                 )
 
-            # ``last_attempt`` / ``last_outcome`` feed the reflection handed to the
-            # NEXT brief (plan 2026-06-20 U2). The safety-halt path above already
-            # returned, so only the three keep/reverse/rollback branches reach here.
-            last_attempt: str | None = diff_ref
-            if fork_reversal:
-                # The resolver overruled the agent's chosen default for a fork on
-                # this iteration -> reverse via the existing rollback, even when
-                # the grade improved (KTD2). Keep the prior verdict; do not compound.
-                self.checkpoint.restore(token)
-                last_outcome = "reversed"
-            elif cv.is_improvement(verdict, new_verdict, self.budget):
-                # Improvement accepted and kept -> compound (never on rollback).
-                self.compounder.compound(
-                    f"iteration {n}: grade {verdict.grade} -> {new_verdict.grade} "
-                    f"by targeting {brief.target_dimensions[:2]}",
-                    regression_test_ref=diff_ref,
-                    grade_delta=float(grade_rank(new_verdict.grade) - grade_rank(verdict.grade)),
-                )
-                verdict = new_verdict
-                accepted += 1
-                last_outcome = "accepted"
-                # Periodic System-2 compression pass (U7), on accepted-fix cadence.
-                if self.compressor is not None and accepted % self.budget.compression_interval == 0:
-                    result = self.compressor.run(run_id, tool_path)
-                    verdict = result.after
-                    n += 1
-                    self._record(run_id, n, verdict, diff_ref="compression")
-                    # The kept verdict now came from compression, not the refactor diff;
-                    # don't tell the next refiner "your edit produced this" (U2).
-                    last_attempt = None
-            else:
-                # Regression or no gain -> roll back; keep the prior verdict.
-                self.checkpoint.restore(token)
-                last_outcome = "rolled_back"
+            # Accept / reverse / rollback (+ compression) -> the kept verdict (U4 helper).
+            verdict, n, accepted, last_attempt, last_outcome = self._apply_outcome(
+                run_id, tool_path, n, token, verdict, new_verdict, brief, diff_ref, fork_reversal, accepted
+            )
 
             # Assemble the reflection for the next iteration from the KEPT verdict
             # (judge-sourced only -- maker != checker, KTD3) and advance the kept
@@ -285,6 +221,86 @@ class LoopController:
             prior_kept_fixtures |= set(verdict.failing_fixtures)
 
     # ----- helpers --------------------------------------------------------
+
+    def _init_run_context(self, run_id: int) -> tuple[list, list]:
+        """Run-start reads (U2/U3): cross-run recurring failures + reused prior
+        learnings, computed once. Records the injected-learning count (U5, observation
+        only). Read-only over the store; never touches the loop's mutable state."""
+        run = self.store.get_run(run_id)
+        # Cross-run history (U1): scoped to this target so unrelated history never leaks.
+        recurring_fixtures = (
+            [fx for fx, _ in self.store.recurring_failures(target=run.target)]
+            if run is not None
+            else []
+        )
+        # Learning-reuse flywheel (plan 2026-06-21 U3/U4): prior-run learnings (and,
+        # opted in, same-lane other targets). Feeds the refiner brief ONLY -- never the
+        # judge (maker != checker). Empty on a first run or an ablation's reuse-OFF leg.
+        if run is not None and not self.disable_reuse:
+            reused_learnings = self.store.prior_learnings(
+                target=run.target, lane=run.lane, cross_target=self.reuse_cross_target
+            )
+        else:
+            reused_learnings = []
+        self.store.record_injected_count(run_id, len(reused_learnings))
+        return recurring_fixtures, reused_learnings
+
+    def _account_token_cost(self, tokens_spent: int, warned_no_cost: bool):
+        """Thread the refiner's reported per-refactor cost into the budget gate (U4),
+        protocol-bound via ``getattr``. Returns ``(cost, tokens_spent, warned_no_cost)``;
+        warns once if a token_budget is set but the refiner reports no cost."""
+        cost = getattr(self.refiner, "last_token_cost", None)
+        if cost is not None:
+            tokens_spent += cost
+        elif self.budget.token_budget is not None and not warned_no_cost:
+            warned_no_cost = True
+            _log.warning(
+                "token_budget=%s is set but the refiner reports no token cost; "
+                "the token gate cannot fire -- relying on max_wall_seconds=%s.",
+                self.budget.token_budget,
+                self.budget.max_wall_seconds,
+            )
+        return cost, tokens_spent, warned_no_cost
+
+    def _apply_outcome(
+        self, run_id, tool_path, n, token, verdict, new_verdict, brief, diff_ref,
+        fork_reversal, accepted,
+    ):
+        """Resolve one iteration's outcome (U4): fork-reversal / accept (+compound
+        +optional compression) / rollback. Returns the KEPT
+        ``(verdict, n, accepted, last_attempt, last_outcome)``. Preserves the exact
+        ordering: compound fires ONLY on a kept improvement; compression rebinds
+        verdict+n and clears last_attempt (KTD4 invariant 4). The safety-halt path
+        returns before this is called."""
+        last_attempt: str | None = diff_ref
+        if fork_reversal:
+            # Resolver overruled the agent's default -> reverse via rollback even when
+            # the grade improved (KTD2). Keep the prior verdict; do not compound.
+            self.checkpoint.restore(token)
+            last_outcome = "reversed"
+        elif cv.is_improvement(verdict, new_verdict, self.budget):
+            self.compounder.compound(
+                f"iteration {n}: grade {verdict.grade} -> {new_verdict.grade} "
+                f"by targeting {brief.target_dimensions[:2]}",
+                regression_test_ref=diff_ref,
+                grade_delta=float(grade_rank(new_verdict.grade) - grade_rank(verdict.grade)),
+            )
+            verdict = new_verdict
+            accepted += 1
+            last_outcome = "accepted"
+            # Periodic System-2 compression pass (U7), on accepted-fix cadence.
+            if self.compressor is not None and accepted % self.budget.compression_interval == 0:
+                result = self.compressor.run(run_id, tool_path)
+                verdict = result.after
+                n += 1
+                self._record(run_id, n, verdict, diff_ref="compression")
+                # The kept verdict now came from compression, not the refactor diff.
+                last_attempt = None
+        else:
+            # Regression or no gain -> roll back; keep the prior verdict.
+            self.checkpoint.restore(token)
+            last_outcome = "rolled_back"
+        return verdict, n, accepted, last_attempt, last_outcome
 
     @staticmethod
     def _build_reflection(

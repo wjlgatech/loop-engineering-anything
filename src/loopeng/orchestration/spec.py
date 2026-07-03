@@ -15,7 +15,7 @@ class FleetSpecError(ValueError):
     """A malformed fleet spec (missing key, duplicate key, dangling dependency)."""
 
 
-def parse_fleet_spec(data: dict) -> list[dict]:
+def parse_fleet_spec(data: dict) -> list[dict]:  # noqa: C901  # deferred: heavy validator (own refactor unit)
     """Validate a fleet spec and return a normalized item list
     ``[{"key": str, "depends_on": list[str]}, ...]``. Raises ``FleetSpecError``
     on a missing/duplicate key or a dependency referencing an unknown item."""
