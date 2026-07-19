@@ -231,6 +231,14 @@ purpose — they are design choices, not missing features:
 
 Full rationale, with the failure mode each choice accepts: [`docs/solutions/outer-loop-non-gaps.md`](docs/solutions/outer-loop-non-gaps.md).
 
+> **Relation to `cobusgreyling/loop-engineering`** — that 8.5k★ repo is the
+> **outer loop** (schedule / triage / escalate a repo over time); this engine is
+> the **inner loop** (converge one artifact to an independent grade). They
+> compose, they don't compete — history says every dead improvement loop died at
+> the *grading* step, which is exactly the step this engine enforces. Should-we /
+> how-to integrate, with the survival-test evidence:
+> [`docs/solutions/integrate-loop-engineering.md`](docs/solutions/integrate-loop-engineering.md).
+
 ---
 
 ## 🛰️ Fleets — coordinate many loops under one goal

@@ -6,6 +6,23 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Integration eval + governance format vs `cobusgreyling/loop-engineering`** —
+  a decision record ([`docs/solutions/integrate-loop-engineering.md`](docs/solutions/integrate-loop-engineering.md))
+  positioning that repo as the **outer loop** (schedule/triage/escalate over time)
+  and this engine as the **inner loop** (converge one artifact to an independent
+  grade), backed by four research sweeps (30-day engagement, 30-year and 300-year
+  survival tests). Verdict: adopt the *discipline and formats*, never the code
+  (KTD1). Adopts a root `gate.yaml` (path denylist + auto-merge allowlist +
+  `maxFiles`) as the machine-readable twin of the safety rules — with the referee
+  files (`adapters/judge.py`, `loop/integrity.py`) explicitly denied to the maker
+  — and the **L1 report-only → L2 assisted → L3 unattended** autonomy ladder as
+  the vocabulary for the confirm/`--scheduled` states. Rewrites the stale
+  `skills/loop-anything/SKILL.md` to match the shipped CLI surface
+  (`fleet`/`demo`/`schedule`/`learnings`/`showcase`/`judge-variance`) and to carry
+  the survival-tested operating discipline (the grader is the product; give the
+  grader requisite variety; measure don't self-report; prove convergence at design
+  time). Names the honest gaps their patterns fill next: live scheduled execution
+  (`schedule tick` is report-only today), `run --pr` Loop-as-PR, and `gate check`.
 - **Learnings portability — the corpus as a versioned artifact (plan 2026-07-02 U1)** —
   the engine's compounding memory (the `learnings` table) lived only in the gitignored,
   machine-local `loopeng.db`, the exact "workspace drift" failure the loop prevents for
