@@ -48,8 +48,12 @@ class DomainRegistry:
 def default_registry() -> DomainRegistry:
     """The registry the router shim and runner resolve against."""
     from .software import SOFTWARE_CODEBASE, SOFTWARE_SERVICE
+    from .tooling import TOOLING_SKILL
 
     reg = DomainRegistry()
+    # Tooling first: a SKILL.md-bearing dir is more specific than software-codebase's
+    # "any existing directory", so it must get first refusal (first-match wins).
+    reg.register(TOOLING_SKILL)
     reg.register(SOFTWARE_SERVICE)
     reg.register(SOFTWARE_CODEBASE)
     return reg
