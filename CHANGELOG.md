@@ -6,6 +6,14 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Before/after examples report ([`docs/loop-anything-before-after.md`](docs/loop-anything-before-after.md))** —
+  a side-by-side of what `/loop-anything` changes, built from the repo's **real**
+  recorded proofs (not invented numbers): the three `live_verified` `F → A` runs
+  (standup digest, factcli `F(0.0) → A(100.0)` in 4 iterations with 2 rollbacks,
+  the 2-slice fleet), plus clearly-labeled `illustrative` recipes — including
+  `software-arch` `D → C → B` **stopped** to show the loop halts honestly instead
+  of faking a green. Provenance (`live_verified` vs `illustrative`) is labeled
+  throughout. Linked from the README verified-loops section.
 - **Integration eval + governance format vs `cobusgreyling/loop-engineering`** —
   a decision record ([`docs/solutions/integrate-loop-engineering.md`](docs/solutions/integrate-loop-engineering.md))
   positioning that repo as the **outer loop** (schedule/triage/escalate over time)

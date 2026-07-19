@@ -48,6 +48,16 @@ only path to a `live_verified` card):
 | **factcli** | a CLI brought up to the agent-native (non-interactive) contract | `F → A` | [PROOF](demos/targets/factcli/PROOF.md) |
 | **one-person-industrial-engine** | a 2-slice product **fleet** (API → dependent digest), both slices converged in dependency order with the upstream outcome routed downstream | `F → A` ×2 | [PROOF](demos/fleets/one-person-industrial-engine/PROOF.md) |
 
+> **Before vs after — what the loop actually changed.** Each verified run turned a
+> failing baseline into an A: `factcli` went `F(0.0) → A(100.0)` in 4 iterations
+> (two refactors *rolled back* for no gain before the third stuck); the standup
+> digest went `F → A` once `version --json` stopped crashing and the digest became
+> structured JSON with the captured blocker surfaced. And when the loop *can't*
+> reach the bar it **stops and says so** (the `software-arch` recipe plateaus at
+> `D → C → B`, `stopped`) rather than fake a green. Full side-by-side with grades,
+> trajectories, and the specific bugs fixed:
+> **[docs/loop-anything-before-after.md](docs/loop-anything-before-after.md)**.
+
 ### 🗺️ The broader menu — point the loop at any of these
 
 | Domain | What "improving itself" looks like |
