@@ -6,6 +6,22 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **`software-arch` graduated to a `live_verified` `F → A` proof** — the first
+  *article-domain* starter to become a real recorded run (the earlier graduates
+  were the personal-automation / self-contained / fleet cohort). A deliberately
+  buggy ops CLI over a local in-process microservice (`demos/targets/software-arch/`,
+  wrapping `service.py`) was graded by the real `cli-judge` on a 4-task D2
+  non-interactive contract (`version` / `health` / `items list` / `items add`) and
+  refactored by the free-tier Gemini refiner (no Anthropic quota) from **F (0.0/18)
+  to A (100/100)** in 2 iterations — independently re-graded at A. Ships the target
+  + `service.py`, the adapter (`demos/adapters/software-arch.py`), the suite +
+  tasks (`demos/suites/software-arch.yaml`, `demos/suites/sa/*.json`), evidence
+  (before/after reports + the converged CLI), a driver
+  (`scripts/drive_software_arch_proof.py`), and `demos/targets/software-arch/PROOF.md`.
+  `demos/results/software-arch.json` flips `illustrative → live_verified` via the
+  legit `demo record` path (KTD2). Docs updated: the README verified-loops table
+  (now 4 `F → A`), the before/after report, and the honest "stops rather than fake a
+  green" example moved to `biotech-discovery` (`C → B → B`, stopped).
 - **Before/after examples report ([`docs/loop-anything-before-after.md`](docs/loop-anything-before-after.md))** —
   a side-by-side of what `/loop-anything` changes, built from the repo's **real**
   recorded proofs (not invented numbers): the three `live_verified` `F → A` runs

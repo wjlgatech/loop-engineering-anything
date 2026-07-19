@@ -1,13 +1,12 @@
 {
   "demo_id": "software-arch",
-  "source": "illustrative",
+  "source": "live_verified",
   "grade_trajectory": [
-    "D",
-    "C",
-    "B"
+    "F",
+    "A"
   ],
-  "final_grade": "B",
-  "convergence_status": "stopped",
+  "final_grade": "A",
+  "convergence_status": "converged",
   "report_ref": "software-arch.report.md",
   "engine_version": "0.1.0"
 }

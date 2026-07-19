@@ -1,7 +1,7 @@
 id: software-arch
 title: Microservice ops CLI
 domain: Complex software architecture
-target: services/example-microservice
+target: demos/targets/software-arch
 lane: codebase
 goal: make a local microservice agent-native
 kind: demo

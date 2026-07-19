@@ -27,10 +27,17 @@ SHIPPED_DOMAINS = {
 # they ship WITHOUT a fixture (draft) and earn a card only via a real `demo proof`.
 PROOF_TARGET_IDS = {"arxiv", "hackernews", "wikipedia"}
 
-# Graduated self-contained demos: recipes that became real, `live_verified` demos
-# via an actual F->A loop run + `demo record` (a third cohort, distinct from the 10
-# article starters and the catalog proof-targets). These legitimately ship verified.
-GRADUATED_DEMO_IDS = {"automate-your-job", "factcli", "one-person-industrial-engine"}
+# Graduated demos: recipes that became real, `live_verified` demos via an actual
+# F->A loop run + `demo record` (distinct from the still-illustrative article
+# starters and the catalog proof-targets). These legitimately ship verified.
+# `software-arch` is the first *article-domain* starter to graduate (the rest are a
+# separate personal-automation / self-contained / fleet cohort).
+GRADUATED_DEMO_IDS = {
+    "automate-your-job",
+    "factcli",
+    "one-person-industrial-engine",
+    "software-arch",
+}
 
 
 def _reg():
@@ -48,7 +55,9 @@ def test_all_manifests_and_fixtures_validate():
     reg = _reg()
     for m in reg.manifests.values():
         reg.result_for(m)  # loads + schema-validates any fixture
-    assert len(_starters(reg)) == 10
+    # 9 article-domain starters remain illustrative; software-arch graduated to a
+    # live_verified run and moved into GRADUATED_DEMO_IDS.
+    assert len(_starters(reg)) == 9
     assert len(reg.recipes()) >= 1
 
 

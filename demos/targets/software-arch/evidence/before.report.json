@@ -1,0 +1,111 @@
+{
+  "suite": "software-arch",
+  "adapter": "software-arch",
+  "score": 0.0,
+  "grade": "F",
+  "safety_blocker": false,
+  "points": 0.0,
+  "max_points": 18.0,
+  "dimensions": {
+    "D2": {
+      "points": 0.0,
+      "max_points": 18.0
+    }
+  },
+  "tasks": [
+    {
+      "id": "d2.svc.version",
+      "dimension": "D2",
+      "points": 0.0,
+      "max_points": 3.0,
+      "provenance": "loop-engineering-anything/software-arch",
+      "findings": [
+        {
+          "severity": "friction",
+          "code": "D2_EXIT_CODE",
+          "message": "exit_code failed",
+          "evidence": "exit=1 expected 0"
+        }
+      ],
+      "exit_code": 1
+    },
+    {
+      "id": "d2.svc.health",
+      "dimension": "D2",
+      "points": 0.0,
+      "max_points": 5.0,
+      "provenance": "loop-engineering-anything/software-arch",
+      "findings": [
+        {
+          "severity": "friction",
+          "code": "D2_STDOUT_IS_JSON",
+          "message": "stdout_is_json failed",
+          "evidence": "stdout not valid JSON"
+        },
+        {
+          "severity": "friction",
+          "code": "D2_STDOUT_JSON_PATH",
+          "message": "stdout_json_path failed",
+          "evidence": "stdout not JSON"
+        },
+        {
+          "severity": "friction",
+          "code": "D2_STDOUT_CONTAINS",
+          "message": "stdout_contains failed",
+          "evidence": "'ok' absent in stdout"
+        }
+      ],
+      "exit_code": 0
+    },
+    {
+      "id": "d2.svc.items_empty",
+      "dimension": "D2",
+      "points": 0.0,
+      "max_points": 5.0,
+      "provenance": "loop-engineering-anything/software-arch",
+      "findings": [
+        {
+          "severity": "friction",
+          "code": "D2_STDOUT_IS_JSON",
+          "message": "stdout_is_json failed",
+          "evidence": "stdout not valid JSON"
+        },
+        {
+          "severity": "friction",
+          "code": "D2_STDOUT_JSON_PATH",
+          "message": "stdout_json_path failed",
+          "evidence": "stdout not JSON"
+        },
+        {
+          "severity": "friction",
+          "code": "D2_NO_LOG_ON_STDOUT",
+          "message": "no_log_on_stdout failed",
+          "evidence": "stdout carries non-JSON log/banner text"
+        }
+      ],
+      "exit_code": 0
+    },
+    {
+      "id": "d2.svc.additem",
+      "dimension": "D2",
+      "points": 0.0,
+      "max_points": 5.0,
+      "provenance": "loop-engineering-anything/software-arch",
+      "findings": [
+        {
+          "severity": "friction",
+          "code": "D2_EXIT_CODE",
+          "message": "exit_code failed",
+          "evidence": "exit=1 expected 0"
+        },
+        {
+          "severity": "friction",
+          "code": "D2_STDOUT_IS_JSON",
+          "message": "stdout_is_json failed",
+          "evidence": "stdout not valid JSON"
+        }
+      ],
+      "exit_code": 1
+    }
+  ]
+}

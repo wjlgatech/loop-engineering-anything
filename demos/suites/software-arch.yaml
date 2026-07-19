@@ -1,0 +1,14 @@
+# Self-contained D2 contract for the loop-anything 'software-arch' proof target.
+# CLI-Judge resolves suites + tasks from its own checkout, so copy this suite and
+# the sa/ task+fixture files there once:
+#   cp demos/suites/software-arch.yaml ~/.cache/loopeng/cli-judge/suites/
+#   mkdir -p ~/.cache/loopeng/cli-judge/fixtures/sa
+#   cp demos/suites/sa/*.json ~/.cache/loopeng/cli-judge/fixtures/sa/
+# All four tasks are upstream-free (the CLI wraps a local in-process service).
+name: software-arch
+description: Make a local microservice agent-native — non-interactive JSON ops CLI over the service module.
+tasks:
+  - d2.svc.version
+  - d2.svc.health
+  - d2.svc.items_empty
+  - d2.svc.additem
