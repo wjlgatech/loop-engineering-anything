@@ -6,6 +6,17 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **First live knowledge graph from a cited repo (U2 knowledge half)** — the
+  ecosystem-hub factory's first real output: a deterministic AST knowledge graph
+  for **HarnessX** (`Darwin-Agent/HarnessX`, pinned SHA), built with **no LLM**
+  (near-free, reproducible) — **584 files → 6317 nodes, 21715 edges** across real
+  edge types; it correctly surfaces the repo's event-driven architecture. Ships the
+  driver `scripts/build_repo_kg.py`, path-clean evidence under `docs/hub/kg/harnessx/`
+  (`KG-PROOF.md` + `kg-summary.json`; the 10 MB full graph is gitignored/regenerable),
+  and marks `harnessx` `kg_status: live` in `docs/cited-repos.yaml`. Honest scope: the
+  **tooling half of U2 is blocked** — the generate-frontier factory (`cli-anything`)
+  isn't installed and no `ToolingJudge` exists yet (U3), so a graded-tool proof is not
+  shippable without faking it.
 - **Ecosystem-hub factory — design + SHA-pinned ingestion registry** — the plan
   ([`docs/plans/2026-07-19-001-ecosystem-hub-factory.md`](docs/plans/2026-07-19-001-ecosystem-hub-factory.md))
   for turning the hub's three axes (knowledge / tooling / experts) into a factory
