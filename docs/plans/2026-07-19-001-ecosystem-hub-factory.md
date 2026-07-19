@@ -97,10 +97,9 @@ grading step, not generation.** So:
 
 The inventory is honest that three things do **not** exist yet:
 
-1. **A `ToolingJudge` + `Domain`** that grades *generated agentic tooling* against
-   the KG: "does this skill/plugin/MCP actually do what its SKILL.md claims, and is
-   it faithful to the repo's real structure?" This is the requisite-variety grader
-   for the tooling axis — the single highest-leverage build.
+1. ~~A `ToolingJudge` + `Domain` that grades *generated agentic tooling*.~~
+   **DONE (U3)** — the deterministic `ToolingJudge` + `tooling-skill` domain grade a
+   skill for structure / claim-fidelity / safety; see the roadmap + `docs/hub/tooling/JUDGE-PROOF.md`.
 2. **A tooling `Factory` that emits a skill/plugin/MCP** (not just a Click CLI),
    keyed off the KG.
 3. **A freshness link KG→tooling** — regenerate the *tooling* (not only the KG) when
@@ -128,9 +127,18 @@ Everything else composes from parts that already ship.
     already note the generate frontier is deferred; there is also no `ToolingJudge`
     yet (U3). So a *graded generated tool* proof is not shippable today — building it
     would mean fabricating a green. The tooling half waits on U3+U4 below.
-- **U3:** the `ToolingJudge` + a `tooling` `Domain` (the gap, item 1) — grade a
-  generated skill for claim-fidelity + repo-faithfulness.
-- **U4:** the tooling `Factory` (gap item 2) — emit a SKILL.md/MCP keyed off the KG.
+- **U3 (SHIPPED):** the `ToolingJudge` + a `tooling-skill` `Domain` (the gap, item 1) —
+  a **deterministic** (no-LLM) referee grading a skill on structure / fidelity
+  ("does it do what it claims" — real files, compiling scripts, name matches dir) /
+  safety (terminal). Two hard gates cap at F: unsafe or unloadable. Proven to
+  discriminate on real skills (`skills/loop-anything` → A, broken/unsafe → F);
+  evidence: `docs/hub/tooling/JUDGE-PROOF.md`, `tests/test_tooling_judge.py`. The
+  domain binds the judge and is registered first (a `SKILL.md` dir routes here, not
+  to software-codebase), so the loop can now **grade an existing skill and refine it
+  toward Grade A** — the tooling half's quality gate now exists.
+- **U4:** the tooling `Factory` (gap item 2) — emit a SKILL.md/MCP keyed off the KG,
+  so the loop can generate→grade→converge tooling end to end (the judge from U3 is
+  already the referee it needs).
 - **U5:** the freshness link (gap item 3) + wire `schedule` to live execution.
 - **U6:** the graph-of-graphs — union the per-repo KGs, cross-link expert↔repo↔tool,
   expose over MCP; render into the existing showcase.

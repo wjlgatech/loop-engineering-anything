@@ -6,6 +6,20 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **`ToolingJudge` + `tooling-skill` domain — the tooling grader (U3)** — closes the
+  factory's biggest gap: a **deterministic, no-LLM** `Judge`
+  (`src/loopeng/adapters/tooling_judge.py`) that grades generated agentic tooling (a
+  skill) on **structure** (loadable frontmatter), **fidelity** (name matches dir,
+  every slash-pathed reference exists, referenced `.py` compiles — the "does it do
+  what it claims" check) and **safety** (terminal: `rm -rf /`, pipe-to-shell,
+  hardcoded secrets ⇒ `safety_ok=False`). Two hard gates cap at F (unsafe or
+  unloadable). The `tooling-skill` `Domain` (`src/loopeng/domains/tooling.py`) binds
+  it and is registered first so a `SKILL.md` dir routes here, not to
+  software-codebase (empty dirs/URLs still route to software — no regression). Proven
+  to discriminate on real skills (`skills/loop-anything` → A(92), broken/unsafe → F);
+  evidence: `docs/hub/tooling/JUDGE-PROOF.md`, 12 tests in
+  `tests/test_tooling_judge.py`. This is the quality gate the factory's tooling half
+  needed; the remaining net-new work is U4 (a skill Factory keyed off the KG).
 - **First live knowledge graph from a cited repo (U2 knowledge half)** — the
   ecosystem-hub factory's first real output: a deterministic AST knowledge graph
   for **HarnessX** (`Darwin-Agent/HarnessX`, pinned SHA), built with **no LLM**

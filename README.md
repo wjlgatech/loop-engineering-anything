@@ -113,8 +113,10 @@ distribute). The ingestion queue is data, SHA-pinned and license-gated:
 **First live output:** a real, deterministic (no-LLM) knowledge graph for a cited
 repo — **HarnessX**, 584 files → 6317 nodes / 21715 edges, correctly surfacing its
 event-driven architecture. Evidence: [`docs/hub/kg/harnessx/`](docs/hub/kg/harnessx/);
-regenerate any repo's graph with `scripts/build_repo_kg.py`. (The *tooling* half of
-the factory is still gated on a `ToolingJudge` — see the plan.)
+regenerate any repo's graph with `scripts/build_repo_kg.py`. The *tooling* half now
+has its quality gate: a deterministic **`ToolingJudge`** grades a generated skill on
+structure / claim-fidelity / safety (proven to discriminate — `skills/loop-anything`
+→ A, broken/unsafe → F; see [`docs/hub/tooling/JUDGE-PROOF.md`](docs/hub/tooling/JUDGE-PROOF.md)).
 
 ---
 
