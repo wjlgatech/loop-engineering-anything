@@ -1,8 +1,10 @@
-# Research report — Microservice ops CLI (illustrative)
+# Research report — run #1
 
-> **Illustrative** — a representative trajectory, not a verified live run. Re-run with `loop-anything demo record software-arch --from <run_id>` once the per-target adapter lands.
+- Target: software-arch (microservice ops CLI) (service lane)
+- Goal: make the microservice ops CLI agent-native: non-interactive, JSON output, no crashes
+- Status: **converged**  |  Final grade: **A**
+- Iterations: 2
+- Grade trajectory: F -> A
 
-- Target: services/example-microservice (codebase lane)
-- Goal: make a local microservice agent-native
-- Status: **stopped**  |  Final grade: **B**
-- Grade trajectory: D -> C -> B
+## Learnings compounded
+- iteration 2: grade F - A by targeting [D2] (regression: 1 file changed, 50 insertions(+), 16 deletions(-))

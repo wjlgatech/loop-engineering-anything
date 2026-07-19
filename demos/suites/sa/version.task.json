@@ -1,0 +1,15 @@
+{
+  "$schema": "../../schemas/task.schema.json",
+  "id": "d2.svc.version",
+  "dimension": "D2",
+  "title": "version --json must exit 0 without crashing",
+  "fixture": "fixtures/sa/software_arch.fixture.json",
+  "call": { "argv": ["version", "--json"] },
+  "assert": [
+    { "kind": "exit_code", "equals": 0 },
+    { "kind": "stdout_not_contains", "value": "Traceback" },
+    { "kind": "never_prompted" }
+  ],
+  "points": 3,
+  "provenance": "loop-engineering-anything/software-arch"
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "../../schemas/task.schema.json",
+  "id": "d2.svc.additem",
+  "dimension": "D2",
+  "title": "items add must run one-shot without prompting",
+  "fixture": "fixtures/sa/software_arch.fixture.json",
+  "call": { "argv": ["items", "add", "--name", "widget", "--qty", "3", "--json"], "no_tty": true, "stdin": "" },
+  "assert": [
+    { "kind": "completes_within_ms", "value": 5000 },
+    { "kind": "never_prompted" },
+    { "kind": "exit_code", "equals": 0 },
+    { "kind": "stdout_is_json" }
+  ],
+  "points": 5,
+  "provenance": "loop-engineering-anything/software-arch"
+}

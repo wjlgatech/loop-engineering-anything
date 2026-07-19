@@ -1,0 +1,16 @@
+{
+  "$schema": "../../schemas/task.schema.json",
+  "id": "d2.svc.health",
+  "dimension": "D2",
+  "title": "health --json must emit JSON with a status field = ok",
+  "fixture": "fixtures/sa/software_arch.fixture.json",
+  "call": { "argv": ["health", "--json"] },
+  "assert": [
+    { "kind": "exit_code", "equals": 0 },
+    { "kind": "stdout_is_json" },
+    { "kind": "stdout_json_path", "path": "status", "op": "exists" },
+    { "kind": "stdout_contains", "value": "ok" }
+  ],
+  "points": 5,
+  "provenance": "loop-engineering-anything/software-arch"
+}

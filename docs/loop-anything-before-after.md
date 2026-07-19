@@ -20,9 +20,10 @@ homework. And a card only becomes `live_verified` through `demo record` /
 
 ## ✅ Verified examples (real F → A runs)
 
-All three ran on **2026-06-16**, engine `0.1.0`, refined by a **free-tier LLM**
-(`FallbackLLMRefiner`, Gemini → Ollama chain — **zero Anthropic quota**). The
-referee is the real `cli-judge`.
+All ran engine `0.1.0`, refined by a **free-tier LLM** (`FallbackLLMRefiner`,
+Gemini → Ollama chain — **zero Anthropic quota**). The referee is the real
+`cli-judge`. The first three ran **2026-06-16**; software-arch graduated
+**2026-07-19**.
 
 ### 1. automate-your-job — a team lead's standup digest
 
@@ -65,6 +66,21 @@ slice, converged in dependency order with the upstream outcome routed downstream
 **Trajectory:** `F → A` on both (converged). Proof:
 [`demos/fleets/one-person-industrial-engine/PROOF.md`](../demos/fleets/one-person-industrial-engine/PROOF.md).
 
+### 4. software-arch — a microservice made agent-native
+
+An ops CLI over a local in-process microservice (`service.py`), graded on a
+four-task D2 non-interactive contract. This recipe **graduated from illustrative
+to verified** via a real run.
+
+| | grade | score | failing tasks |
+|---|---|---|---|
+| **before** (baseline `cli.py`) | **F** | 0.0/18 | all 4 — `version` crashes with a `TypeError`, `health` prints plain text, `items list` emits `no items` (no `items` key), `items add` prompts interactively |
+| **after** (loop-refined) | **A** | 100.0/100 | none — every command is non-interactive and emits valid JSON |
+
+**Trajectory:** `F → A` (converged, 2 iterations, Gemini refiner). Independently
+re-graded at A (100/100). Proof:
+[`demos/targets/software-arch/PROOF.md`](../demos/targets/software-arch/PROOF.md).
+
 ---
 
 ## 🧪 Illustrative examples (recipes — expected trajectory, not yet a live run)
@@ -77,11 +93,12 @@ not cite them as proof.
 |---|---|---|---|
 | **pr-lifecycle** (autonomous PR-lifecycle CLI) | `C → B → A` | converged | the inner loop under a PR-babysitter outer loop |
 | **quant-macro** (Frankfurter FX CLI) | `C → B → A` | converged | a data/API tool climbing to A |
-| **software-arch** (microservice ops CLI) | `D → C → B` | **stopped at B** | honest non-A outcome — the loop plateaued and stopped rather than fake a green |
+| **biotech-discovery** (assay/discovery CLI) | `C → B → B` | **stopped at B** | honest non-A outcome — the loop plateaued and stopped rather than fake a green |
 
-The `software-arch` row is the important one: when the loop can't reach the bar,
-it **stops and says so** (`convergence_status: stopped`, final grade B). An honest
-❌/B beats a fabricated A.
+The `biotech-discovery` row is the important one: when the loop can't reach the
+bar, it **stops and says so** (`convergence_status: stopped`, final grade B). An
+honest ❌/B beats a fabricated A. (`software-arch` used to be this example — it has
+since graduated to a verified `F → A`, above.)
 
 ---
 

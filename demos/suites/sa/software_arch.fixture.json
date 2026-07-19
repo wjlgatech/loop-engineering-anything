@@ -1,0 +1,9 @@
+{
+  "$schema": "../../schemas/fixture.schema.json",
+  "id": "software_arch_ops",
+  "type": "subprocess_transcript",
+  "provenance": "loop-engineering-anything/software-arch",
+  "description": "The target CLI wraps a local in-process service module; no HTTP replay needed.",
+  "synthetic": false,
+  "transcript": {}
+}

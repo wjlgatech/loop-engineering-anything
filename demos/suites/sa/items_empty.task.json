@@ -1,0 +1,16 @@
+{
+  "$schema": "../../schemas/task.schema.json",
+  "id": "d2.svc.items_empty",
+  "dimension": "D2",
+  "title": "items list --json must be valid JSON with an items key even when empty",
+  "fixture": "fixtures/sa/software_arch.fixture.json",
+  "call": { "argv": ["items", "list", "--json"] },
+  "assert": [
+    { "kind": "exit_code", "equals": 0 },
+    { "kind": "stdout_is_json" },
+    { "kind": "stdout_json_path", "path": "items", "op": "exists" },
+    { "kind": "no_log_on_stdout" }
+  ],
+  "points": 5,
+  "provenance": "loop-engineering-anything/software-arch"
+}
