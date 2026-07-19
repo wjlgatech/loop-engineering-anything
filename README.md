@@ -97,6 +97,21 @@ loop-anything demo proof <id> --catalog cli-anything --name <entry> \
 
 ---
 
+## 🕸️ The hub — knowledge · tooling · experts
+
+Beyond running loops, this repo is a **hub of three things**: the *knowledge*, the
+*tooling*, and the *experts* of the loop-engineering ecosystem. The **ecosystem-hub
+factory** ingests each top-rated cited repo and emits, per repo, a **knowledge
+graph** *and* **grade-gated agentic tooling** (skills / plugins / MCP servers) —
+composing existing blocks (understand-anything / graphify for the KG, `cli-anything
+build` for tooling, the loop controller to grade-and-converge, SKILL.md + MCP to
+distribute). The ingestion queue is data, SHA-pinned and license-gated:
+[`docs/cited-repos.yaml`](docs/cited-repos.yaml). Design + the five axes
+(high-quality / fast / cheap / up-to-date / future-proof) as concrete mechanisms:
+[`docs/plans/2026-07-19-001-ecosystem-hub-factory.md`](docs/plans/2026-07-19-001-ecosystem-hub-factory.md).
+
+---
+
 ## 🧠 Why a loop?
 
 Building agent-native tooling today is a **one-shot act**: generate a CLI, eyeball it, stop.

@@ -1,0 +1,142 @@
+# Cited-repos registry — the ingestion queue for the ecosystem hub factory.
+#
+# loop-engineering-anything is the HUB of three things: (1) knowledge, (2) tooling,
+# (3) experts. This file is the single source of truth (data, not code) for the
+# top-rated repos the hub ingests. For each, the factory produces a knowledge graph
+# and grade-gated agentic tooling. See docs/plans/2026-07-19-001-ecosystem-hub-factory.md.
+#
+# Discipline baked into this file (future-proofing, learned the hard way):
+#   - PINNED by full 40-char commit SHA (verified 2026-07-19) — never a moving ref.
+#     Freshness is a *loop* (poll upstream HEAD, re-pin, re-ingest), not a floating ref.
+#   - LICENSE-GATED: a repo with no license (redistribution unclear) is `ingest_kg: true`
+#     but `emit_tooling: false` — we may study it, we may NOT ship generated tooling from it.
+#   - TIERED: T1 real+top-rated (ingest now) / T2 real+niche (ingest on demand) /
+#     T3 seed/fork/self-cited (skip until it earns activity).
+#   - Ratings & SHAs are a snapshot; a scheduled cadence re-verifies (see the plan).
+version: 1
+verified_at: "2026-07-19"
+
+repos:
+  - id: cli-anything
+    repo: HKUDS/CLI-Anything
+    sha: bc536c9bebb7c3d9f7bb2736a732609139c1acdb
+    stars: 45590
+    license: Apache-2.0
+    lang: Python
+    tier: T1
+    purpose: "Making ALL software agent-native — CLI framework/hub."
+    ingest_kg: true
+    emit_tooling: true
+    experts: [HKUDS]
+
+  - id: compound-engineering-plugin
+    repo: EveryInc/compound-engineering-plugin
+    sha: 1f2ea66b2cb7a9743249b30e8d0ce2a6adb89590
+    stars: 23227
+    license: MIT
+    lang: TypeScript
+    tier: T1
+    purpose: "Official Compound Engineering plugin for Claude Code/Codex/Cursor."
+    ingest_kg: true
+    emit_tooling: true
+    experts: [EveryInc]
+
+  - id: agent-orchestrator
+    repo: AgentWrapper/agent-orchestrator
+    sha: 5532fa1bd18562b39c6ef6de550d91874582072a
+    stars: 8380
+    license: Apache-2.0
+    lang: Go
+    tier: T1
+    purpose: "Agent IDE to manage fleets of coding agents."
+    ingest_kg: true
+    emit_tooling: true
+    experts: [AgentWrapper]
+
+  - id: gepa
+    repo: gepa-ai/gepa
+    sha: 665cbc368313b7223f2b0638d2ef47da7a130dad
+    stars: 5696
+    license: MIT
+    lang: Jupyter
+    tier: T1
+    purpose: "Reflective AI optimizer for prompts/code."
+    ingest_kg: true
+    emit_tooling: true
+    experts: [gepa-ai]
+
+  - id: cli-printing-press
+    repo: mvanhorn/cli-printing-press
+    sha: f000ba4cdfbf6b6f5e5b1ca76e54ba24a7bf06f2
+    stars: 4070
+    license: MIT
+    lang: Go
+    tier: T1
+    purpose: "Absorbs features from competing APIs into one CLI."
+    ingest_kg: true
+    emit_tooling: true
+    experts: [mvanhorn]
+
+  - id: gemini-cli
+    repo: google-gemini/gemini-cli
+    sha: acae7124bdd849e554eaa5e090199a0cf08cd782
+    stars: 106074
+    license: Apache-2.0
+    lang: TypeScript
+    tier: T1
+    purpose: "Open-source agentic AI in the terminal."
+    ingest_kg: true
+    emit_tooling: true
+    experts: [google-gemini]
+
+  - id: hermes-agent
+    repo: NousResearch/hermes-agent
+    sha: 299e409f15aa5615a8a64be488580be92cda351e
+    stars: 217190
+    license: MIT
+    lang: Python
+    tier: T1
+    purpose: "General agent that grows with you; cited loop-primitive adopter."
+    ingest_kg: true
+    emit_tooling: true
+    experts: [NousResearch]
+
+  - id: harnessx
+    repo: Darwin-Agent/HarnessX
+    sha: 0e86396f504de7ed7af8acfdef62b62288dec594
+    stars: 262
+    license: MIT
+    lang: Python
+    tier: T2
+    purpose: "Harness foundry — forge agent harnesses from reusable processors."
+    ingest_kg: true
+    emit_tooling: true
+    experts: [Darwin-Agent]
+
+# --- Deferred (do not ingest yet; documented for honesty & future promotion) ---
+deferred:
+  - repo: WorldFlowAI/everything-claude-code
+    reason: "STALE (~6mo, last push 2026-01-23) AND no license — study only, never redistribute."
+    tier: T2
+    ingest_kg: true
+    emit_tooling: false
+  - repo: mvanhorn/printing-press-library
+    reason: "No license file — redistribution unclear; KG ok, no tooling emission."
+    tier: T2
+    ingest_kg: true
+    emit_tooling: false
+  - repo: cobusgreyling/goal-engineering
+    reason: "Niche (32★) companion to loop-engineering; promote if activity grows."
+    tier: T2
+  - repo: wjlgatech/cli-judge
+    reason: "Self-authored seed (1★) — already a first-class dependency, not an ingestion target."
+    tier: T3
+  - repo: open-spek/loop
+    reason: "Seed (3★); term-collision peer, not a dependency."
+    tier: T3
+  - repo: open-spek/jsonq
+    reason: "1★ PoC proof for open-spek/loop."
+    tier: T3
+  - repo: 50thycal/loop-engineering
+    reason: "0★ fork/mirror of cobusgreyling/loop-engineering."
+    tier: T3
