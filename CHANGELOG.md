@@ -6,6 +6,19 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Ecosystem-hub factory — design + SHA-pinned ingestion registry** — the plan
+  ([`docs/plans/2026-07-19-001-ecosystem-hub-factory.md`](docs/plans/2026-07-19-001-ecosystem-hub-factory.md))
+  for turning the hub's three axes (knowledge / tooling / experts) into a factory
+  that, for each top-rated cited repo, emits a knowledge graph **and** grade-gated
+  agentic tooling. Composes existing blocks (understand-anything / graphify for the
+  KG, `cli-anything build` as the tooling Factory, the loop controller as the
+  grade-and-converge backbone, SKILL.md + MCP for distribution) and names the only
+  net-new work (a `ToolingJudge`, a skill/plugin Factory, and a KG→tooling freshness
+  link). Ships the ingestion queue as data: [`docs/cited-repos.yaml`](docs/cited-repos.yaml)
+  — 8 T1/T2 targets pinned by full commit SHA (verified 2026-07-19) and
+  license-gated (no-license repos are `emit_tooling: false`). Each of the five axes
+  (high-quality / fast / cheap / up-to-date / future-proof) is specified as a
+  concrete mechanism, not an adjective.
 - **`software-arch` graduated to a `live_verified` `F → A` proof** — the first
   *article-domain* starter to become a real recorded run (the earlier graduates
   were the personal-automation / self-contained / fleet cohort). A deliberately
