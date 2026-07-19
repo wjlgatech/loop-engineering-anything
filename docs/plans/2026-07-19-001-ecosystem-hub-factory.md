@@ -110,12 +110,24 @@ Everything else composes from parts that already ship.
 
 ## Roadmap (decomposed — one verified step per unit)
 
-- **U1 (shipped here):** the `docs/cited-repos.yaml` registry (SHA-pinned, license-gated)
+- **U1 (shipped):** the `docs/cited-repos.yaml` registry (SHA-pinned, license-gated)
   + this plan.
-- **U2:** a live proof-of-concept — one T1 repo (propose `cli-anything`, the closest
-  fit) through the full pipeline, recorded as a before/after proof exactly like
-  `software-arch` (`demo record`, `live_verified`). Prove the composition before
-  scaling.
+- **U2 — knowledge half (SHIPPED, live):** a real knowledge graph for a cited repo,
+  built deterministically (graphify AST path, **no LLM**, near-free, reproducible via
+  `scripts/build_repo_kg.py`). First target: **HarnessX** — chosen over the doc's
+  original `cli-anything` example as the cheapest on-topic first proof (small + Python
+  + the most direct harness-foundry fit), to de-risk before the large T1 repos.
+  Result: **584 files → 6317 nodes, 21715 edges** across real edge types
+  (uses/calls/contains/method/inherits/imports); the graph correctly surfaces
+  HarnessX's event-driven architecture (the `events_*` nodes, `MultiHookProcessor`,
+  `HarnessConfig`, `HarnessJournal` are its structural hubs). Confidence is honestly
+  split EXTRACTED (literal AST) vs INFERRED (heuristic edges). Evidence:
+  `docs/hub/kg/harnessx/`.
+  - **U2 — tooling half (BLOCKED, honest):** the generate-frontier factory
+    (`cli-anything`) is **not installed on this machine**, and this repo's own proofs
+    already note the generate frontier is deferred; there is also no `ToolingJudge`
+    yet (U3). So a *graded generated tool* proof is not shippable today — building it
+    would mean fabricating a green. The tooling half waits on U3+U4 below.
 - **U3:** the `ToolingJudge` + a `tooling` `Domain` (the gap, item 1) — grade a
   generated skill for claim-fidelity + repo-faithfulness.
 - **U4:** the tooling `Factory` (gap item 2) — emit a SKILL.md/MCP keyed off the KG.

@@ -110,6 +110,12 @@ distribute). The ingestion queue is data, SHA-pinned and license-gated:
 (high-quality / fast / cheap / up-to-date / future-proof) as concrete mechanisms:
 [`docs/plans/2026-07-19-001-ecosystem-hub-factory.md`](docs/plans/2026-07-19-001-ecosystem-hub-factory.md).
 
+**First live output:** a real, deterministic (no-LLM) knowledge graph for a cited
+repo — **HarnessX**, 584 files → 6317 nodes / 21715 edges, correctly surfacing its
+event-driven architecture. Evidence: [`docs/hub/kg/harnessx/`](docs/hub/kg/harnessx/);
+regenerate any repo's graph with `scripts/build_repo_kg.py`. (The *tooling* half of
+the factory is still gated on a `ToolingJudge` — see the plan.)
+
 ---
 
 ## 🧠 Why a loop?

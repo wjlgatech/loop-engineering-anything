@@ -112,6 +112,12 @@ repos:
     ingest_kg: true
     emit_tooling: true
     experts: [Darwin-Agent]
+    # First live KG (U2 knowledge half): real deterministic AST graph — 584 files,
+    # 6317 nodes, 21715 edges. Evidence: docs/hub/kg/harnessx/ (regenerate the full
+    # graph with `scripts/build_repo_kg.py`). Chosen as the cheapest on-topic first
+    # target (small + Python + harness-foundry) to de-risk before the large T1 repos.
+    kg_status: live
+    kg_evidence: docs/hub/kg/harnessx/
 
 # --- Deferred (do not ingest yet; documented for honesty & future promotion) ---
 deferred:
