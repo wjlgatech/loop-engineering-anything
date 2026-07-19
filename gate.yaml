@@ -1,0 +1,29 @@
+# Machine-readable governance for loop-engineering-anything.
+# Adopted format from cobusgreyling/loop-engineering (loop-gate); enforced here by
+# the engine's own primitives: within_workspace (fs jail), validate_target
+# (rejects shell metachars), minimal_env (credential allowlist), and the terminal
+# BLOCKED_SAFETY verdict. See docs/solutions/integrate-loop-engineering.md.
+version: 1
+
+# Paths an autonomous loop must never write, no matter how high the grade.
+denylist:
+  - ".env"
+  - ".env.*"
+  - "**/secrets/**"
+  - "**/credentials/**"
+  - "**/*_key*"
+  - "**/*_secret*"
+  - "loopeng.db"            # local-first memory store — never machine-written into a PR
+  - ".loopeng/**"           # run workspaces, proofs, worktrees
+  - "src/loopeng/adapters/judge.py"   # referee immutability: maker never edits the checker
+  - "src/loopeng/loop/integrity.py"   # the maker≠checker contract itself
+
+# Max files a single unattended iteration may touch before it must escalate.
+maxFiles: 10
+
+# Paths a converged run may auto-merge (docs/tests only) once at L3.
+# Everything else stays behind the human VerificationGate (L2).
+autoMergeAllowlist:
+  - "docs/**"
+  - "**/*.md"
+  - "demos/results/**"
