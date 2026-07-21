@@ -117,6 +117,10 @@ regenerate any repo's graph with `scripts/build_repo_kg.py`. The *tooling* half 
 has its quality gate: a deterministic **`ToolingJudge`** grades a generated skill on
 structure / claim-fidelity / safety (proven to discriminate — `skills/loop-anything`
 → A, broken/unsafe → F; see [`docs/hub/tooling/JUDGE-PROOF.md`](docs/hub/tooling/JUDGE-PROOF.md)).
+And the tooling half now runs **end to end**: a KG-keyed **`ToolingSkillFactory`**
+generates a skill from a repo's knowledge graph, which the loop grades and
+converges — proven on HarnessX (**generate → A(100) → CONVERGED**;
+[`docs/hub/tooling/FACTORY-PROOF.md`](docs/hub/tooling/FACTORY-PROOF.md)).
 
 ---
 

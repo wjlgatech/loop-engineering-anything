@@ -1,0 +1,25 @@
+{
+  "repo": "harnessx",
+  "files_ingested": 584,
+  "nodes": 6317,
+  "edges": 21715,
+  "node_types": {
+    "code": 4584,
+    "rationale": 1733
+  },
+  "edge_types": {
+    "uses": 12683,
+    "calls": 2535,
+    "contains": 2504,
+    "method": 1670,
+    "rationale_for": 1568,
+    "imports_from": 436,
+    "inherits": 241,
+    "imports": 78
+  },
+  "edge_confidence": {
+    "EXTRACTED": 6497,
+    "INFERRED": 15218
+  },
+  "html_rendered": false
+}

@@ -100,8 +100,10 @@ The inventory is honest that three things do **not** exist yet:
 1. ~~A `ToolingJudge` + `Domain` that grades *generated agentic tooling*.~~
    **DONE (U3)** — the deterministic `ToolingJudge` + `tooling-skill` domain grade a
    skill for structure / claim-fidelity / safety; see the roadmap + `docs/hub/tooling/JUDGE-PROOF.md`.
-2. **A tooling `Factory` that emits a skill/plugin/MCP** (not just a Click CLI),
-   keyed off the KG.
+2. ~~A tooling `Factory` that emits a skill keyed off the KG.~~ **DONE (U4)** —
+   `ToolingSkillFactory` generates a skill (SKILL.md + a real onboarding helper)
+   from a repo's KG; proven generate→grade→converge on HarnessX (A/100, CONVERGED).
+   See `docs/hub/tooling/FACTORY-PROOF.md`. (Plugin/MCP emission is the follow-on.)
 3. **A freshness link KG→tooling** — regenerate the *tooling* (not only the KG) when
    the repo changes.
 
@@ -136,9 +138,15 @@ Everything else composes from parts that already ship.
   domain binds the judge and is registered first (a `SKILL.md` dir routes here, not
   to software-codebase), so the loop can now **grade an existing skill and refine it
   toward Grade A** — the tooling half's quality gate now exists.
-- **U4:** the tooling `Factory` (gap item 2) — emit a SKILL.md/MCP keyed off the KG,
-  so the loop can generate→grade→converge tooling end to end (the judge from U3 is
-  already the referee it needs).
+- **U4 (SHIPPED):** the tooling `Factory` (gap item 2) — `ToolingSkillFactory`
+  generates a skill (SKILL.md + a compiling `scripts/kg_query.py` onboarding helper
+  + the bundled KG summary) from a repo's knowledge graph, **deterministically (no
+  LLM)**. Proven end to end on the real HarnessX KG: **generate → ToolingJudge grades
+  A(100) → LoopController CONVERGED** (`scripts/build_repo_tooling.py`,
+  `tests/test_tooling_factory.py`, evidence `docs/hub/tooling/`). The `tooling-skill`
+  domain now binds both factory (U4) and judge (U3), so the loop runs
+  generate→grade→converge on tooling with maker ≠ checker held. Follow-on: plugin/MCP
+  emission (same seam, richer template) + the LLM refine path for sub-A generations.
 - **U5:** the freshness link (gap item 3) + wire `schedule` to live execution.
 - **U6:** the graph-of-graphs — union the per-repo KGs, cross-link expert↔repo↔tool,
   expose over MCP; render into the existing showcase.

@@ -133,6 +133,8 @@ def test_registry_leaves_plain_dir_to_codebase(tmp_path):
     assert reg.resolve(str(tmp_path)).name == "software-codebase"
 
 
-def test_tooling_domain_is_refine_only():
-    assert TOOLING_SKILL.factory() is None
-    assert isinstance(TOOLING_SKILL.judge(), ToolingJudge)
+def test_tooling_domain_binds_factory_and_judge():
+    from loopeng.adapters.tooling_factory import ToolingSkillFactory
+
+    assert isinstance(TOOLING_SKILL.factory(), ToolingSkillFactory)  # U4
+    assert isinstance(TOOLING_SKILL.judge(), ToolingJudge)  # U3
