@@ -6,6 +6,18 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **`ToolingSkillFactory` — generate tooling from a repo's KG (U4)** — the tooling
+  half's generator, closing the loop with U3. Given a repo's knowledge graph
+  (`kg-summary.json`), it emits a **skill** — `SKILL.md` + a real, compiling
+  `scripts/kg_query.py` onboarding helper + the bundled KG summary — **deterministically
+  (no LLM)**, faithful by construction (name matches dir, referenced helper ships and
+  runs). Proven end to end on the real HarnessX KG (U2): **generate → `ToolingJudge`
+  grades A(100) → `LoopController` CONVERGED** (maker ≠ checker held). The
+  `tooling-skill` domain now binds both factory (U4) and judge (U3) in-domain, so the
+  loop runs generate→grade→converge on tooling. Ships the factory, driver
+  `scripts/build_repo_tooling.py`, the generated exemplar `docs/hub/tooling/use-harnessx/`,
+  `docs/hub/tooling/FACTORY-PROOF.md`, and 5 tests in `tests/test_tooling_factory.py`.
+  Follow-on: plugin/MCP emission + the LLM refine path for sub-A generations.
 - **`ToolingJudge` + `tooling-skill` domain — the tooling grader (U3)** — closes the
   factory's biggest gap: a **deterministic, no-LLM** `Judge`
   (`src/loopeng/adapters/tooling_judge.py`) that grades generated agentic tooling (a
