@@ -1,0 +1,105 @@
+{
+  "suite": "vlm-probe",
+  "adapter": "vlm-probe",
+  "score": 0.0,
+  "grade": "F",
+  "safety_blocker": false,
+  "points": 0.0,
+  "max_points": 18.0,
+  "dimensions": {
+    "D2": {
+      "points": 0.0,
+      "max_points": 18.0
+    }
+  },
+  "tasks": [
+    {
+      "id": "d2.repl.banner_signature",
+      "dimension": "D2",
+      "points": 0.0,
+      "max_points": 3.0,
+      "provenance": "HKUDS/CLI-Anything#278",
+      "findings": [
+        {
+          "severity": "friction",
+          "code": "D2_EXIT_CODE",
+          "message": "exit_code failed",
+          "evidence": "exit=2 expected 0"
+        }
+      ],
+      "exit_code": 2
+    },
+    {
+      "id": "d2.vlmprobe.run_scorecard_json",
+      "dimension": "D2",
+      "points": 0.0,
+      "max_points": 5.0,
+      "provenance": "wjlgatech/FM-os skills/vlm-failure-probe (agent-native wrap)",
+      "findings": [
+        {
+          "severity": "friction",
+          "code": "D2_EXIT_CODE",
+          "message": "exit_code failed",
+          "evidence": "exit=1 expected 0"
+        },
+        {
+          "severity": "friction",
+          "code": "D2_STDOUT_IS_JSON",
+          "message": "stdout_is_json failed",
+          "evidence": "stdout not valid JSON"
+        },
+        {
+          "severity": "friction",
+          "code": "D2_STDOUT_JSON_PATH",
+          "message": "stdout_json_path failed",
+          "evidence": "stdout not JSON"
+        }
+      ],
+      "exit_code": 1
+    },
+    {
+      "id": "d2.vlmprobe.gate_honest_fail",
+      "dimension": "D2",
+      "points": 0.0,
+      "max_points": 5.0,
+      "provenance": "FM-os Certified discipline: no evidence => No; an honest gate exits non-zero",
+      "findings": [
+        {
+          "severity": "friction",
+          "code": "D2_STDOUT_IS_JSON",
+          "message": "stdout_is_json failed",
+          "evidence": "stdout not valid JSON"
+        }
+      ],
+      "exit_code": 1
+    },
+    {
+      "id": "d2.vlmprobe.gate_pass_json",
+      "dimension": "D2",
+      "points": 0.0,
+      "max_points": 5.0,
+      "provenance": "wjlgatech/FM-os skills/vlm-failure-probe (agent-native wrap)",
+      "findings": [
+        {
+          "severity": "friction",
+          "code": "D2_STDOUT_IS_JSON",
+          "message": "stdout_is_json failed",
+          "evidence": "stdout not valid JSON"
+        },
+        {
+          "severity": "friction",
+          "code": "D2_STDOUT_JSON_PATH",
+          "message": "stdout_json_path failed",
+          "evidence": "stdout not JSON"
+        },
+        {
+          "severity": "friction",
+          "code": "D2_NO_LOG_ON_STDOUT",
+          "message": "no_log_on_stdout failed",
+          "evidence": "stdout carries non-JSON log/banner text"
+        }
+      ],
+      "exit_code": 0
+    }
+  ]
+}

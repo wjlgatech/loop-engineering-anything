@@ -30,5 +30,31 @@
         "evidence": "542 passed, ruff clean, CI 3.11-3.13, PR #43 merged"
       }
     ]
+  },
+  {
+    "id": "rc0002",
+    "delivery": "vlm-probe: first cross-repo loop demo \u2014 FM-os failure-probe suite driven from naive human CLI to agent-native, F(0.0) -> A(100.0) CONVERGED in 3 iterations by the free-tier refiner, graded by real cli-judge; new honest-gate task class (gate must exit 1 on the failing model)",
+    "objective": "Execute the loop using the CLI-anything (codebase) lane in loop-engineering-anything, shipped with proof and docs",
+    "created_at": "2026-07-26T04:39:31Z",
+    "key_results": [
+      {
+        "text": "new demo cohort member: target + adapter + 4-task suite + driver + registry manifest, demo validate 22/22, pytest 542 passed",
+        "target": "graduated live_verified",
+        "score": 1.0,
+        "evidence": "demos/results/vlm-probe.json (A, converged)"
+      },
+      {
+        "text": "compounding lesson banked: contract-only brief plateaued at B twice (16 iters, refiner invented probe_result.success); +2 sentences of engine API in the goal -> A in 3 iters",
+        "target": "the brief is part of the loop",
+        "score": 1.0,
+        "evidence": "PROOF.md results table"
+      },
+      {
+        "text": "honest scope: chain/claude tier blocked by missing /ce-work plugin (run 4 F->F measures environment); Printing-Press lane unexercised",
+        "target": "no fake green",
+        "score": 1.0,
+        "evidence": "PROOF.md honest-scope"
+      }
+    ]
   }
 ]

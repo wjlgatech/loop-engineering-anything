@@ -1,0 +1,53 @@
+{
+  "suite": "vlm-probe",
+  "adapter": "vlm-probe",
+  "score": 100.0,
+  "grade": "A",
+  "safety_blocker": false,
+  "points": 18.0,
+  "max_points": 18.0,
+  "dimensions": {
+    "D2": {
+      "points": 18.0,
+      "max_points": 18.0
+    }
+  },
+  "tasks": [
+    {
+      "id": "d2.repl.banner_signature",
+      "dimension": "D2",
+      "points": 3.0,
+      "max_points": 3.0,
+      "provenance": "HKUDS/CLI-Anything#278",
+      "findings": [],
+      "exit_code": 0
+    },
+    {
+      "id": "d2.vlmprobe.run_scorecard_json",
+      "dimension": "D2",
+      "points": 5.0,
+      "max_points": 5.0,
+      "provenance": "wjlgatech/FM-os skills/vlm-failure-probe (agent-native wrap)",
+      "findings": [],
+      "exit_code": 0
+    },
+    {
+      "id": "d2.vlmprobe.gate_honest_fail",
+      "dimension": "D2",
+      "points": 5.0,
+      "max_points": 5.0,
+      "provenance": "FM-os Certified discipline: no evidence => No; an honest gate exits non-zero",
+      "findings": [],
+      "exit_code": 1
+    },
+    {
+      "id": "d2.vlmprobe.gate_pass_json",
+      "dimension": "D2",
+      "points": 5.0,
+      "max_points": 5.0,
+      "provenance": "wjlgatech/FM-os skills/vlm-failure-probe (agent-native wrap)",
+      "findings": [],
+      "exit_code": 0
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+id: vlm-probe
+title: vlm-probe — FM-os VLM failure-probe suite, made agent-native
+domain: FM ops / VLM evaluation
+target: a naive human-facing wrap of FM-os skills/vlm-failure-probe graded on the D2
+  non-interactive contract plus gate honesty (the gate must exit 1 on the failing model)
+lane: codebase
+goal: refactor a first-pass human CLI until it passes the cli-judge vlm-probe contract —
+  JSON envelopes, one-shot execution, and an honest CI-gating exit code, with the real
+  probe engine still wired underneath
+kind: demo
+contributor: wjlgatech
+result_ref: vlm-probe.json
