@@ -37,6 +37,7 @@ GRADUATED_DEMO_IDS = {
     "factcli",
     "one-person-industrial-engine",
     "software-arch",
+    "vlm-probe",
 }
 
 

@@ -1,0 +1,11 @@
+# Agent-native contract for the loop-anything 'vlm-probe' proof target — a wrap
+# of FM-os skills/vlm-failure-probe graded on the D2 non-interactive contract
+# PLUS gate honesty (the gate must fail the failing model). All four tasks are
+# upstream-free — no replay server needed.
+name: vlm-probe
+description: D2 agent-native + honest-gate contract for the vlm-probe proof target.
+tasks:
+  - d2.repl.banner_signature
+  - d2.vlmprobe.run_scorecard_json
+  - d2.vlmprobe.gate_honest_fail
+  - d2.vlmprobe.gate_pass_json
