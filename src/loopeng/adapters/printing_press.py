@@ -20,14 +20,16 @@ DEFAULT_TIMEOUT = 60 * 60  # seconds
 
 
 class PrintingPressFactory:
-    def __init__(self, executable: str = "printing-press", timeout: float = DEFAULT_TIMEOUT):
+    def __init__(self, executable: str = "cli-printing-press", timeout: float = DEFAULT_TIMEOUT):
         self.executable = executable
         self.timeout = timeout
 
     def _build_command(self, target: str, workdir: str) -> list[str]:
-        # DOCUMENTED SURFACE — verify against the installed Printing-Press.
-        # Printing-Press accepts a URL / HAR / OpenAPI spec and emits a CLI.
-        return [self.executable, "generate", target, "--out", workdir]
+        # PINNED SURFACE — verified against cli-printing-press v4.29.0 (2026-07-27):
+        # `generate --spec <path|url> --output <dir> --json`. The binary ships as
+        # `cli-printing-press`; a HAR target goes through `browser-sniff` first
+        # (not yet wired here), and docs URLs use `--docs` via the skill flow.
+        return [self.executable, "generate", "--spec", target, "--output", workdir, "--json"]
 
     def generate(self, target: str, goal: str = "", workdir: str = ".") -> GenerateResult:
         validate_target(target)

@@ -24,3 +24,4 @@ runs/
 # generated knowledge graphs (regenerable via scripts/build_repo_kg.py)
 graphify-out/
 **/graph.json
+.loopeng/
