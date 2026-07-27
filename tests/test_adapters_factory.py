@@ -47,3 +47,18 @@ def test_factory_rejects_shell_metacharacters(monkeypatch):
     monkeypatch.setattr(printing_press, "run_tool", lambda *a, **k: _ok())
     with pytest.raises(ValueError):
         printing_press.PrintingPressFactory().generate("https://x.com; rm -rf ~")
+
+
+def test_printing_press_command_is_pinned_to_v4_surface(monkeypatch):
+    seen = {}
+
+    def capture(cmd, **k):
+        seen["cmd"] = cmd
+        return _ok()
+
+    monkeypatch.setattr(printing_press, "run_tool", capture)
+    printing_press.PrintingPressFactory().generate("https://api.example.com/openapi.json", workdir="/tmp/wd")
+    # v4.29.0 real surface: generate --spec <url> --output <dir> --json
+    assert seen["cmd"][0] == "cli-printing-press"
+    assert seen["cmd"][1] == "generate"
+    assert "--spec" in seen["cmd"] and "--output" in seen["cmd"]

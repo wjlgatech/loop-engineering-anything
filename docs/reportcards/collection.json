@@ -56,5 +56,31 @@
         "evidence": "PROOF.md honest-scope"
       }
     ]
+  },
+  {
+    "id": "rc0003",
+    "delivery": "Service lane unlocked: cli-printing-press v4.29.0 installed pinned+checksummed, 9 skills added, loopeng adapter bound to the real v4 surface, and a first live generation \u2014 Wikimedia REST (46 paths) -> Go CLI, all gates PASS, live API call verified, Steinberger scorecard 86/100 Grade A",
+    "objective": "OK'd: install printing-press and unlock the service lane",
+    "created_at": "2026-07-27T05:40:04Z",
+    "key_results": [
+      {
+        "text": "preflight [ok] for service lane; adapter pinned to generate --spec/--output with regression test; pytest 543 passed",
+        "target": "lane operational",
+        "score": 1.0,
+        "evidence": "tests/test_adapters_factory.py"
+      },
+      {
+        "text": "first service-lane artifact: wikipedia-pp-cli generated, built, live-verified (page get-summary, meta.source=live)",
+        "target": "real CLI from real spec",
+        "score": 1.0,
+        "evidence": "docs/solutions/service-lane-unlocked.md"
+      },
+      {
+        "text": "referee grade: 86/100 Grade A (Steinberger bar), auth/live-verify honestly N/A'd",
+        "target": "measured not asserted",
+        "score": 1.0,
+        "evidence": "scorecard output"
+      }
+    ]
   }
 ]
