@@ -124,5 +124,47 @@
       "source": "pytest -q"
     },
     "next_lever": "Item 9: a false-green rate benchmark \u2014 how often the loop says A when a stronger evaluator disagrees"
+  },
+  {
+    "id": "rc0005",
+    "delivery": "Long-form article 'An AI Reviewed My Repo and Told Me to Make It Worse' at public/articles/ai-review-told-me-to-make-it-worse.html, per docs/ARTICLE_AUTHORING.md end to end: cover 1200x627 + 2-panel infographic (house style, rasterized, visually inspected, every count counted in the raster), byline, back-link, reader kit, rk-summary, related, engage.js, portfolio.yaml registration, promo kit (LinkedIn + 8-tweet thread), translation deferral recorded (machine-gated), CHANGELOG. Three external quotes verified verbatim against primary sources (Kubernetes blog, RFC 9413 raw text, arXiv 2404.13076); W3C DNT added as the mechanism's largest real instance. 5-S gate run twice with reviewer != maker: pass 1 FAIL at S2 3/5 (3 blockers), pass 2 PASS (S1 5, S2 4, S3 5, S5 4). Also corrected a 599->600 off-by-one the reviewer found in the engine repo's eval doc. npm test and npm run build both exit 0. Committed on branch article/ai-review-told-me-to-make-it-worse; NOT pushed.",
+    "objective": "Make loop-engineering-anything's public architecture as honest and reviewable as its engine already is",
+    "created_at": "2026-08-12T16:24:05-05:00",
+    "key_results": [
+      {
+        "text": "The upgrade is published as long-form, playbook-complete",
+        "target": "every DoD item in ARTICLE_AUTHORING.md",
+        "score": 1.0,
+        "evidence": "npm test + npm run build exit 0, incl. test-translation-coverage 0 silent gaps"
+      },
+      {
+        "text": "Nothing ships that an independent reviewer can falsify",
+        "target": "5-S gate passed with reviewer != maker",
+        "score": 1.0,
+        "evidence": "content/promos/ai-review-told-me-to-make-it-worse.scorecard.md, 2 passes"
+      },
+      {
+        "text": "Claims about my own code are true",
+        "target": "every number reconciled against source",
+        "score": 1.0,
+        "evidence": "reviewer re-ran the CLI and the test suite; 3 blockers fixed"
+      }
+    ],
+    "request": "write a long form article about this upgrade and publish it to my portfolio writtings, all according to our playbooks",
+    "headline": "Article shipped; the gate failed it first",
+    "brief": "I wrote the long-form piece about the loop.yaml upgrade and put it in your portfolio. Your own publishing playbook made me have an independent reviewer grade it before shipping. It failed the first time \u2014 it caught me claiming something about my own code that was not true, a source listed but never used, and three numbers that did not add up. I fixed those, it passed the second round, and I fixed two more things it found even after passing.",
+    "growth": [
+      "C:met:Ran the playbook's reviewer!=maker gate instead of self-certifying, and published the FAIL in the scorecard rather than only the PASS",
+      "P:met:When the reviewer found a contract key that compiles to nothing at runtime, disclosed it in the article as a violation of my own Rule 2 rather than defending it"
+    ],
+    "why": "The engine's whole thesis is that a declaration nobody enforces is a costume. Publishing an article about that thesis without running my own publishing gate would have been the same failure one level up \u2014 and the gate immediately proved it by catching a false claim about my own CLI flags.",
+    "needle": {
+      "name": "5-S mandatory dimensions at or above 4/5",
+      "before": "3 of 4 (S2 failed at 3)",
+      "after": "4 of 4",
+      "better": "up",
+      "source": "content/promos/ai-review-told-me-to-make-it-worse.scorecard.md"
+    },
+    "next_lever": "Item 9 from the review: a false-green rate benchmark \u2014 how often the loop reports A when a stronger judge disagrees"
   }
 ]

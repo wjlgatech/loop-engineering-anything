@@ -23,7 +23,7 @@ So the review splits cleanly:
 | **Real gap** | 1, 5, 6, 7, 8, 9 | Genuinely absent. Worth building. |
 | **Partial** | 3, 4, 10, 11, 12 | The mechanism exists; the surface or taxonomy is thin. |
 | **Already exists** | 2 | Shipped as the `Domain` seam; the proposal would *regress* it. |
-| **Reject** | §20 | A big-bang rename of 9k LOC / 599 tests with zero behavior change. |
+| **Reject** | §20 | A big-bang rename of 9k LOC / 600 tests with zero behavior change. |
 
 ---
 
@@ -144,7 +144,7 @@ Adding LangGraph and Codex to that table is a straight improvement.
 
 ### §20 proposed directory tree — **REJECT**
 
-A wholesale rename of a 9k-LOC, 599-test engine with no behavior change, on a repo whose
+A wholesale rename of a 9k-LOC, 600-test engine with no behavior change, on a repo whose
 own fitness functions (`tests/test_architecture.py`) pin the current import arrows. The
 correct move is the opposite: **make the README describe the architecture that exists**
 (the `Domain` seam), and add lanes by registration.
