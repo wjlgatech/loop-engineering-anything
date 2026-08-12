@@ -1,0 +1,41 @@
+# A run contract — the reviewable order ticket for one loop.
+#
+#   loop-anything contract check docs/examples/loop.yaml     # validate, print the compiled plan
+#   loop-anything run --contract docs/examples/loop.yaml     # run it
+#   loop-anything contract evidence docs/examples/loop.yaml --run 12   # verify what it promised
+#
+# Every key below compiles into a primitive the engine ALREADY enforces
+# (config.Budget, config.Lane, the VerificationGate). Anything else is a parse
+# error — a contract may not declare what nothing consumes.
+
+version: 1
+name: qms-agent-native
+target: ./qms-kbp
+goal: Make the factory QMS inspection workflow operable by AI agents.
+
+# Optional. Omit to let the router classify the target itself.
+lane: codebase
+
+budget:
+  target_grade: A          # A-F; the letter ladder the judge grades on
+  max_iterations: 8        # the hard guarantee
+  plateau_patience: 2      # stop after N iterations with no gain
+  plateau_pivots: 1        # rotate to the next-lowest dimension before stopping
+  token_budget: 250000     # enforced only for refiners that report cost
+  max_wall_seconds: 5400   # the universal cost backstop
+  min_score_gain: 0.0      # noise band; set from `loop-anything judge-variance`
+
+gate:
+  # May be omitted or true. `false` is rejected: the contract is caller-authored,
+  # and a caller can never pre-confirm its own run (anti-surrender).
+  require_human_confirm: true
+
+evidence:
+  # Checked against the run's real proof pack by `contract evidence`. A pack omits
+  # (never fakes) a field it has no source for, so a missing item is a real gap.
+  required:
+    - grade_trajectory     # before_grade -> after_grade
+    - dimension_diff       # per-dimension before/after/delta
+    - iterations
+    - convergence_status
+    - regression_tests     # the tests /ce-compound recorded on accepted fixes

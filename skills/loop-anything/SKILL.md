@@ -95,6 +95,22 @@ lane is auto-classified; `--lane` forces it. `judge-variance` re-judges an
 unchanged tool K times to measure grader stability and recommend a
 `min_score_gain` threshold (rule 2 above).
 
+### Run contract — the reviewable order ticket
+
+```
+loop-anything run --contract loop.yaml [--refiner ...] [--judge-adapter PATH]
+loop-anything contract check <path> [--json]          # validate; print the compiled plan
+loop-anything contract evidence <path> --run <run_id> # exit 1 if a declared item is missing
+```
+
+A contract supplies `target` / `goal` / `lane` / `budget` from a committed file, so a
+run is diff-able and reviewable. Passing `--goal`, `--lane`, `--max-iterations`, or a
+positional target *alongside* `--contract` is an error — the file must keep describing
+the run it produced. Two rules to relay when a user hits them: an unknown key is a
+**parse error** (a contract may only declare what the engine enforces), and
+`gate.require_human_confirm: false` is **rejected** (a caller can never pre-confirm its
+own run). Design: `docs/solutions/run-contract.md`; example: `docs/examples/loop.yaml`.
+
 ### Fleet — dependency-ordered multi-target
 
 ```
