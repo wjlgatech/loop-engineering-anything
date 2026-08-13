@@ -166,5 +166,47 @@
       "source": "content/promos/ai-review-told-me-to-make-it-worse.scorecard.md"
     },
     "next_lever": "Item 9 from the review: a false-green rate benchmark \u2014 how often the loop reports A when a stronger judge disagrees"
+  },
+  {
+    "id": "rc0006",
+    "delivery": "loop-engineering-anything PR #47 merged (squash); main CI run 31660129517 completed success; 600 tests pass on main. agentic-portfolio PR #291 merged (5cab2fe) via scripts/merge-when-green.sh, which waited for run 31660311521 to EXIST then watched it to success; post-merge main run 31660679142 also success. Mid-ship discovery: the 'uncommitted' Build-the-Loop draft was already on origin/main via PR #289 \u2014 my local checkout was 10 commits stale, which made the PR DIRTY. Rebuilt the branch on origin/main carrying only my 10 files, re-ran npm test + npm run build (both exit 0), force-pushed with an explicit expected-sha lease. Live-verified: article 200 with correct title, cover 200, infographic 200, and it appears in the homepage Writing rail. Restored Paul's working tree to branch linkedin-sync-agent @ f3e6912 with all 16 modifications and untracked files intact; stash list back to its original 3.",
+    "objective": "Make loop-engineering-anything's public architecture as honest and reviewable as its engine already is",
+    "created_at": "2026-08-12T21:27:44-05:00",
+    "key_results": [
+      {
+        "text": "The upgrade is on main, not on a branch",
+        "target": "PR merged with a watched green run",
+        "score": 1.0,
+        "evidence": "PR #47, main run 31660129517 success"
+      },
+      {
+        "text": "The article is live and discoverable",
+        "target": "HTTP 200 + listed in the Writing rail",
+        "score": 1.0,
+        "evidence": "curl 200 on article, cover, infographic; homepage rail hit"
+      },
+      {
+        "text": "No collateral damage to in-flight work",
+        "target": "tree restored to the state found",
+        "score": 1.0,
+        "evidence": "branch linkedin-sync-agent @ f3e6912, 10 modified + 6 untracked restored, stash list 3"
+      }
+    ],
+    "request": "ship them",
+    "headline": "Both merged, both green, article live",
+    "brief": "Both are shipped. The engine change and the article are merged into main, and I watched each robot check finish before merging \u2014 never guessed. One surprise: the draft I thought was unfinished was already published from another machine, so my copy clashed. I rebuilt my change on top of the real latest version, kept only my own files, and put your other work back exactly where I found it.",
+    "growth": [
+      "C:met:Treated a stale local checkout as a real possibility and checked origin before merging, instead of trusting the working tree that had already produced one wrong premise this session",
+      "R:met:Diagnosed DIRTY to its cause (10-commit stale main, article already published via #289) and rebuilt the branch rather than resolving conflicts on top of a wrong base"
+    ],
+    "why": "A merged branch is not a shipped feature; the playbook's rule is that a queue delay is not an absence, so nothing merged until a run existed and passed. That rule earned its keep this turn: the stale-checkout collision would have merged a duplicate article had I trusted local state.",
+    "needle": {
+      "name": "shipped to main and live-verified",
+      "before": "0 of 2 repos",
+      "after": "2 of 2 repos",
+      "better": "up",
+      "source": "PR #47 + PR #291, curl 200"
+    },
+    "next_lever": "Item 9: the false-green benchmark \u2014 how often the loop reports A when a stronger judge disagrees"
   }
 ]
