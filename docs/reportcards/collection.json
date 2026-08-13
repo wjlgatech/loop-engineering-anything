@@ -82,5 +82,89 @@
         "evidence": "scorecard output"
       }
     ]
+  },
+  {
+    "id": "rc0004",
+    "delivery": "Verified the external review against the codebase (not the README, which is what it read). Shipped src/loopeng/contracts/ + 'run --contract' / 'contract check' / 'contract evidence' (items 1+7): a loop.yaml that compiles into config.Budget/Lane, rejects any key nothing enforces (parse error, not no-op), and makes the human gate monotonic (require_human_confirm:false is rejected). evidence.required is verified against the real ProofPack, exit 1 on a gap. Rejected item 2 (artifact_type as a closed Literal) as a regression of the existing open Domain registry, and rejected the section-20 directory rename. Recorded docs/solutions/external-eval-2026-08-12.md with an item-by-item verdict and a counter-scorecard. Suite 543 -> 600 passing, ruff clean.",
+    "objective": "Make loop-engineering-anything's public architecture as honest and reviewable as its engine already is",
+    "created_at": "2026-08-12T14:11:12-05:00",
+    "key_results": [
+      {
+        "text": "External review adjudicated item-by-item against code",
+        "target": "12/12 items ruled",
+        "score": 1.0,
+        "evidence": "docs/solutions/external-eval-2026-08-12.md"
+      },
+      {
+        "text": "Run inputs become a reviewable, fail-closed artifact",
+        "target": "run --contract ships with tests",
+        "score": 1.0,
+        "evidence": "tests/test_run_contract.py, 57 tests"
+      },
+      {
+        "text": "No regression to the engine",
+        "target": "full suite green",
+        "score": 1.0,
+        "evidence": "600 passed, 2 skipped; ruff clean"
+      }
+    ],
+    "request": "Eval this post [external 8.6/10 architecture review of loop-engineering-anything] based on deep research, align and upgrade loop-engineering-anything code base.",
+    "headline": "Review answered; loop.yaml contract shipped",
+    "brief": "Someone graded the repo 8.6/10 and listed 12 upgrades. I checked each one against the actual code instead of the README. Six were real gaps, five were half-built already, and one would have made the repo worse. I built the biggest real one: you can now write the ask for a run in a file you commit, and the file is checked so it can never quietly promise something the engine does not do.",
+    "growth": [
+      "C:met:Checked every claim against src/ before accepting it; caught that the review's central premise came from README-only sourcing",
+      "P:met:Derived the contract's three rules from the repo's existing invariants (KTD1, maker!=checker, anti-surrender) rather than copying the reviewer's schema"
+    ],
+    "why": "The review's headline claim (too CLI-shaped) is false about the engine and true about the README; acting on it literally would have replaced an open registry with a closed enum. Answering it with code evidence now prevents a 23-item backlog from being executed on a wrong premise.",
+    "needle": {
+      "name": "tests passing",
+      "before": "543",
+      "after": "600",
+      "better": "up",
+      "source": "pytest -q"
+    },
+    "next_lever": "Item 9: a false-green rate benchmark \u2014 how often the loop says A when a stronger evaluator disagrees"
+  },
+  {
+    "id": "rc0005",
+    "delivery": "Long-form article 'An AI Reviewed My Repo and Told Me to Make It Worse' at public/articles/ai-review-told-me-to-make-it-worse.html, per docs/ARTICLE_AUTHORING.md end to end: cover 1200x627 + 2-panel infographic (house style, rasterized, visually inspected, every count counted in the raster), byline, back-link, reader kit, rk-summary, related, engage.js, portfolio.yaml registration, promo kit (LinkedIn + 8-tweet thread), translation deferral recorded (machine-gated), CHANGELOG. Three external quotes verified verbatim against primary sources (Kubernetes blog, RFC 9413 raw text, arXiv 2404.13076); W3C DNT added as the mechanism's largest real instance. 5-S gate run twice with reviewer != maker: pass 1 FAIL at S2 3/5 (3 blockers), pass 2 PASS (S1 5, S2 4, S3 5, S5 4). Also corrected a 599->600 off-by-one the reviewer found in the engine repo's eval doc. npm test and npm run build both exit 0. Committed on branch article/ai-review-told-me-to-make-it-worse; NOT pushed.",
+    "objective": "Make loop-engineering-anything's public architecture as honest and reviewable as its engine already is",
+    "created_at": "2026-08-12T16:24:05-05:00",
+    "key_results": [
+      {
+        "text": "The upgrade is published as long-form, playbook-complete",
+        "target": "every DoD item in ARTICLE_AUTHORING.md",
+        "score": 1.0,
+        "evidence": "npm test + npm run build exit 0, incl. test-translation-coverage 0 silent gaps"
+      },
+      {
+        "text": "Nothing ships that an independent reviewer can falsify",
+        "target": "5-S gate passed with reviewer != maker",
+        "score": 1.0,
+        "evidence": "content/promos/ai-review-told-me-to-make-it-worse.scorecard.md, 2 passes"
+      },
+      {
+        "text": "Claims about my own code are true",
+        "target": "every number reconciled against source",
+        "score": 1.0,
+        "evidence": "reviewer re-ran the CLI and the test suite; 3 blockers fixed"
+      }
+    ],
+    "request": "write a long form article about this upgrade and publish it to my portfolio writtings, all according to our playbooks",
+    "headline": "Article shipped; the gate failed it first",
+    "brief": "I wrote the long-form piece about the loop.yaml upgrade and put it in your portfolio. Your own publishing playbook made me have an independent reviewer grade it before shipping. It failed the first time \u2014 it caught me claiming something about my own code that was not true, a source listed but never used, and three numbers that did not add up. I fixed those, it passed the second round, and I fixed two more things it found even after passing.",
+    "growth": [
+      "C:met:Ran the playbook's reviewer!=maker gate instead of self-certifying, and published the FAIL in the scorecard rather than only the PASS",
+      "P:met:When the reviewer found a contract key that compiles to nothing at runtime, disclosed it in the article as a violation of my own Rule 2 rather than defending it"
+    ],
+    "why": "The engine's whole thesis is that a declaration nobody enforces is a costume. Publishing an article about that thesis without running my own publishing gate would have been the same failure one level up \u2014 and the gate immediately proved it by catching a false claim about my own CLI flags.",
+    "needle": {
+      "name": "5-S mandatory dimensions at or above 4/5",
+      "before": "3 of 4 (S2 failed at 3)",
+      "after": "4 of 4",
+      "better": "up",
+      "source": "content/promos/ai-review-told-me-to-make-it-worse.scorecard.md"
+    },
+    "next_lever": "Item 9 from the review: a false-green rate benchmark \u2014 how often the loop reports A when a stronger judge disagrees"
   }
 ]

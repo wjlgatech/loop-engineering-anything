@@ -233,6 +233,42 @@ same sanitize-on-write path as recorded learnings (`MemoryStore.record_learning`
 hostile line in a corpus file can't forge prompt structure — and re-importing the same
 file inserts nothing.
 
+### 📝 Run it from a contract, not a shell history
+
+A run used to exist only as CLI flags — unreviewable, un-diffable, and impossible to
+attach to the proof pack it produced. Now the ask is a file you commit next to the thing
+it converges:
+
+```bash
+loop-anything contract check loop.yaml              # validate; print the compiled plan
+loop-anything run --contract loop.yaml              # run it
+loop-anything contract evidence loop.yaml --run 12  # verify it proved what it promised
+```
+
+```yaml
+version: 1
+name: qms-agent-native
+target: ./qms-kbp
+goal: Make the factory QMS inspection workflow operable by AI agents.
+budget: { target_grade: A, max_iterations: 8, plateau_patience: 2, token_budget: 250000 }
+evidence:
+  required: [grade_trajectory, dimension_diff, regression_tests]
+```
+
+Three rules keep it from becoming decoration
+([design](docs/solutions/run-contract.md), [annotated example](docs/examples/loop.yaml)):
+
+- **It compiles, it doesn't extend.** Every key becomes a `config.Budget` / `Lane` the
+  loop already reads. No new controller state, no knob the engine ignores.
+- **An unenforced declaration is an error, not a no-op.** A typo'd `max_iteratons:` — or a
+  hopeful `safety:` block nothing consumes — fails the parse. A governance field that
+  quietly does nothing is the false-green this engine exists to prevent.
+- **The gate only tightens.** `require_human_confirm: false` is rejected. The contract is
+  caller-authored, and a caller can never pre-confirm its own run.
+
+`evidence.required` is checked against the run's **real** proof pack and exits non-zero on
+a gap — so declaring evidence is a claim the run has to satisfy.
+
 ---
 
 ## ⚙️ How it works
@@ -338,8 +374,9 @@ flowchart TD
 ```
 loop-engineering-anything/
 ├── src/loopeng/
-│   ├── cli.py                 # loop-anything entrypoint  (run / preflight / status / report / demo proof)
+│   ├── cli.py                 # loop-anything entrypoint  (run / contract / preflight / status / report / demo proof)
 │   ├── config.py              # budgets, convergence knobs, dependency table
+│   ├── contracts/             # loop.yaml run contract — parse, compile to Budget/Lane, verify evidence
 │   ├── preflight.py           # per-mechanism dependency detection (+ refine-only gate)
 │   ├── adopt.py               # catalog tool adopter — venv-isolated, env-pruned, full-SHA pin
 │   ├── proof.py               # ProofPack builder + store-backed compounder
@@ -354,7 +391,7 @@ loop-engineering-anything/
 │   ├── loop/                  # controller state machine, convergence, brief, compound, GitCheckpoint
 │   └── autonomous/            # research report + autonomous runner
 ├── skills/loop-anything/      # the /loop-anything agent skill
-├── tests/                     # 286 tests — loop dynamics validated against recorded verdicts
+├── tests/                     # 600 tests — loop dynamics validated against recorded verdicts
 └── docs/plans/                # the implementation plan
 ```
 

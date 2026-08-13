@@ -6,6 +6,33 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **The run contract (`loop.yaml`) — a reviewable order ticket for a loop** — run inputs
+  (target, goal, lane, ten budget knobs) existed only as CLI flags: un-diffable,
+  unreviewable, and impossible to attach to the proof pack the run produced. Ships
+  `src/loopeng/contracts/` + `loop-anything run --contract`, `contract check`, and
+  `contract evidence`. Built on three rules that keep it from becoming decoration:
+  (1) **it compiles, it doesn't extend** — every key becomes a `config.Budget`/`Lane` the
+  loop already reads, so there is no new controller state and no knob the engine ignores;
+  (2) **an unenforced declaration is a parse error, not a no-op** — a typo'd
+  `max_iteratons:`, a `safety:` block nothing consumes, or maker-authored
+  `evaluation.dimensions` (maker ≠ checker laundering) all fail the parse, and the error
+  message names what *is* accepted; (3) **the gate is monotonic** —
+  `gate.require_human_confirm: false` is rejected, because a caller-authored file must
+  never hand back the bypass `VerificationGate` deliberately withholds. `evidence.required`
+  names real `ProofPack` fields and is verified against the recorded run (exit 1 on a gap),
+  so declaring evidence is a claim the run has to satisfy. Conflicting flags alongside
+  `--contract` fail closed rather than silently taking precedence. 57 tests in
+  `tests/test_run_contract.py`; design in `docs/solutions/run-contract.md`; annotated
+  example (pinned by a test) in `docs/examples/loop.yaml`.
+- **`docs/solutions/external-eval-2026-08-12.md` — the repo's answer to an external
+  architecture review** — an item-by-item verdict, checked against the code rather than
+  the README: 6 real gaps, 5 partials, and 1 proposal (`artifact_type` as a closed enum)
+  **rejected as a regression** of the existing `Domain` registry seam, plus a
+  counter-scorecard that scores human-gate and generality *higher* than the review and
+  safety, observability, and enterprise-readiness *lower*. Records the meta-finding: the
+  review's every citation resolves to the README, so "the architecture is too CLI-shaped"
+  is evidence the **README** is CLI-shaped, not the engine. Names the best idea in the
+  review (a **false-green rate** benchmark) as the top remaining P0.
 - **`ToolingSkillFactory` — generate tooling from a repo's KG (U4)** — the tooling
   half's generator, closing the loop with U3. Given a repo's knowledge graph
   (`kg-summary.json`), it emits a **skill** — `SKILL.md` + a real, compiling

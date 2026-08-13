@@ -3,6 +3,7 @@
 Subcommands:
   preflight  Detect the four external dependencies.
   run        Route a target, generate the tool, and drive a real refine loop.
+  contract   Validate a run contract (loop.yaml) and verify its declared evidence.
   status     Show recorded runs from the memory store.
   report     Render the research report for a run.
   fleet      Coordinate a fleet of self-improving loops.
@@ -69,7 +70,7 @@ def preflight_cmd(as_json: bool, lane: str | None) -> None:
 def _execute_run(
     target: str, goal: str, lane: str | None, judge_adapter: str | None,
     judge_registry: str | None, refiner_kind: str, workspace: str, confirm: bool,
-    scheduled: bool, max_iterations: int | None, *, store, echo,
+    scheduled: bool, max_iterations: int | None, *, store, echo, budget=None,
 ):
     """Orchestrate route -> generate -> resolve -> deps -> refine loop (plan 2026-06-22 U3).
 
@@ -115,7 +116,9 @@ def _execute_run(
             err=True,
         )
 
-    config = Config()
+    # A contract-supplied Budget replaces the default wholesale (it was validated at
+    # parse time); --max-iterations still layers on top for the flag-driven path.
+    config = Config(budget=budget) if budget is not None else Config()
     if max_iterations is not None:
         config = dataclasses.replace(
             config, budget=dataclasses.replace(config.budget, max_iterations=max_iterations)
@@ -132,8 +135,10 @@ def _execute_run(
 
 
 @main.command("run")
-@click.argument("target")
-@click.option("--goal", required=True, help="High-level goal for the loop.")
+@click.argument("target", required=False)
+@click.option("--goal", default=None, help="High-level goal for the loop.")
+@click.option("--contract", "contract_path", default=None,
+              help="Run contract (loop.yaml) supplying target, goal, lane, and budget.")
 @click.option(
     "--lane",
     type=click.Choice([lane.value for lane in Lane]),
@@ -152,11 +157,15 @@ def _execute_run(
 @click.option("--scheduled", is_flag=True, help="Mark an unattended run (gate stays confirm-required).")
 @click.option("--max-iterations", type=int, default=None, help="Override the loop's max iterations.")
 def run_cmd(
-    target: str, goal: str, lane: str | None, judge_adapter: str | None,
-    judge_registry: str | None, refiner_kind: str, workspace: str, confirm: bool,
-    scheduled: bool, max_iterations: int | None,
+    target: str | None, goal: str | None, contract_path: str | None, lane: str | None,
+    judge_adapter: str | None, judge_registry: str | None, refiner_kind: str, workspace: str,
+    confirm: bool, scheduled: bool, max_iterations: int | None,
 ) -> None:
-    """Route TARGET, generate the tool, and drive a real refine loop to Grade A."""
+    """Route TARGET, generate the tool, and drive a real refine loop to Grade A.
+
+    Supply TARGET/--goal directly, or ``--contract loop.yaml`` to run from a
+    reviewed, version-controlled contract.
+    """
     # Anti-surrender: a scheduled (unattended) run cannot be pre-confirmed from the
     # CLI -- confirmation must come from a human after the run (R5).
     if scheduled and confirm:
@@ -169,10 +178,32 @@ def run_cmd(
     from .loop.controller import LoopState
     from .memory.store import MemoryStore
 
+    budget = None
+    contract = None
+    if contract_path:
+        contract = _load_contract_or_fail(contract_path)
+        # Fail closed on a split source of truth: a flag that also appears in the
+        # contract would leave the file no longer describing the run it produced.
+        conflicts = [
+            name for name, value in
+            (("TARGET", target), ("--goal", goal), ("--lane", lane), ("--max-iterations", max_iterations))
+            if value is not None
+        ]
+        if conflicts:
+            raise click.ClickException(
+                f"--contract supplies {', '.join(conflicts)}; drop the flag(s) or edit {contract_path}."
+            )
+        target, goal, budget = contract.target, contract.goal, contract.budget
+        lane = contract.lane.value if contract.lane else None
+        click.echo(f"Contract: {contract.name or contract.target} ({contract_path})")
+    elif not target or not goal:
+        raise click.ClickException("provide TARGET and --goal, or --contract <loop.yaml>.")
+
     try:
         result, refiner_used = _execute_run(
             target, goal, lane, judge_adapter, judge_registry, refiner_kind, workspace,
             confirm, scheduled, max_iterations, store=MemoryStore.default(), echo=click.echo,
+            budget=budget,
         )
     except (ValueError, JudgeAdapterError, RuntimeError) as e:  # domain errors -> actionable message
         raise click.ClickException(str(e))
@@ -189,6 +220,79 @@ def run_cmd(
             + (f" -- gate: {result.gate_reason}" if result.gate_reason else "")
         )
     click.echo(f"Inspect: loopeng report {result.run_id}")
+    if contract is not None and contract.evidence_required:
+        click.echo(
+            f"Evidence declared ({', '.join(contract.evidence_required)}); verify with: "
+            f"loop-anything contract evidence {contract_path} --run {result.run_id}"
+        )
+
+
+def _load_contract_or_fail(path: str):
+    """Load a run contract, mapping a ``ContractError`` to an actionable CLI error."""
+    from .contracts import ContractError, load_contract
+
+    try:
+        return load_contract(path)
+    except ContractError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+@main.group("contract")
+def contract_grp() -> None:
+    """Validate and verify run contracts (loop.yaml)."""
+
+
+@contract_grp.command("check")
+@click.argument("path")
+@click.option("--json", "as_json", is_flag=True, help="Emit the compiled plan as JSON.")
+def contract_check_cmd(path: str, as_json: bool) -> None:
+    """Validate PATH and print the plan it compiles to (no run, no side effects)."""
+    from .contracts import describe
+
+    plan = describe(_load_contract_or_fail(path))
+    if as_json:
+        click.echo(json.dumps(plan, indent=2, sort_keys=True))
+        return
+    click.echo(f"OK  {plan['name']}  ({path})")
+    click.echo(f"  target: {plan['target']}")
+    click.echo(f"  goal:   {plan['goal']}")
+    click.echo(f"  lane:   {plan['lane'] or 'auto (routed)'}")
+    for key, value in plan["budget"].items():
+        click.echo(f"  budget.{key}: {value if value is not None else '-'}")
+    click.echo(f"  require_human_confirm: {plan['require_human_confirm']}")
+    click.echo(f"  evidence_required: {', '.join(plan['evidence_required']) or '-'}")
+
+
+@contract_grp.command("evidence")
+@click.argument("path")
+@click.option("--run", "run_id", type=int, required=True, help="Run whose proof pack to verify.")
+def contract_evidence_cmd(path: str, run_id: int) -> None:
+    """Verify RUN's proof pack carries every evidence item PATH declares.
+
+    Exits non-zero when a declared item is missing -- the declaration is a claim
+    the run has to satisfy, not a promise in a file.
+    """
+    from .contracts import missing_evidence
+    from .memory.store import MemoryStore
+    from .proof import ProofPack
+
+    contract = _load_contract_or_fail(path)
+    if not contract.evidence_required:
+        click.echo(f"{path} declares no evidence; nothing to verify.")
+        return
+    try:
+        pack = ProofPack.from_run(MemoryStore.default(), run_id)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    missing = missing_evidence(contract, pack)
+    for name in contract.evidence_required:
+        click.echo(f"  {'MISSING' if name in missing else 'present'}  {name}")
+    if missing:
+        raise click.ClickException(
+            f"run #{run_id} is missing declared evidence: {', '.join(missing)}"
+        )
+    click.echo(f"OK  run #{run_id} carries all {len(contract.evidence_required)} declared evidence item(s).")
 
 
 @main.command("judge-variance")
