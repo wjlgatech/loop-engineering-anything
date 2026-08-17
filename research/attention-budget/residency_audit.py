@@ -31,8 +31,10 @@ import argparse
 import collections
 import json
 import pathlib
-import re
 import sys
+
+from skillmeta import distinct as _distinct
+from skillmeta import load_skills as _load_skills
 
 # The paper's conservative bound. It is ARGUED from the literature, not measured by
 # the authors -- see trigger_reliability.py, which measures it here.
@@ -41,35 +43,9 @@ DESC_GUIDANCE_CHARS = 120
 
 
 def scan(root: pathlib.Path) -> tuple[list[dict], list[dict]]:
-    """Return (readable, phantom) skill records under root."""
-    readable: list[dict] = []
-    phantom: list[dict] = []
-    for p in sorted(root.rglob("SKILL.md")):
-        rel = str(p.relative_to(root))
-        try:
-            text = p.read_text(encoding="utf-8", errors="replace")
-        except OSError as e:
-            target = None
-            try:
-                target = str(p.readlink())
-            except OSError:
-                pass
-            phantom.append({"path": rel, "dir": p.parent.name, "target": target, "why": type(e).__name__})
-            continue
-        m = re.match(r"^---\s*\n(.*?)\n---\s*\n", text, re.S)
-        fm = m.group(1) if m else ""
-
-        def field(key: str) -> str:
-            mm = re.search(rf"^{key}:\s*(.*)$", fm, re.M)
-            return mm.group(1).strip().strip("\"'") if mm else ""
-
-        readable.append({
-            "name": field("name") or p.parent.name,
-            "desc": field("description"),
-            "body_chars": len(text),
-            "path": rel,
-        })
-    return readable, phantom
+    """Delegates to skillmeta, which parses YAML block scalars correctly.
+    A local regex here once returned "|" as a description -- see skillmeta.py."""
+    return _load_skills(root)
 
 
 def audit(root: pathlib.Path) -> dict:
@@ -78,7 +54,7 @@ def audit(root: pathlib.Path) -> dict:
     by_name: dict[str, list[dict]] = collections.defaultdict(list)
     for r in readable:
         by_name[r["name"]].append(r)
-    distinct = {n: v[0] for n, v in by_name.items()}
+    distinct = _distinct(readable)
     duplicates = {n: [x["path"] for x in v] for n, v in by_name.items() if len(v) > 1}
 
     resident = sum(len(r["desc"]) for r in distinct.values())

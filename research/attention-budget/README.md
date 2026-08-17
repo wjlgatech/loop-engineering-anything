@@ -47,9 +47,9 @@ Audits a real library against the three-tier model. Run on this operator's own m
 | distinct skill names | **176** |
 | paper's argued reliable-slot bound | 100 |
 | **over budget by** | **1.76x** |
-| resident index (name + description) | 34,120 chars (~8,530 tokens) |
+| resident index (name + description) | 62,010 chars (~15,502 tokens) |
 | every body, if resident | 2,954,435 chars (~738,608 tokens) |
-| **content-to-index ratio** | **86.6x** |
+| **content-to-index ratio** | **47.6x** |
 
 Four failure classes the paper predicts, all present:
 
@@ -59,15 +59,26 @@ Four failure classes the paper predicts, all present:
   and nothing says so. The failure is not wasted attention — it is **absence with no signal**.
 - **DUPLICATE — 25 names installed more than once** (`access` ×3, `configure` ×3,
   `living-knowledge` ×3). The local form of the corpus-wide collisions the paper measures.
-- **OVERLONG — 72 of 176** descriptions exceed the protocol's ~120-char guidance; the worst
-  is **11.6x** it. The description *is* the trigger signal, so length is spent attention.
-- **UNTRIGGERED — 0.** Clean.
+- **OVERLONG — 130 of 176** descriptions (74%) exceed the protocol's ~120-char guidance;
+  the worst is **11.6x** it. The description *is* the trigger signal, so length is spent attention.
+- **UNTRIGGERED — 1** of 176 carries no description at all, so it cannot feed a trigger index.
 
 The tool **measures and proposes; it never mutates.** Which capabilities deserve residency is
 operator judgement, and a script that silently re-tiered a library would be making exactly
 the unreviewable change the protocol exists to prevent.
 
 Full report: [`AUDIT.md`](./AUDIT.md).
+
+### A correction, recorded rather than quietly fixed
+
+The first version of this audit reported a resident index of 34,120 chars and a ratio of
+86.6x, with 72 overlong descriptions. **Those numbers were wrong.** The reader used
+`^description:\s*(.*)$`, which captures the *indicator* of a YAML block scalar — so every
+skill written as `description: |` was measured as having a **one-character** description.
+The parser never failed; it returned a plausible wrong value, which is the precise failure
+class this audit exists to report. Fixed in [`skillmeta.py`](./skillmeta.py) and pinned by
+[`test_skillmeta.py`](./test_skillmeta.py), including a regression guard that fails if any
+indicator-only description ever reappears in a real library.
 
 ## 2. R&D area 1 — measuring the paper's unmeasured quantity
 
@@ -110,7 +121,7 @@ protocol, one layer down, for tools instead of skills.
 Sampled schema cost (n=2, the two tools actually loaded this session: `WebFetch`,
 `WebSearch`): ~250 tokens each. Extrapolated, ~190 resident schemas would cost ~47k tokens
 versus ~1.5k for names alone — a **~30x** ratio, independently in the same order as the
-**86.6x** measured for skills. Marked as an estimate: n=2 is a sample, not a census.
+**47.6x** measured for skills. Marked as an estimate: n=2 is a sample, not a census.
 
 ## 4. R&D area 3 — the same principle, applied to instructions
 

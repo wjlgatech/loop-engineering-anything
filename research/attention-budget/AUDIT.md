@@ -9,9 +9,9 @@ Library: `/Users/jialiang.wu/.claude`
 - Paper's conservative reliable-slot bound: **100**
 - Over budget by: **1.76x**
 
-- Resident index (name + description): **34,120 chars** (~8,530 tokens)
+- Resident index (name + description): **62,010 chars** (~15,502 tokens)
 - Every body, if all were resident: **2,954,435 chars** (~738,608 tokens)
-- Content-to-index ratio: **86.6x** — this is the paper's thesis as a single number: the index costs ~1/86 of the content.
+- Content-to-index ratio: **47.6x** — this is the paper's thesis as a single number: the index costs ~1/47 of the content.
 
 ## PHANTOM — holds a name, loads nothing
 
@@ -62,7 +62,7 @@ Library: `/Users/jialiang.wu/.claude`
 
 ## OVERLONG — description past the protocol's ~120-char guidance
 
-**72 of 176** exceed it. The description *is* the trigger signal, so every extra character is resident attention spent on one tenant of the index.
+**130 of 176** exceed it. The description *is* the trigger signal, so every extra character is resident attention spent on one tenant of the index.
 
 - `dreammaketrue` — 1394 chars (11.6x guidance)
 - `free-llm` — 1173 chars (9.8x guidance)
@@ -79,7 +79,7 @@ Library: `/Users/jialiang.wu/.claude`
 
 ## UNTRIGGERED — cannot feed a trigger index
 
-None.
+`math-olympiad`
 
 ## Proposal
 
@@ -87,7 +87,7 @@ To reach the argued bound, **76 skills** must stop being resident. In @skills te
 
 1. Remove the **17 phantom** entries. Zero capability lost — they already load nothing.
 2. Collapse the **25 duplicated** names to one copy each.
-3. Rewrite the **72 overlong** descriptions toward 120 chars. Same coverage, less resident spend.
+3. Rewrite the **130 overlong** descriptions toward 120 chars. Same coverage, less resident spend.
 4. Demote every skill that is only ever invoked *by name* (a slash command you type) out of the auto-trigger index. If you always ask for it explicitly, it never needed a trigger slot — that is the paper's central point, and it is the largest available win.
 
 This tool does not apply any of the above. Which capabilities deserve residency is operator judgement, and a script that silently re-tiered a library would be making exactly the unreviewable change the protocol exists to prevent.

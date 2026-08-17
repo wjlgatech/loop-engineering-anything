@@ -60,6 +60,9 @@ import time
 import urllib.error
 import urllib.request
 
+from skillmeta import distinct as _distinct
+from skillmeta import load_skills as _load_skills
+
 HERE = pathlib.Path(__file__).resolve().parent
 CACHE = HERE / ".cache"
 CACHE.mkdir(exist_ok=True)
@@ -77,28 +80,13 @@ MIN_TRIALS = 8
 
 
 def load_skills() -> dict[str, str]:
-    """Distinct {name: description} from every readable SKILL.md under ~/.claude."""
-    root = pathlib.Path.home() / ".claude"
-    out: dict[str, str] = {}
-    for p in sorted(root.rglob("SKILL.md")):
-        try:
-            text = p.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue  # unreadable (e.g. a dangling symlink) -- it loads nothing, so it is not a skill
-        m = re.match(r"^---\s*\n(.*?)\n---\s*\n", text, re.S)
-        if not m:
-            continue
-        fm = m.group(1)
+    """Distinct {name: description} via the shared frontmatter reader.
 
-        def field(key: str) -> str:
-            mm = re.search(rf"^{key}:\s*(.*)$", fm, re.M)
-            return mm.group(1).strip().strip("\"'") if mm else ""
-
-        name = field("name") or p.parent.name
-        desc = field("description")
-        if name and desc and name not in out:
-            out[name] = desc
-    return out
+    A local regex here once captured YAML block-scalar INDICATORS ("|", ">-") as the
+    description, which handed several unrelated targets the same meaningless probe.
+    See skillmeta.py."""
+    readable, _ = _load_skills(pathlib.Path.home() / ".claude")
+    return {n: r["desc"] for n, r in _distinct(readable).items() if r["desc"]}
 
 
 # ----- transport ----------------------------------------------------------
@@ -189,7 +177,14 @@ def ask_subject(prompt: str) -> str:
 
 
 def ask_generator(prompt: str) -> str:
-    """Probe writer. Deliberately a DIFFERENT model family from the subject, so the
+    """Probe writer.
+
+    max_tokens is 1200, not 200. MEASURED 2026-08-13: at 200 the Gemini response came
+    back as a 15-28 char FRAGMENT ("Hey, can you pull"), because reasoning tokens are
+    billed against the same budget -- so several unrelated targets received identical,
+    meaningless probes and the resulting accuracy measured nothing but this bug. The
+    same trap hit the subject model on a different provider. If an answer looks
+    truncated, suspect the token budget before the model. Deliberately a DIFFERENT model family from the subject, so the
     request wording is not authored by the same model that has to route it.
 
     Chain: Gemini first (free tier); on quota exhaustion fall back to Claude Haiku.
@@ -201,7 +196,7 @@ def ask_generator(prompt: str) -> str:
         def gemini():
             d = _post(
                 "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", gkey,
-                {"model": GENERATOR_MODEL, "temperature": 0.7, "max_tokens": 200,
+                {"model": GENERATOR_MODEL, "temperature": 0.7, "max_tokens": 1200,
                  "messages": [{"role": "user", "content": prompt}]},
             )
             return (d["choices"][0]["message"].get("content") or "").strip()
@@ -215,7 +210,7 @@ def ask_generator(prompt: str) -> str:
         def claude():
             d = _post(
                 "https://api.anthropic.com/v1/messages", akey,
-                {"model": FALLBACK_GENERATOR, "max_tokens": 200, "temperature": 1.0,
+                {"model": FALLBACK_GENERATOR, "max_tokens": 1200, "temperature": 1.0,
                  "messages": [{"role": "user", "content": prompt}]},
                 extra={"x-api-key": akey, "anthropic-version": "2023-06-01"},
             )
@@ -242,11 +237,16 @@ def make_probe(name: str, desc: str) -> str:
         "NOT use the word 'skill', write it the way a person actually types (one or two\n"
         f"sentences, no preamble, no quotes).\n\nTOOL DESCRIPTION:\n{desc[:900]}"
     )
-    return out.strip().strip('"').split("\n")[0][:400]
+    # BUG FIXED 2026-08-13: this used to be `.split("\n")[0]`, which kept only the
+    # FIRST LINE of a wrapped generation. That produced truncated, generic requests
+    # ("Hey, can you pull") that were IDENTICAL across unrelated targets, so the
+    # ground truth was corrupt and the measured accuracy was measuring this bug.
+    # Collapse whitespace instead, and keep the whole request.
+    return " ".join(out.replace("\n", " ").split()).strip('"').strip()[:400]
 
 
 def menu_prompt(menu: list[tuple[str, str]], request: str) -> str:
-    lines = "\n".join(f"- {n}: {d[:240]}" for n, d in menu)
+    lines = "\n".join(f"- {n}: {d[:160]}" for n, d in menu)
     return (
         "You route a user's message to at most one tool.\n\n"
         f"AVAILABLE TOOLS ({len(menu)}):\n{lines}\n\n"
