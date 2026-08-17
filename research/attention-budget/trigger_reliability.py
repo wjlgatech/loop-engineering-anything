@@ -270,64 +270,80 @@ def parse_pick(raw: str, valid: set[str]) -> str | None:
     return None
 
 
-def main() -> int:
-    skills = load_skills()
-    names = sorted(skills)
-    print(f"corpus: {len(names)} distinct readable skills")
-    if len(names) < max(N_SWEEP):
-        print(f"note: corpus smaller than max N; capping sweep at {len(names)}")
+def _one_trial(target: str, request: str, names: list[str], skills: dict[str, str],
+               cap: int, rng: random.Random) -> tuple[str, str | None, str | None]:
+    """Run a single trial. Returns (outcome, pick, error_detail)."""
+    pool = [x for x in names if x != target]
+    menu_names = rng.sample(pool, cap - 1) + [target]
+    rng.shuffle(menu_names)
+    menu = [(x, skills[x]) for x in menu_names]
+    try:
+        raw = ask_subject(menu_prompt(menu, request))
+    except ProviderError as e:
+        return "error", None, str(e)[:120]
+    pick = parse_pick(raw, set(menu_names))
+    if pick == target:
+        return "hit", pick, None
+    if pick == "NONE":
+        return "none", pick, None
+    if pick is None:
+        return "unparsed", pick, None
+    return "wrong", pick, None
 
-    rng = random.Random(7)
-    targets = rng.sample(names, min(12, len(names)))
 
-    print(f"generating {len(targets)} probe requests with {GENERATOR_MODEL} ...")
+def _build_probes(targets: list[str], skills: dict[str, str]) -> dict[str, str]:
     probes: dict[str, str] = {}
     for t in targets:
         try:
             probes[t] = make_probe(t, skills[t])
         except ProviderError as e:
-            print(f"  ! probe generation failed for {t}: {e}")
-    print(f"  {len(probes)} probes ready")
-    if not probes:
-        print("no probes -- refusing to report a number")
-        return 1
+            print(f"  ! probe generation failed for {t}: {str(e)[:110]}")
+    return probes
 
+
+def _sweep(probes: dict[str, str], names: list[str], skills: dict[str, str]) -> tuple[dict, list]:
     results = {n: {"hit": 0, "wrong": 0, "none": 0, "unparsed": 0, "error": 0} for n in N_SWEEP}
-    trials = []
-
+    trials: list[dict] = []
     for n in N_SWEEP:
         cap = min(n, len(names))
         for seed in SEEDS:
-            r = random.Random(seed)
+            rng = random.Random(seed)
             for target, request in probes.items():
-                pool = [x for x in names if x != target]
-                menu_names = r.sample(pool, cap - 1) + [target]
-                r.shuffle(menu_names)
-                menu = [(x, skills[x]) for x in menu_names]
-                try:
-                    raw = ask_subject(menu_prompt(menu, request))
-                except ProviderError as e:
-                    results[n]["error"] += 1
-                    trials.append({"n": cap, "seed": seed, "target": target, "outcome": "error", "detail": str(e)[:120]})
-                    continue
-                pick = parse_pick(raw, set(menu_names))
-                if pick == target:
-                    outcome = "hit"
-                elif pick == "NONE":
-                    outcome = "none"
-                elif pick is None:
-                    outcome = "unparsed"
-                else:
-                    outcome = "wrong"
+                outcome, pick, detail = _one_trial(target, request, names, skills, cap, rng)
                 results[n][outcome] += 1
-                trials.append({"n": cap, "seed": seed, "target": target,
-                               "outcome": outcome, "pick": pick, "request": request[:160]})
-                time.sleep(2.0)  # free tier: stay under the per-minute cap by construction
+                row = {"n": cap, "seed": seed, "target": target, "outcome": outcome}
+                if detail:
+                    row["detail"] = detail
+                else:
+                    row.update({"pick": pick, "request": request[:160]})
+                trials.append(row)
+                if outcome != "error":
+                    time.sleep(2.0)  # free tier: stay under the per-minute cap by construction
         d = results[n]
         usable = d["hit"] + d["wrong"] + d["none"] + d["unparsed"]
         acc = f"{100*d['hit']/usable:.1f}%" if usable >= MIN_TRIALS else "insufficient data"
         print(f"  N={cap:4d}  top-1 {acc:>18}  (hit {d['hit']} wrong {d['wrong']} "
               f"none {d['none']} unparsed {d['unparsed']} errors {d['error']})")
+    return results, trials
+
+
+def main() -> int:
+    skills = load_skills()
+    names = sorted(skills)
+    print(f"corpus: {len(names)} distinct readable skills with a description")
+    if len(names) < max(N_SWEEP):
+        print(f"note: corpus smaller than max N; capping sweep at {len(names)}")
+
+    rng = random.Random(7)
+    targets = rng.sample(names, min(12, len(names)))
+    print(f"generating {len(targets)} probe requests ...")
+    probes = _build_probes(targets, skills)
+    print(f"  {len(probes)} probes ready")
+    if not probes:
+        print("no probes -- refusing to report a number")
+        return 1
+
+    results, trials = _sweep(probes, names, skills)
 
     out = {
         "paper": "arXiv:2608.12610 (Yin et al., 12 Aug 2026)",

@@ -113,15 +113,29 @@ Results land in `results.json`.
 
 ## 3. R&D area 2 — the same principle, applied to tool schemas
 
-Already shipping, and measurable from this session: the harness listed **~190 MCP tool
-names with their schemas withheld** — "Their schemas are NOT loaded… Use ToolSearch" —
-i.e. tier-3 residency for the *name*, tier-1 on-demand fetch for the *schema*. Exactly the
-protocol, one layer down, for tools instead of skills.
+Already shipping, and countable from this session's own notices: the harness listed tool
+**names** while explicitly withholding their schemas — "Their schemas are NOT loaded… Use
+ToolSearch". That is tier-3 residency for the *name* and tier-1 on-demand fetch for the
+*schema*: the protocol, one layer down, for tools instead of skills.
 
-Sampled schema cost (n=2, the two tools actually loaded this session: `WebFetch`,
-`WebSearch`): ~250 tokens each. Extrapolated, ~190 resident schemas would cost ~47k tokens
-versus ~1.5k for names alone — a **~30x** ratio, independently in the same order as the
-**47.6x** measured for skills. Marked as an estimate: n=2 is a sample, not a census.
+Counted, not estimated:
+
+| deferred tool names | count |
+|---|---:|
+| built-in (Cron*, Task*, Web*, Monitor, …) | 25 |
+| claude.ai connectors (Gmail 24, Calendar 9, Drive 8, LunarCrush 15, …) | 62 |
+| local MCP — moomoo | 5 |
+| local MCP — notebooklm | 40 |
+| **peak deferred** | **132** |
+| later withdrawn mid-session (server disconnect) | 67 |
+
+**Correction:** an earlier version of this file said "~190". That was an overestimate by
+1.44x, from eyeballing the list instead of counting it. 132 is the counted figure.
+
+Schema cost is still a *sample*: the two tools actually loaded this session (`WebFetch`,
+`WebSearch`) ran ~250 tokens each. At that rate 132 resident schemas would cost ~33k tokens
+against ~1k for names alone — order **~30x**, independently in the same range as the
+**47.6x** measured for skills. n=2 is a sample, not a census, and it stays labelled as one.
 
 ## 4. R&D area 3 — the same principle, applied to instructions
 
