@@ -116,6 +116,7 @@ def audit(rubric: pathlib.Path | None = None) -> dict:
 
     return {
         "rubric": str(path.relative_to(ROOT)),
+        "provenance": doc.get("provenance"),
         "source": doc["source"],
         "total_items": len(results),
         "verifiable": len(verifiable),
@@ -131,7 +132,13 @@ def audit(rubric: pathlib.Path | None = None) -> dict:
 
 def render(a: dict) -> str:
     src = a["source"]
-    L = ["# Agent Loop Engineering — conformance audit", "",
+    L = ["# Agent Loop Engineering — conformance audit", ""]
+    if a.get("provenance"):
+        # A generated file gets read on its own, far from the rubric header. If the rubric
+        # declares itself a reconstruction, its output says so on line 3 or the number
+        # travels without its caveat -- which is the defect this whole audit is about.
+        L += [f"> **{a['provenance'].strip()}**", ""]
+    L += [
          f"Rubric: `{a['rubric']}` — {a['total_items']} items drawn from "
          f"*{src['title']}* ({src['publisher']}, received {src['received']}).", "",
          f"That source is a **{src['nature']}**. Every claim below is scored against shipped "

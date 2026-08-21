@@ -21,7 +21,8 @@
 # THIS FILE IS THE SPEC. `scripts/audit_loop_rubric.py` is the only consumer, so the
 # published score cannot drift from the claims it scores.
 #
-# RULES (docs/skill/playbooks/operationalizing-a-paper-rubric-checklist-standa.md):
+# RULES (the operationalizing-a-rubric playbook; it ships with the anyagent skill, not in
+# this repo -- the rules are restated here so the file stands alone):
 #   * Evidence is OBSERVED (a symbol in shipped code, a passing test), never claimed.
 #   * No evidence => NO. Not "probably".
 #   * A probe that cannot run is `unmeasured` — excluded from the rate, and it BLOCKS
@@ -29,6 +30,10 @@
 #   * `expect: absent` items are honest gap declarations: the rubric asserts the engine
 #     does NOT have this, and the probe FAILS if the gap ever silently closes.
 version: 1
+provenance: >-
+  ARCHIVED RECONSTRUCTION, committed after the fact. This rubric was not committed at the
+  time it produced its 23/23. It is the current rubric minus the five second-pass items.
+  Treat the score as reproducible, but the file as rebuilt rather than recovered.
 source:
   title: "Agent Loop Engineering — 讲座总结"
   publisher: "DataApplab / AI聘 (info@aipin.io)"
