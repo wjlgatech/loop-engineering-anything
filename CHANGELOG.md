@@ -6,6 +6,34 @@ All notable changes to this project are documented here, following
 ## [Unreleased]
 
 ### Added
+- **Agent Loop Engineering rubric — this engine scored against someone else's checklist
+  (25/28, gate FAIL).** A webinar summary listed sixteen sections of what a mature agent loop
+  must have and verified none of it against a running system. Encoded as data in
+  `docs/rubrics/agent-loop-engineering.yml`, scored by `scripts/audit_loop_rubric.py`, which is
+  the only consumer — so the published score cannot drift from the claims it scores. Evidence
+  is **observed** (a symbol at `file:line`, or a pytest node actually executed); no evidence
+  means no; a probe that cannot run is `unmeasured`, excluded from the rate **and** blocking.
+  `--gate` exits 1. **The first version scored 23/23 and that was the defect** — it was authored
+  by someone who had just read the codebase and contained no question he expected to fail. It is
+  kept at `docs/rubrics/archive/` as a labelled reconstruction so the claim is reproducible
+  (`--rubric …/agent-loop-engineering.v1.yml`), and the rubric's `provenance:` field is rendered
+  into any report, so a reconstruction cannot emit output that looks like a clean run. Three
+  items stay red with a `rationale` beside the mark and no mechanism to convert one into a pass;
+  three declared gaps carry probes that fail if the gap silently closes.
+- **`MemoryStore.success_rate(target=None)` — cross-run task outcome.** Per-run token cost, wall
+  time and iteration count were already recorded; nothing ever divided. Two choices keep the
+  number honest: a run still in flight is **excluded from the denominator**, and `blocked_safety`
+  **counts as a failure**, so the metric cannot rise when the safety gate fires. Returns `None`,
+  never `0.0`, when nothing has finished — *not measured* must not read as *tried and failed*.
+  6 tests in `tests/test_success_rate.py`.
+- **`research/attention-budget/` — the `@skills` residency principle applied and measured.**
+  `residency_audit.py` scores a real skill library against arXiv:2608.12610's three-tier model
+  (offline, deterministic, measures and proposes, never mutates). `trigger_reliability.py` runs
+  the experiment that paper explicitly does **not** run: top-1 routing across a 175-skill corpus
+  measured at 100% (N=10), 100% (N=40), 83.3% (N=80), 44.4% (N=176) — the break falling below
+  the paper's argued 100-slot bound. Declared bias, confidence intervals, and two
+  self-corrections (a YAML block-scalar parse bug that invalidated the first numbers, and a
+  retracted eyeball estimate) are recorded in that directory's README rather than quietly fixed.
 - **The run contract (`loop.yaml`) — a reviewable order ticket for a loop** — run inputs
   (target, goal, lane, ten budget knobs) existed only as CLI flags: un-diffable,
   unreviewable, and impossible to attach to the proof pack the run produced. Ships
