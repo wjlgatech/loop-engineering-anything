@@ -1,10 +1,10 @@
 # Agent Loop Engineering — conformance audit
 
-Rubric: `docs/rubrics/agent-loop-engineering.yml` — 31 items drawn from *Agent Loop Engineering — 讲座总结* (DataApplab / AI聘 (info@aipin.io), received 2026-08-20).
+Rubric: `docs/rubrics/archive/agent-loop-engineering.v1.yml` — 26 items drawn from *Agent Loop Engineering — 讲座总结* (DataApplab / AI聘 (info@aipin.io), received 2026-08-20).
 
 That source is a **lecture summary; taxonomy, no verification against a running system**. Every claim below is scored against shipped code or a test that was actually executed. No evidence means no.
 
-**Conformance: 25/28 (89%)** verifiable claims implemented · 3 declared gaps · 0 unmeasured · gate **FAIL**
+**Conformance: 23/23 (100%)** verifiable claims implemented · 3 declared gaps · 0 unmeasured · gate **PASS**
 
 ## Implemented — with observed evidence
 
@@ -31,7 +31,7 @@ That source is a **lecture summary; taxonomy, no verification against a running 
   - evidence: `src/loopeng/adapters/base.py:62`
 - **L8-maker-not-checker** · 10 — evaluation must be trustworthy
   - claim: The thing that builds is not the thing that grades.
-  - evidence: `tests/test_maker_checker.py -> 30 passed in 0.13s`
+  - evidence: `tests/test_maker_checker.py -> 30 passed in 0.14s`
 - **L9-reflection** · 4/6 — Plan-Execute-Observe-Reflect, Self-Reflection
   - claim: Why the last attempt scored what it did is carried into the next attempt.
   - evidence: `src/loopeng/adapters/base.py:66`
@@ -43,7 +43,7 @@ That source is a **lecture summary; taxonomy, no verification against a running 
   - evidence: `src/loopeng/adapters/base.py:142`
 - **L12-recovery-state** · 8 — Recovery keeps enough state to resume
   - claim: A failed change can be rolled back rather than restarting from zero.
-  - evidence: `tests/test_checkpoint.py -> 2 passed in 0.61s`
+  - evidence: `tests/test_checkpoint.py -> 2 passed in 0.49s`
 - **L13-exit-success** · 9 — explicit exits: success
   - claim: The loop stops when the goal is verifiably met.
   - evidence: `src/loopeng/loop/convergence.py:29`
@@ -64,7 +64,7 @@ That source is a **lecture summary; taxonomy, no verification against a running 
   - evidence: `src/loopeng/config.py:127`
 - **L19-hitl-unbypassable** · 12 — the gate must actually hold
   - claim: An unattended run cannot pre-confirm its own result.
-  - evidence: `tests/test_run_contract.py::test_contract_can_never_disable_the_human_gate -> 4 passed in 0.04s`
+  - evidence: `tests/test_run_contract.py::test_contract_can_never_disable_the_human_gate -> 4 passed in 0.05s`
 - **L20-multi-agent-graph** · 11 — Loop becomes Graph with many agents
   - claim: Multiple agents are coordinated as a dependency graph, cycles refused.
   - evidence: `src/loopeng/orchestration/coordinator.py:6`
@@ -77,27 +77,6 @@ That source is a **lecture summary; taxonomy, no verification against a running 
 - **L23-cost-never-faked** · 14 — measurement must be real to be useful
   - claim: An unavailable cost is omitted, never estimated into the record.
   - evidence: `tests/test_proof.py -> 7 passed in 0.09s`
-- **L29-success-rate-metric** · 14 — measure tokens, time, iteration count AND task success rate
-  - claim: Task success RATE is computed across runs, not just per-run outcome.
-  - evidence: `tests/test_success_rate.py -> 6 passed in 0.07s`
-- **L31-error-memory** · 13 — record errors so the agent does not repeat the same mistake
-  - claim: Failures that recur across runs are surfaced to the next attempt.
-  - evidence: `src/loopeng/memory/store.py:277`
-
-## NOT implemented
-
-- **L27-react-interleaving** · 5 — ReAct: reasoning and acting alternate at fine granularity
-  - claim: The loop interleaves reason->act->observe per tool call, rather than one coarse generate/judge/refactor turn.
-  - evidence: `pattern /class ReActLoop|def reason_then_act/ not found in 76 file(s)`
-  - why it is still a miss: Deliberate divergence, not an oversight: ReAct puts the actor in charge of judging its own next step, and this engine's load-bearing rule is that the maker never grades. Recorded as a MISS rather than reclassified as a pass, because a rubric that lets the author explain failures away scores nothing.
-- **L28-human-takeover** · 12 — a human may take the task over directly
-  - claim: A human can seize control of a running loop, not merely approve or reject its result.
-  - evidence: `pattern /def takeover|def handoff_to_human/ not found in 76 file(s)`
-  - why it is still a miss: A real gap. The gate is end-of-run approval; there is no control channel into a loop already in flight. Worth building; not built.
-- **L30-manager-worker** · 11 — Manager-Worker and hierarchical multi-agent structures
-  - claim: A manager agent decomposes a goal and assigns sub-tasks to worker agents.
-  - evidence: `pattern /class ManagerAgent|def assign_subtask/ not found in 76 file(s)`
-  - why it is still a miss: Divergence: coordination is an explicit dependency DAG with cycle rejection, which is inspectable before anything runs, rather than a manager agent deciding at runtime. Still a miss against the lecture's claim.
 
 ## Declared gaps — the engine does NOT do these, and says so
 

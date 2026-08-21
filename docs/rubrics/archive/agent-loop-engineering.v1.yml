@@ -1,3 +1,17 @@
+# ARCHIVED RECONSTRUCTION — the 23/23 rubric, committed after the fact.
+#
+# This is the FIRST version of docs/rubrics/agent-loop-engineering.yml: 26 items,
+# 23 verifiable + 3 declared gaps. Run against the engine it scored 23/23, gate green,
+# and that perfect score was the bug — every question here was written by someone who
+# had just spent an hour in the codebase, and not one was expected to come back red.
+#
+# HONEST PROVENANCE: this file was never committed at the time. It is reconstructed by
+# removing the five items added in the second pass, and committed now so the 23/23 claim
+# is REPRODUCIBLE rather than merely asserted by its author — which is the whole point of
+# the exercise it documents. Reconstruction, not a recovered original.
+#
+# Reproduce:  python3 scripts/audit_loop_rubric.py --rubric docs/rubrics/archive/agent-loop-engineering.v1.yml
+#
 # Agent Loop Engineering — the lecture's claims, as a machine-checkable rubric.
 #
 # SOURCE: "AI开发进入新时代：Agent Loop Engineering - 讲座总结" (DataApplab / AI聘 webinar
@@ -7,8 +21,7 @@
 # THIS FILE IS THE SPEC. `scripts/audit_loop_rubric.py` is the only consumer, so the
 # published score cannot drift from the claims it scores.
 #
-# RULES (the operationalizing-a-rubric playbook; it ships with the anyagent skill, not in
-# this repo -- the rules are restated here so the file stands alone):
+# RULES (docs/skill/playbooks/operationalizing-a-paper-rubric-checklist-standa.md):
 #   * Evidence is OBSERVED (a symbol in shipped code, a passing test), never claimed.
 #   * No evidence => NO. Not "probably".
 #   * A probe that cannot run is `unmeasured` — excluded from the rate, and it BLOCKS
@@ -159,46 +172,3 @@ items:
     expect: absent
     probe: {type: grep, pattern: "opentelemetry|trace_id|def emit_span", paths: ["src/loopeng"]}
     gap_note: "Reports and proof packs exist; a span-level trace schema does not."
-
-  # ---- claims the lecture makes that this engine does NOT satisfy ----
-  # Added after the first run scored 23/23. A rubric authored by the same person who
-  # knows the codebase, that then passes everything, has measured nothing. These are
-  # the lecture's claims I had NOT encoded, chosen precisely because I expected them
-  # to fail. A gate that cannot fail is decoration.
-
-  - id: L27-react-interleaving
-    section: "5 — ReAct: reasoning and acting alternate at fine granularity"
-    claim: "The loop interleaves reason->act->observe per tool call, rather than one coarse generate/judge/refactor turn."
-    probe: {type: grep, pattern: "class ReActLoop|def reason_then_act", paths: ["src/loopeng"]}
-    rationale: >-
-      Deliberate divergence, not an oversight: ReAct puts the actor in charge of judging
-      its own next step, and this engine's load-bearing rule is that the maker never
-      grades. Recorded as a MISS rather than reclassified as a pass, because a rubric
-      that lets the author explain failures away scores nothing.
-
-  - id: L28-human-takeover
-    section: "12 — a human may take the task over directly"
-    claim: "A human can seize control of a running loop, not merely approve or reject its result."
-    probe: {type: grep, pattern: "def takeover|def handoff_to_human", paths: ["src/loopeng"]}
-    rationale: >-
-      A real gap. The gate is end-of-run approval; there is no control channel into a
-      loop already in flight. Worth building; not built.
-
-  - id: L29-success-rate-metric
-    section: "14 — measure tokens, time, iteration count AND task success rate"
-    claim: "Task success RATE is computed across runs, not just per-run outcome."
-    probe: {type: pytest, node: "tests/test_success_rate.py"}
-
-  - id: L30-manager-worker
-    section: "11 — Manager-Worker and hierarchical multi-agent structures"
-    claim: "A manager agent decomposes a goal and assigns sub-tasks to worker agents."
-    probe: {type: grep, pattern: "class ManagerAgent|def assign_subtask", paths: ["src/loopeng"]}
-    rationale: >-
-      Divergence: coordination is an explicit dependency DAG with cycle rejection, which
-      is inspectable before anything runs, rather than a manager agent deciding at
-      runtime. Still a miss against the lecture's claim.
-
-  - id: L31-error-memory
-    section: "13 — record errors so the agent does not repeat the same mistake"
-    claim: "Failures that recur across runs are surfaced to the next attempt."
-    probe: {type: grep, pattern: "recurring_failures", paths: ["src/loopeng/memory/store.py"]}

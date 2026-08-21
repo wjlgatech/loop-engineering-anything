@@ -6,7 +6,8 @@ summary that asserts what a mature agent loop must have and verifies none of it 
 running system. This script is the missing half: every claim becomes a probe against
 shipped code or a real test run, and the score is whatever the probes return.
 
-Discipline (playbook: operationalizing-a-paper-rubric-checklist-standard):
+Discipline (the operationalizing-a-rubric playbook, which ships with the anyagent
+skill rather than in this repo -- summarised here so this file stands alone):
 
   * Evidence is OBSERVED -- a symbol at a file:line, or a pytest node that actually
     passes. Never a claim in prose.
@@ -98,8 +99,9 @@ def run_item(item: dict) -> dict:
     return {**item, "status": PASS if ok else FAIL, "evidence": evidence}
 
 
-def audit() -> dict:
-    doc = yaml.safe_load(RUBRIC.read_text(encoding="utf-8"))
+def audit(rubric: pathlib.Path | None = None) -> dict:
+    path = rubric or RUBRIC
+    doc = yaml.safe_load(path.read_text(encoding="utf-8"))
     results = [run_item(i) for i in doc["items"]]
 
     verifiable = [r for r in results if not r.get("expect")]
@@ -113,6 +115,7 @@ def audit() -> dict:
     gate_ok = not missing and not unmeasured and all(g["status"] == PASS for g in gaps)
 
     return {
+        "rubric": str(path.relative_to(ROOT)),
         "source": doc["source"],
         "total_items": len(results),
         "verifiable": len(verifiable),
@@ -129,7 +132,7 @@ def audit() -> dict:
 def render(a: dict) -> str:
     src = a["source"]
     L = ["# Agent Loop Engineering — conformance audit", "",
-         f"Rubric: `docs/rubrics/agent-loop-engineering.yml` — {a['total_items']} items drawn from "
+         f"Rubric: `{a['rubric']}` — {a['total_items']} items drawn from "
          f"*{src['title']}* ({src['publisher']}, received {src['received']}).", "",
          f"That source is a **{src['nature']}**. Every claim below is scored against shipped "
          "code or a test that was actually executed. No evidence means no.", "",
@@ -169,12 +172,14 @@ def render(a: dict) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--rubric", default=None,
+                    help="score an alternative rubric file (e.g. an archived version)")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--gate", action="store_true", help="exit 1 unless every item passes")
     ap.add_argument("--out")
     args = ap.parse_args()
 
-    a = audit()
+    a = audit(pathlib.Path(args.rubric).resolve() if args.rubric else None)
     text = json.dumps(a, indent=2) if args.json else render(a)
     if args.out:
         pathlib.Path(args.out).write_text(text + "\n", encoding="utf-8")
