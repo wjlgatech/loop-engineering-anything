@@ -13,7 +13,7 @@ reality, and refactors until the grade stops climbing — then tells you what it
 
 [![CI](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml/badge.svg)](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml)
 [![loop-anything-hub](https://img.shields.io/badge/loop--anything--hub-live-brightgreen)](https://wjlgatech.github.io/loop-engineering-anything/)
-[![Tests](https://img.shields.io/badge/tests-315%20passing-brightgreen)](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-606%20passing-brightgreen)](https://github.com/wjlgatech/loop-engineering-anything/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
 [![Units](https://img.shields.io/badge/plan-6%2F8%20units-blue)](docs/plans/)
 [![License](https://img.shields.io/badge/license-MIT-green)](#-license)
@@ -269,6 +269,63 @@ Three rules keep it from becoming decoration
 `evidence.required` is checked against the run's **real** proof pack and exits non-zero on
 a gap — so declaring evidence is a claim the run has to satisfy.
 
+### 🧮 Scored against someone else's checklist — and it fails
+
+A webinar summary listed sixteen things a mature agent loop must have, and verified none of
+them against a running system. That is a rubric wearing an essay's clothes, so it is encoded
+as one: [`docs/rubrics/agent-loop-engineering.yml`](docs/rubrics/agent-loop-engineering.yml)
+holds the claims as **data**, and [`scripts/audit_loop_rubric.py`](scripts/audit_loop_rubric.py)
+is the only thing that reads them, so the published score cannot drift from the claims it scores.
+
+```bash
+python3 scripts/audit_loop_rubric.py                 # score this engine
+python3 scripts/audit_loop_rubric.py --gate          # exit 1 unless every item passes
+```
+
+```
+**Conformance: 25/28 (89%)** verifiable claims implemented · 3 declared gaps · 0 unmeasured · gate **FAIL**
+```
+
+Evidence is **observed** — a symbol at a real `file:line`, or a pytest node that is actually
+executed. No evidence means no. A probe that cannot run is `unmeasured`: excluded from the rate
+**and** blocking, because "I could not look" is not "it works".
+
+**The first version of this rubric scored 23/23, and that was the bug.** It was written by
+someone who had just spent an hour in this codebase, and it contained no question he expected
+to fail — an assessment that cannot fail its author is a mirror. That run is kept, honestly
+labelled a reconstruction, so the claim is reproducible rather than asserted:
+
+```bash
+python3 scripts/audit_loop_rubric.py --rubric docs/rubrics/archive/agent-loop-engineering.v1.yml
+# 23/23 (100%) · gate PASS   ← the score that measured nothing
+```
+
+Three items stay red with a `rationale` recorded beside the mark and **no mechanism to turn a
+rationale into a pass** (ReAct interleaving and manager-worker are deliberate divergences;
+human takeover of a running loop is a real gap). Three further **declared gaps** — typed
+failure taxonomy, branching search, span-level trace schema — carry probes that *fail the
+moment the gap silently closes*, so the limitation list cannot rot.
+
+Full output: [`docs/rubrics/AUDIT.md`](docs/rubrics/AUDIT.md).
+
+### 📊 Did it actually work? — cross-run success rate
+
+Per-run cost, wall time and iteration count were always recorded; nothing ever divided.
+`MemoryStore.success_rate(target=None)` closes that, and two choices decide whether the number
+is honest: a run **still in flight is excluded from the denominator**, and a run halted by the
+safety gate **counts as a failure** — otherwise the metric would rise when the safety gate
+fires. It returns `None`, never `0.0`, when nothing has finished: *not measured* must not read
+as *tried and failed*.
+
+### 🔬 Research — the attention budget, measured
+
+[`research/attention-budget/`](research/attention-budget/) applies the `@skills` protocol
+(arXiv:2608.12610) to a real skill library and then measures the quantity that paper explicitly
+does **not** measure. Top-1 routing against a 175-skill corpus: **100% at N=10 and N=40, 83% at
+N=80, 44% at N=176** — the break falls below the paper's argued 100-slot bound. Limits, bias and
+two self-corrections (a YAML block-scalar parse bug that made the first numbers wrong) are
+recorded in that directory's README rather than quietly fixed.
+
 ---
 
 ## ⚙️ How it works
@@ -381,6 +438,7 @@ loop-engineering-anything/
 │   ├── adopt.py               # catalog tool adopter — venv-isolated, env-pruned, full-SHA pin
 │   ├── proof.py               # ProofPack builder + store-backed compounder
 │   ├── router.py              # target → lane classification
+│   ├── memory/store.py        # + success_rate(): cross-run outcome, safety blocks count as failures
 │   ├── adapters/
 │   │   ├── base.py            # Verdict / GenerateResult + Judge/Refiner/Compounder/Checkpoint protocols
 │   │   ├── safety.py          # shell=False exec, metachar rejection, workspace jail
@@ -390,8 +448,11 @@ loop-engineering-anything/
 │   ├── memory/                # SQLite store + trend/plateau/recurring queries
 │   ├── loop/                  # controller state machine, convergence, brief, compound, GitCheckpoint
 │   └── autonomous/            # research report + autonomous runner
+├── docs/rubrics/              # the Agent Loop Engineering rubric as data + its generated audit
+├── research/attention-budget/ # the @skills residency audit + the trigger-reliability experiment
+├── scripts/audit_loop_rubric.py  # scores this engine against the rubric; --gate exits 1
 ├── skills/loop-anything/      # the /loop-anything agent skill
-├── tests/                     # 600 tests — loop dynamics validated against recorded verdicts
+├── tests/                     # 606 tests — loop dynamics validated against recorded verdicts
 └── docs/plans/                # the implementation plan
 ```
 
