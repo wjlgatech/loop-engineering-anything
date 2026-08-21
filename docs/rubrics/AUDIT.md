@@ -31,7 +31,7 @@ That source is a **lecture summary; taxonomy, no verification against a running 
   - evidence: `src/loopeng/adapters/base.py:62`
 - **L8-maker-not-checker** · 10 — evaluation must be trustworthy
   - claim: The thing that builds is not the thing that grades.
-  - evidence: `tests/test_maker_checker.py -> 30 passed in 0.13s`
+  - evidence: `tests/test_maker_checker.py -> 30 passed in 0.18s`
 - **L9-reflection** · 4/6 — Plan-Execute-Observe-Reflect, Self-Reflection
   - claim: Why the last attempt scored what it did is carried into the next attempt.
   - evidence: `src/loopeng/adapters/base.py:66`
@@ -43,7 +43,7 @@ That source is a **lecture summary; taxonomy, no verification against a running 
   - evidence: `src/loopeng/adapters/base.py:142`
 - **L12-recovery-state** · 8 — Recovery keeps enough state to resume
   - claim: A failed change can be rolled back rather than restarting from zero.
-  - evidence: `tests/test_checkpoint.py -> 2 passed in 0.61s`
+  - evidence: `tests/test_checkpoint.py -> 2 passed in 0.60s`
 - **L13-exit-success** · 9 — explicit exits: success
   - claim: The loop stops when the goal is verifiably met.
   - evidence: `src/loopeng/loop/convergence.py:29`
@@ -64,7 +64,7 @@ That source is a **lecture summary; taxonomy, no verification against a running 
   - evidence: `src/loopeng/config.py:127`
 - **L19-hitl-unbypassable** · 12 — the gate must actually hold
   - claim: An unattended run cannot pre-confirm its own result.
-  - evidence: `tests/test_run_contract.py::test_contract_can_never_disable_the_human_gate -> 4 passed in 0.04s`
+  - evidence: `tests/test_run_contract.py::test_contract_can_never_disable_the_human_gate -> 4 passed in 0.05s`
 - **L20-multi-agent-graph** · 11 — Loop becomes Graph with many agents
   - claim: Multiple agents are coordinated as a dependency graph, cycles refused.
   - evidence: `src/loopeng/orchestration/coordinator.py:6`
@@ -76,10 +76,10 @@ That source is a **lecture summary; taxonomy, no verification against a running 
   - evidence: `src/loopeng/proof.py:108`
 - **L23-cost-never-faked** · 14 — measurement must be real to be useful
   - claim: An unavailable cost is omitted, never estimated into the record.
-  - evidence: `tests/test_proof.py -> 7 passed in 0.09s`
+  - evidence: `tests/test_proof.py -> 7 passed in 0.15s`
 - **L29-success-rate-metric** · 14 — measure tokens, time, iteration count AND task success rate
   - claim: Task success RATE is computed across runs, not just per-run outcome.
-  - evidence: `tests/test_success_rate.py -> 6 passed in 0.07s`
+  - evidence: `tests/test_success_rate.py -> 6 passed in 0.08s`
 - **L31-error-memory** · 13 — record errors so the agent does not repeat the same mistake
   - claim: Failures that recur across runs are surfaced to the next attempt.
   - evidence: `src/loopeng/memory/store.py:277`

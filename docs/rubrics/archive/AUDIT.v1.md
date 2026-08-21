@@ -1,5 +1,7 @@
 # Agent Loop Engineering — conformance audit
 
+> **ARCHIVED RECONSTRUCTION, committed after the fact. This rubric was not committed at the time it produced its 23/23. It is the current rubric minus the five second-pass items. Treat the score as reproducible, but the file as rebuilt rather than recovered.**
+
 Rubric: `docs/rubrics/archive/agent-loop-engineering.v1.yml` — 26 items drawn from *Agent Loop Engineering — 讲座总结* (DataApplab / AI聘 (info@aipin.io), received 2026-08-20).
 
 That source is a **lecture summary; taxonomy, no verification against a running system**. Every claim below is scored against shipped code or a test that was actually executed. No evidence means no.
@@ -31,7 +33,7 @@ That source is a **lecture summary; taxonomy, no verification against a running 
   - evidence: `src/loopeng/adapters/base.py:62`
 - **L8-maker-not-checker** · 10 — evaluation must be trustworthy
   - claim: The thing that builds is not the thing that grades.
-  - evidence: `tests/test_maker_checker.py -> 30 passed in 0.14s`
+  - evidence: `tests/test_maker_checker.py -> 30 passed in 0.43s`
 - **L9-reflection** · 4/6 — Plan-Execute-Observe-Reflect, Self-Reflection
   - claim: Why the last attempt scored what it did is carried into the next attempt.
   - evidence: `src/loopeng/adapters/base.py:66`
@@ -43,7 +45,7 @@ That source is a **lecture summary; taxonomy, no verification against a running 
   - evidence: `src/loopeng/adapters/base.py:142`
 - **L12-recovery-state** · 8 — Recovery keeps enough state to resume
   - claim: A failed change can be rolled back rather than restarting from zero.
-  - evidence: `tests/test_checkpoint.py -> 2 passed in 0.49s`
+  - evidence: `tests/test_checkpoint.py -> 2 passed in 0.73s`
 - **L13-exit-success** · 9 — explicit exits: success
   - claim: The loop stops when the goal is verifiably met.
   - evidence: `src/loopeng/loop/convergence.py:29`
@@ -64,7 +66,7 @@ That source is a **lecture summary; taxonomy, no verification against a running 
   - evidence: `src/loopeng/config.py:127`
 - **L19-hitl-unbypassable** · 12 — the gate must actually hold
   - claim: An unattended run cannot pre-confirm its own result.
-  - evidence: `tests/test_run_contract.py::test_contract_can_never_disable_the_human_gate -> 4 passed in 0.05s`
+  - evidence: `tests/test_run_contract.py::test_contract_can_never_disable_the_human_gate -> 4 passed in 0.09s`
 - **L20-multi-agent-graph** · 11 — Loop becomes Graph with many agents
   - claim: Multiple agents are coordinated as a dependency graph, cycles refused.
   - evidence: `src/loopeng/orchestration/coordinator.py:6`
@@ -76,7 +78,7 @@ That source is a **lecture summary; taxonomy, no verification against a running 
   - evidence: `src/loopeng/proof.py:108`
 - **L23-cost-never-faked** · 14 — measurement must be real to be useful
   - claim: An unavailable cost is omitted, never estimated into the record.
-  - evidence: `tests/test_proof.py -> 7 passed in 0.09s`
+  - evidence: `tests/test_proof.py -> 7 passed in 0.15s`
 
 ## Declared gaps — the engine does NOT do these, and says so
 
