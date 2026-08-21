@@ -208,5 +208,47 @@
       "source": "PR #47 + PR #291, curl 200"
     },
     "next_lever": "Item 9: the false-green benchmark \u2014 how often the loop reports A when a stronger judge disagrees"
+  },
+  {
+    "id": "rc0007",
+    "delivery": "Part A (@skills, arXiv:2608.12610): residency_audit.py on the live library \u2014 221 entries, 176 distinct = 1.76x the paper's argued 100-slot bound; resident index 62,010 chars (~15.5k tok) vs 2.95M chars of bodies = 47.6x; 17 phantom symlinks, 25 duplicate names, 130/176 overlong descriptions. trigger_reliability.py runs the paper's OWN named future work: top-1 routing 100% (N=10), 100% (N=40), 83.3% (N=80), 44.4% (N=176, 9 usable trials, CI 19-73%) \u2014 subject gpt-oss-120b, probe generator a different family, declared optimistic-bound bias, failed calls excluded from the denominator. TWO self-corrections shipped as commits: a YAML block-scalar parse bug made my first audit numbers wrong (86.6x/72 overlong -> 47.6x/130) AND corrupted the experiment's ground truth (three targets got the identical probe 'Hey, can you pull'); and an eyeballed '~190 MCP tools' was retracted for a counted 132. Part B (Agent Loop Engineering lecture): encoded 16 sections as docs/rubrics/agent-loop-engineering.yml + scripts/audit_loop_rubric.py with observed-only evidence and unmeasured-blocks-the-gate. First run 23/23 -> went back for claims chosen because I expected them to fail -> 25/28, gate FAIL. Closed one gap for real: MemoryStore.success_rate() (in-flight excluded, blocked_safety counts as failure, None not 0.0 when nothing finished, 6 tests). 606 tests pass, ruff clean, 5 commits on branch research/attention-budget.",
+    "objective": "Make loop-engineering-anything's public architecture as honest and reviewable as its engine already is",
+    "created_at": "2026-08-21T11:45:03-05:00",
+    "key_results": [
+      {
+        "text": "A paper's unmeasured central claim becomes measured",
+        "target": "a curve with CIs from a real corpus",
+        "score": 1.0,
+        "evidence": "research/attention-budget/results.json, per-trial records tracked"
+      },
+      {
+        "text": "A lecture's taxonomy becomes a gate that can fail us",
+        "target": "rubric as data + observed-evidence checker",
+        "score": 1.0,
+        "evidence": "docs/rubrics/AUDIT.md, 25/28 gate FAIL, exit 1"
+      },
+      {
+        "text": "My own errors are caught and published, not buried",
+        "target": "self-corrections shipped as commits",
+        "score": 1.0,
+        "evidence": "382759f parse bug, 5f910e0 count retraction, both with corrected numbers in the README"
+      }
+    ],
+    "request": "study the @skills paper + atskills repo: 1. apply it 2. extend to other agentic resource management with 4-window research 3. deep R&D on top 3 areas 4. long-form article. THEN: eval/research/10X the Agent Loop Engineering lecture, make it TRUE for /loop-anything, and write another article.",
+    "headline": "Two rubrics scored; both first answers were wrong",
+    "brief": "I measured the thing a new paper admits nobody has measured: how reliably an AI picks the right tool as you install more. Perfect at 40 tools, 83% at 80, 44% at your 176. Then I turned a lecture's checklist into an automatic test of your engine. It scored 23 out of 23, which was the bug \u2014 I wrote the questions knowing the answers. Adding the ones I expected to fail gave an honest 25 of 28.",
+    "growth": [
+      "C:met:Treated my own 23/23 as evidence of a bad rubric rather than a good engine, and went looking for questions I expected to fail",
+      "P:met:Derived the success-rate definition from first principles about what would corrupt it \u2014 excluded in-flight runs and counted safety blocks as failures, so the metric cannot rise when the safety gate fires"
+    ],
+    "why": "Both sources assert without verifying \u2014 the paper says its central number is unmeasured, the lecture says it is not a standard. Acting on either as fact would have been the exact false-green this repo exists to prevent. The 23/23 moment proves the risk is not hypothetical: I produced a perfect score on my own system within an hour of starting.",
+    "needle": {
+      "name": "verifiable claims about this engine backed by an executable probe",
+      "before": "0",
+      "after": "28",
+      "better": "up",
+      "source": "scripts/audit_loop_rubric.py"
+    },
+    "next_lever": "Human takeover of a running loop \u2014 the one red item with a reason but no plan; it is the only miss I cannot defend as a design divergence"
   }
 ]
