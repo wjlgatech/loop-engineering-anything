@@ -1,0 +1,815 @@
+{
+  "paper": "arXiv:2608.12610 (Yin et al., 12 Aug 2026)",
+  "measures": "trigger reliability as a function of installed-skill count (the paper's own named future work)",
+  "declared_bias": "probe requests are generated FROM each target's description, so target trigger wording leaks into the request; these accuracies are an OPTIMISTIC UPPER BOUND on real-world routing",
+  "subject_model": "openai/gpt-oss-120b",
+  "generator_model": "gemini-3.6-flash",
+  "generator_fallbacks_used": [
+    "claude-haiku-4-5-20251001"
+  ],
+  "corpus_size": 175,
+  "targets": [
+    "benchmark",
+    "blogwatcher",
+    "browser-harness",
+    "canvas",
+    "copilotkit",
+    "knowledgefy",
+    "longevity-loop",
+    "moomoo-derivatives-anomaly",
+    "project-artifact",
+    "sag",
+    "sonoscli",
+    "ux-research"
+  ],
+  "seeds": [
+    11,
+    22
+  ],
+  "min_trials": 8,
+  "by_n": {
+    "10": {
+      "hit": 24,
+      "wrong": 0,
+      "none": 0,
+      "unparsed": 0,
+      "error": 0
+    },
+    "40": {
+      "hit": 24,
+      "wrong": 0,
+      "none": 0,
+      "unparsed": 0,
+      "error": 0
+    },
+    "80": {
+      "hit": 20,
+      "wrong": 3,
+      "none": 1,
+      "unparsed": 0,
+      "error": 0
+    },
+    "176": {
+      "hit": 4,
+      "wrong": 4,
+      "none": 1,
+      "unparsed": 0,
+      "error": 15
+    }
+  },
+  "trials": [
+    {
+      "n": 10,
+      "seed": 11,
+      "target": "knowledgefy",
+      "outcome": "hit",
+      "pick": "knowledgefy",
+      "request": "Can you kgfy this repo so I can quickly map out the core components before my 2 PM design review? https://github.com/vllm-project/vllm"
+    },
+    {
+      "n": 10,
+      "seed": 11,
+      "target": "copilotkit",
+      "outcome": "hit",
+      "pick": "copilotkit",
+      "request": "I need to add an AI copilot sidebar to our Next.js app that can read page state and trigger actions\u2014can you set up the provider, API route, and hooks for it?"
+    },
+    {
+      "n": 10,
+      "seed": 11,
+      "target": "moomoo-derivatives-anomaly",
+      "outcome": "hit",
+      "pick": "moomoo-derivatives-anomaly",
+      "request": "hey can you check if there's any unusual options activity in nvidia right now, want to see if smart money is positioning for something"
+    },
+    {
+      "n": 10,
+      "seed": 11,
+      "target": "ux-research",
+      "outcome": "hit",
+      "pick": "ux-research",
+      "request": "hey can you do a deep dive on how stripe and square handle their dashboard UX? need to see what patterns they're using before we redesign ours"
+    },
+    {
+      "n": 10,
+      "seed": 11,
+      "target": "benchmark",
+      "outcome": "hit",
+      "pick": "benchmark",
+      "request": "hey can you check if my latest PR regressed the page load times? i want to make sure the bundle size didn't blow up"
+    },
+    {
+      "n": 10,
+      "seed": 11,
+      "target": "browser-harness",
+      "outcome": "hit",
+      "pick": "browser-harness",
+      "request": "can you log into our staging dashboard and pull the latest test results from the QA reports page, then export it as CSV?"
+    },
+    {
+      "n": 10,
+      "seed": 11,
+      "target": "sag",
+      "outcome": "hit",
+      "pick": "sag",
+      "request": "hey can you read this design doc out loud for me while i finish this code review?"
+    },
+    {
+      "n": 10,
+      "seed": 11,
+      "target": "canvas",
+      "outcome": "hit",
+      "pick": "canvas",
+      "request": "hey can you push this dashboard html to my iPad so I can see it on the big screen while I'm testing?"
+    },
+    {
+      "n": 10,
+      "seed": 11,
+      "target": "longevity-loop",
+      "outcome": "hit",
+      "pick": "longevity-loop",
+      "request": "Hey, can you run the latest pyaging models on our cohort data and then benchmark the results against the leaderboard to see where we stand on the aging clock ac"
+    },
+    {
+      "n": 10,
+      "seed": 11,
+      "target": "sonoscli",
+      "outcome": "hit",
+      "pick": "sonoscli",
+      "request": "Pause the speakers in the office, I'm hopping on a call right now."
+    },
+    {
+      "n": 10,
+      "seed": 11,
+      "target": "blogwatcher",
+      "outcome": "hit",
+      "pick": "blogwatcher",
+      "request": "can you start watching the golang weekly newsletter and let me know whenever there's a new post about concurrency patterns?"
+    },
+    {
+      "n": 10,
+      "seed": 11,
+      "target": "project-artifact",
+      "outcome": "hit",
+      "pick": "project-artifact",
+      "request": "hey can you set up a status page for the infrastructure migration project? we've got like 5 different teams working on different pieces and i need something i c"
+    },
+    {
+      "n": 10,
+      "seed": 22,
+      "target": "knowledgefy",
+      "outcome": "hit",
+      "pick": "knowledgefy",
+      "request": "Can you kgfy this repo so I can quickly map out the core components before my 2 PM design review? https://github.com/vllm-project/vllm"
+    },
+    {
+      "n": 10,
+      "seed": 22,
+      "target": "copilotkit",
+      "outcome": "hit",
+      "pick": "copilotkit",
+      "request": "I need to add an AI copilot sidebar to our Next.js app that can read page state and trigger actions\u2014can you set up the provider, API route, and hooks for it?"
+    },
+    {
+      "n": 10,
+      "seed": 22,
+      "target": "moomoo-derivatives-anomaly",
+      "outcome": "hit",
+      "pick": "moomoo-derivatives-anomaly",
+      "request": "hey can you check if there's any unusual options activity in nvidia right now, want to see if smart money is positioning for something"
+    },
+    {
+      "n": 10,
+      "seed": 22,
+      "target": "ux-research",
+      "outcome": "hit",
+      "pick": "ux-research",
+      "request": "hey can you do a deep dive on how stripe and square handle their dashboard UX? need to see what patterns they're using before we redesign ours"
+    },
+    {
+      "n": 10,
+      "seed": 22,
+      "target": "benchmark",
+      "outcome": "hit",
+      "pick": "benchmark",
+      "request": "hey can you check if my latest PR regressed the page load times? i want to make sure the bundle size didn't blow up"
+    },
+    {
+      "n": 10,
+      "seed": 22,
+      "target": "browser-harness",
+      "outcome": "hit",
+      "pick": "browser-harness",
+      "request": "can you log into our staging dashboard and pull the latest test results from the QA reports page, then export it as CSV?"
+    },
+    {
+      "n": 10,
+      "seed": 22,
+      "target": "sag",
+      "outcome": "hit",
+      "pick": "sag",
+      "request": "hey can you read this design doc out loud for me while i finish this code review?"
+    },
+    {
+      "n": 10,
+      "seed": 22,
+      "target": "canvas",
+      "outcome": "hit",
+      "pick": "canvas",
+      "request": "hey can you push this dashboard html to my iPad so I can see it on the big screen while I'm testing?"
+    },
+    {
+      "n": 10,
+      "seed": 22,
+      "target": "longevity-loop",
+      "outcome": "hit",
+      "pick": "longevity-loop",
+      "request": "Hey, can you run the latest pyaging models on our cohort data and then benchmark the results against the leaderboard to see where we stand on the aging clock ac"
+    },
+    {
+      "n": 10,
+      "seed": 22,
+      "target": "sonoscli",
+      "outcome": "hit",
+      "pick": "sonoscli",
+      "request": "Pause the speakers in the office, I'm hopping on a call right now."
+    },
+    {
+      "n": 10,
+      "seed": 22,
+      "target": "blogwatcher",
+      "outcome": "hit",
+      "pick": "blogwatcher",
+      "request": "can you start watching the golang weekly newsletter and let me know whenever there's a new post about concurrency patterns?"
+    },
+    {
+      "n": 10,
+      "seed": 22,
+      "target": "project-artifact",
+      "outcome": "hit",
+      "pick": "project-artifact",
+      "request": "hey can you set up a status page for the infrastructure migration project? we've got like 5 different teams working on different pieces and i need something i c"
+    },
+    {
+      "n": 40,
+      "seed": 11,
+      "target": "knowledgefy",
+      "outcome": "hit",
+      "pick": "knowledgefy",
+      "request": "Can you kgfy this repo so I can quickly map out the core components before my 2 PM design review? https://github.com/vllm-project/vllm"
+    },
+    {
+      "n": 40,
+      "seed": 11,
+      "target": "copilotkit",
+      "outcome": "hit",
+      "pick": "copilotkit",
+      "request": "I need to add an AI copilot sidebar to our Next.js app that can read page state and trigger actions\u2014can you set up the provider, API route, and hooks for it?"
+    },
+    {
+      "n": 40,
+      "seed": 11,
+      "target": "moomoo-derivatives-anomaly",
+      "outcome": "hit",
+      "pick": "moomoo-derivatives-anomaly",
+      "request": "hey can you check if there's any unusual options activity in nvidia right now, want to see if smart money is positioning for something"
+    },
+    {
+      "n": 40,
+      "seed": 11,
+      "target": "ux-research",
+      "outcome": "hit",
+      "pick": "ux-research",
+      "request": "hey can you do a deep dive on how stripe and square handle their dashboard UX? need to see what patterns they're using before we redesign ours"
+    },
+    {
+      "n": 40,
+      "seed": 11,
+      "target": "benchmark",
+      "outcome": "hit",
+      "pick": "benchmark",
+      "request": "hey can you check if my latest PR regressed the page load times? i want to make sure the bundle size didn't blow up"
+    },
+    {
+      "n": 40,
+      "seed": 11,
+      "target": "browser-harness",
+      "outcome": "hit",
+      "pick": "browser-harness",
+      "request": "can you log into our staging dashboard and pull the latest test results from the QA reports page, then export it as CSV?"
+    },
+    {
+      "n": 40,
+      "seed": 11,
+      "target": "sag",
+      "outcome": "hit",
+      "pick": "sag",
+      "request": "hey can you read this design doc out loud for me while i finish this code review?"
+    },
+    {
+      "n": 40,
+      "seed": 11,
+      "target": "canvas",
+      "outcome": "hit",
+      "pick": "canvas",
+      "request": "hey can you push this dashboard html to my iPad so I can see it on the big screen while I'm testing?"
+    },
+    {
+      "n": 40,
+      "seed": 11,
+      "target": "longevity-loop",
+      "outcome": "hit",
+      "pick": "longevity-loop",
+      "request": "Hey, can you run the latest pyaging models on our cohort data and then benchmark the results against the leaderboard to see where we stand on the aging clock ac"
+    },
+    {
+      "n": 40,
+      "seed": 11,
+      "target": "sonoscli",
+      "outcome": "hit",
+      "pick": "sonoscli",
+      "request": "Pause the speakers in the office, I'm hopping on a call right now."
+    },
+    {
+      "n": 40,
+      "seed": 11,
+      "target": "blogwatcher",
+      "outcome": "hit",
+      "pick": "blogwatcher",
+      "request": "can you start watching the golang weekly newsletter and let me know whenever there's a new post about concurrency patterns?"
+    },
+    {
+      "n": 40,
+      "seed": 11,
+      "target": "project-artifact",
+      "outcome": "hit",
+      "pick": "project-artifact",
+      "request": "hey can you set up a status page for the infrastructure migration project? we've got like 5 different teams working on different pieces and i need something i c"
+    },
+    {
+      "n": 40,
+      "seed": 22,
+      "target": "knowledgefy",
+      "outcome": "hit",
+      "pick": "knowledgefy",
+      "request": "Can you kgfy this repo so I can quickly map out the core components before my 2 PM design review? https://github.com/vllm-project/vllm"
+    },
+    {
+      "n": 40,
+      "seed": 22,
+      "target": "copilotkit",
+      "outcome": "hit",
+      "pick": "copilotkit",
+      "request": "I need to add an AI copilot sidebar to our Next.js app that can read page state and trigger actions\u2014can you set up the provider, API route, and hooks for it?"
+    },
+    {
+      "n": 40,
+      "seed": 22,
+      "target": "moomoo-derivatives-anomaly",
+      "outcome": "hit",
+      "pick": "moomoo-derivatives-anomaly",
+      "request": "hey can you check if there's any unusual options activity in nvidia right now, want to see if smart money is positioning for something"
+    },
+    {
+      "n": 40,
+      "seed": 22,
+      "target": "ux-research",
+      "outcome": "hit",
+      "pick": "ux-research",
+      "request": "hey can you do a deep dive on how stripe and square handle their dashboard UX? need to see what patterns they're using before we redesign ours"
+    },
+    {
+      "n": 40,
+      "seed": 22,
+      "target": "benchmark",
+      "outcome": "hit",
+      "pick": "benchmark",
+      "request": "hey can you check if my latest PR regressed the page load times? i want to make sure the bundle size didn't blow up"
+    },
+    {
+      "n": 40,
+      "seed": 22,
+      "target": "browser-harness",
+      "outcome": "hit",
+      "pick": "browser-harness",
+      "request": "can you log into our staging dashboard and pull the latest test results from the QA reports page, then export it as CSV?"
+    },
+    {
+      "n": 40,
+      "seed": 22,
+      "target": "sag",
+      "outcome": "hit",
+      "pick": "sag",
+      "request": "hey can you read this design doc out loud for me while i finish this code review?"
+    },
+    {
+      "n": 40,
+      "seed": 22,
+      "target": "canvas",
+      "outcome": "hit",
+      "pick": "canvas",
+      "request": "hey can you push this dashboard html to my iPad so I can see it on the big screen while I'm testing?"
+    },
+    {
+      "n": 40,
+      "seed": 22,
+      "target": "longevity-loop",
+      "outcome": "hit",
+      "pick": "longevity-loop",
+      "request": "Hey, can you run the latest pyaging models on our cohort data and then benchmark the results against the leaderboard to see where we stand on the aging clock ac"
+    },
+    {
+      "n": 40,
+      "seed": 22,
+      "target": "sonoscli",
+      "outcome": "hit",
+      "pick": "sonoscli",
+      "request": "Pause the speakers in the office, I'm hopping on a call right now."
+    },
+    {
+      "n": 40,
+      "seed": 22,
+      "target": "blogwatcher",
+      "outcome": "hit",
+      "pick": "blogwatcher",
+      "request": "can you start watching the golang weekly newsletter and let me know whenever there's a new post about concurrency patterns?"
+    },
+    {
+      "n": 40,
+      "seed": 22,
+      "target": "project-artifact",
+      "outcome": "hit",
+      "pick": "project-artifact",
+      "request": "hey can you set up a status page for the infrastructure migration project? we've got like 5 different teams working on different pieces and i need something i c"
+    },
+    {
+      "n": 80,
+      "seed": 11,
+      "target": "knowledgefy",
+      "outcome": "hit",
+      "pick": "knowledgefy",
+      "request": "Can you kgfy this repo so I can quickly map out the core components before my 2 PM design review? https://github.com/vllm-project/vllm"
+    },
+    {
+      "n": 80,
+      "seed": 11,
+      "target": "copilotkit",
+      "outcome": "hit",
+      "pick": "copilotkit",
+      "request": "I need to add an AI copilot sidebar to our Next.js app that can read page state and trigger actions\u2014can you set up the provider, API route, and hooks for it?"
+    },
+    {
+      "n": 80,
+      "seed": 11,
+      "target": "moomoo-derivatives-anomaly",
+      "outcome": "hit",
+      "pick": "moomoo-derivatives-anomaly",
+      "request": "hey can you check if there's any unusual options activity in nvidia right now, want to see if smart money is positioning for something"
+    },
+    {
+      "n": 80,
+      "seed": 11,
+      "target": "ux-research",
+      "outcome": "hit",
+      "pick": "ux-research",
+      "request": "hey can you do a deep dive on how stripe and square handle their dashboard UX? need to see what patterns they're using before we redesign ours"
+    },
+    {
+      "n": 80,
+      "seed": 11,
+      "target": "benchmark",
+      "outcome": "hit",
+      "pick": "benchmark",
+      "request": "hey can you check if my latest PR regressed the page load times? i want to make sure the bundle size didn't blow up"
+    },
+    {
+      "n": 80,
+      "seed": 11,
+      "target": "browser-harness",
+      "outcome": "wrong",
+      "pick": "browse",
+      "request": "can you log into our staging dashboard and pull the latest test results from the QA reports page, then export it as CSV?"
+    },
+    {
+      "n": 80,
+      "seed": 11,
+      "target": "sag",
+      "outcome": "hit",
+      "pick": "sag",
+      "request": "hey can you read this design doc out loud for me while i finish this code review?"
+    },
+    {
+      "n": 80,
+      "seed": 11,
+      "target": "canvas",
+      "outcome": "hit",
+      "pick": "canvas",
+      "request": "hey can you push this dashboard html to my iPad so I can see it on the big screen while I'm testing?"
+    },
+    {
+      "n": 80,
+      "seed": 11,
+      "target": "longevity-loop",
+      "outcome": "wrong",
+      "pick": "coding-agent",
+      "request": "Hey, can you run the latest pyaging models on our cohort data and then benchmark the results against the leaderboard to see where we stand on the aging clock ac"
+    },
+    {
+      "n": 80,
+      "seed": 11,
+      "target": "sonoscli",
+      "outcome": "hit",
+      "pick": "sonoscli",
+      "request": "Pause the speakers in the office, I'm hopping on a call right now."
+    },
+    {
+      "n": 80,
+      "seed": 11,
+      "target": "blogwatcher",
+      "outcome": "hit",
+      "pick": "blogwatcher",
+      "request": "can you start watching the golang weekly newsletter and let me know whenever there's a new post about concurrency patterns?"
+    },
+    {
+      "n": 80,
+      "seed": 11,
+      "target": "project-artifact",
+      "outcome": "hit",
+      "pick": "project-artifact",
+      "request": "hey can you set up a status page for the infrastructure migration project? we've got like 5 different teams working on different pieces and i need something i c"
+    },
+    {
+      "n": 80,
+      "seed": 22,
+      "target": "knowledgefy",
+      "outcome": "wrong",
+      "pick": "graphify",
+      "request": "Can you kgfy this repo so I can quickly map out the core components before my 2 PM design review? https://github.com/vllm-project/vllm"
+    },
+    {
+      "n": 80,
+      "seed": 22,
+      "target": "copilotkit",
+      "outcome": "hit",
+      "pick": "copilotkit",
+      "request": "I need to add an AI copilot sidebar to our Next.js app that can read page state and trigger actions\u2014can you set up the provider, API route, and hooks for it?"
+    },
+    {
+      "n": 80,
+      "seed": 22,
+      "target": "moomoo-derivatives-anomaly",
+      "outcome": "hit",
+      "pick": "moomoo-derivatives-anomaly",
+      "request": "hey can you check if there's any unusual options activity in nvidia right now, want to see if smart money is positioning for something"
+    },
+    {
+      "n": 80,
+      "seed": 22,
+      "target": "ux-research",
+      "outcome": "hit",
+      "pick": "ux-research",
+      "request": "hey can you do a deep dive on how stripe and square handle their dashboard UX? need to see what patterns they're using before we redesign ours"
+    },
+    {
+      "n": 80,
+      "seed": 22,
+      "target": "benchmark",
+      "outcome": "hit",
+      "pick": "benchmark",
+      "request": "hey can you check if my latest PR regressed the page load times? i want to make sure the bundle size didn't blow up"
+    },
+    {
+      "n": 80,
+      "seed": 22,
+      "target": "browser-harness",
+      "outcome": "hit",
+      "pick": "browser-harness",
+      "request": "can you log into our staging dashboard and pull the latest test results from the QA reports page, then export it as CSV?"
+    },
+    {
+      "n": 80,
+      "seed": 22,
+      "target": "sag",
+      "outcome": "hit",
+      "pick": "sag",
+      "request": "hey can you read this design doc out loud for me while i finish this code review?"
+    },
+    {
+      "n": 80,
+      "seed": 22,
+      "target": "canvas",
+      "outcome": "hit",
+      "pick": "canvas",
+      "request": "hey can you push this dashboard html to my iPad so I can see it on the big screen while I'm testing?"
+    },
+    {
+      "n": 80,
+      "seed": 22,
+      "target": "longevity-loop",
+      "outcome": "none",
+      "pick": "NONE",
+      "request": "Hey, can you run the latest pyaging models on our cohort data and then benchmark the results against the leaderboard to see where we stand on the aging clock ac"
+    },
+    {
+      "n": 80,
+      "seed": 22,
+      "target": "sonoscli",
+      "outcome": "hit",
+      "pick": "sonoscli",
+      "request": "Pause the speakers in the office, I'm hopping on a call right now."
+    },
+    {
+      "n": 80,
+      "seed": 22,
+      "target": "blogwatcher",
+      "outcome": "hit",
+      "pick": "blogwatcher",
+      "request": "can you start watching the golang weekly newsletter and let me know whenever there's a new post about concurrency patterns?"
+    },
+    {
+      "n": 80,
+      "seed": 22,
+      "target": "project-artifact",
+      "outcome": "hit",
+      "pick": "project-artifact",
+      "request": "hey can you set up a status page for the infrastructure migration project? we've got like 5 different teams working on different pieces and i need something i c"
+    },
+    {
+      "n": 175,
+      "seed": 11,
+      "target": "knowledgefy",
+      "outcome": "wrong",
+      "pick": "knowledge-graph",
+      "request": "Can you kgfy this repo so I can quickly map out the core components before my 2 PM design review? https://github.com/vllm-project/vllm"
+    },
+    {
+      "n": 175,
+      "seed": 11,
+      "target": "copilotkit",
+      "outcome": "hit",
+      "pick": "copilotkit",
+      "request": "I need to add an AI copilot sidebar to our Next.js app that can read page state and trigger actions\u2014can you set up the provider, API route, and hooks for it?"
+    },
+    {
+      "n": 175,
+      "seed": 11,
+      "target": "moomoo-derivatives-anomaly",
+      "outcome": "hit",
+      "pick": "moomoo-derivatives-anomaly",
+      "request": "hey can you check if there's any unusual options activity in nvidia right now, want to see if smart money is positioning for something"
+    },
+    {
+      "n": 175,
+      "seed": 11,
+      "target": "ux-research",
+      "outcome": "hit",
+      "pick": "ux-research",
+      "request": "hey can you do a deep dive on how stripe and square handle their dashboard UX? need to see what patterns they're using before we redesign ours"
+    },
+    {
+      "n": 175,
+      "seed": 11,
+      "target": "benchmark",
+      "outcome": "hit",
+      "pick": "benchmark",
+      "request": "hey can you check if my latest PR regressed the page load times? i want to make sure the bundle size didn't blow up"
+    },
+    {
+      "n": 175,
+      "seed": 11,
+      "target": "browser-harness",
+      "outcome": "wrong",
+      "pick": "browse",
+      "request": "can you log into our staging dashboard and pull the latest test results from the QA reports page, then export it as CSV?"
+    },
+    {
+      "n": 175,
+      "seed": 11,
+      "target": "sag",
+      "outcome": "wrong",
+      "pick": "sherpa-onnx-tts",
+      "request": "hey can you read this design doc out loud for me while i finish this code review?"
+    },
+    {
+      "n": 175,
+      "seed": 11,
+      "target": "canvas",
+      "outcome": "wrong",
+      "pick": "installable-web-app",
+      "request": "hey can you push this dashboard html to my iPad so I can see it on the big screen while I'm testing?"
+    },
+    {
+      "n": 175,
+      "seed": 11,
+      "target": "longevity-loop",
+      "outcome": "none",
+      "pick": "NONE",
+      "request": "Hey, can you run the latest pyaging models on our cohort data and then benchmark the results against the leaderboard to see where we stand on the aging clock ac"
+    },
+    {
+      "n": 175,
+      "seed": 11,
+      "target": "sonoscli",
+      "outcome": "error",
+      "detail": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "n": 175,
+      "seed": 11,
+      "target": "blogwatcher",
+      "outcome": "error",
+      "detail": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "n": 175,
+      "seed": 11,
+      "target": "project-artifact",
+      "outcome": "error",
+      "detail": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "n": 175,
+      "seed": 22,
+      "target": "knowledgefy",
+      "outcome": "error",
+      "detail": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "n": 175,
+      "seed": 22,
+      "target": "copilotkit",
+      "outcome": "error",
+      "detail": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "n": 175,
+      "seed": 22,
+      "target": "moomoo-derivatives-anomaly",
+      "outcome": "error",
+      "detail": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "n": 175,
+      "seed": 22,
+      "target": "ux-research",
+      "outcome": "error",
+      "detail": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "n": 175,
+      "seed": 22,
+      "target": "benchmark",
+      "outcome": "error",
+      "detail": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "n": 175,
+      "seed": 22,
+      "target": "browser-harness",
+      "outcome": "error",
+      "detail": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "n": 175,
+      "seed": 22,
+      "target": "sag",
+      "outcome": "error",
+      "detail": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "n": 175,
+      "seed": 22,
+      "target": "canvas",
+      "outcome": "error",
+      "detail": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "n": 175,
+      "seed": 22,
+      "target": "longevity-loop",
+      "outcome": "error",
+      "detail": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "n": 175,
+      "seed": 22,
+      "target": "sonoscli",
+      "outcome": "error",
+      "detail": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "n": 175,
+      "seed": 22,
+      "target": "blogwatcher",
+      "outcome": "error",
+      "detail": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    },
+    {
+      "n": 175,
+      "seed": 22,
+      "target": "project-artifact",
+      "outcome": "error",
+      "detail": "<urlopen error [Errno 8] nodename nor servname provided, or not known>"
+    }
+  ]
+}

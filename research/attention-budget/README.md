@@ -109,7 +109,35 @@ experiment:
 2. `gpt-oss-120b` bills reasoning tokens to `max_tokens`, so a small cap returns an
    **empty `content`** — a false "the model said nothing" that is really a budget bug.
 
-Results land in `results.json`.
+### Result — measured 13 Aug 2026
+
+| installed skills (N) | usable trials | top-1 routing | 95% CI (Wilson) |
+|---:|---:|---:|---|
+| 10 | 24 | **100.0%** | 86–100% |
+| 40 | 24 | **100.0%** | 86–100% |
+| 80 | 24 | **83.3%** | 64–93% |
+| 176 | 9 | **44.4%** | 19–73% |
+
+Routing is perfect to 40, degrades at 80, and collapses at the full library. **The break
+falls between 40 and 80** — below, not at, the paper's argued bound of 100. So the bound is
+directionally supported and, on this corpus, *generous*.
+
+The operator's own library is **176 skills** — the collapse cell.
+
+What this is NOT:
+- **Not a general constant.** One subject model (`gpt-oss-120b`), one corpus, 12 probes ×
+  2 seeds. A different model or corpus will move the curve.
+- **Not tight at the top end.** The N=176 cell rests on **9 usable trials** (15 calls lost to
+  free-tier rate limits) and its interval is 19–73%. It shows a collapse; it does not locate one.
+- **Still the optimistic bound.** Probes are derived from each target's own description, so
+  real phrasing — which never quotes the description — should do worse, not better.
+
+Failure shape is worth as much as the rate: at N=80 the misses are 3 wrong picks and 1
+abstention; at N=176, 4 wrong and 1 abstention. The model does not mostly say "none of
+these" — **it confidently picks the wrong skill.** A silent wrong route is harder to notice
+than a refusal.
+
+Raw per-trial records: `results.json`.
 
 ## 3. R&D area 2 — the same principle, applied to tool schemas
 
