@@ -1,0 +1,203 @@
+# Agent Loop Engineering — the lecture's claims, as a machine-checkable rubric.
+#
+# SOURCE: "AI开发进入新时代：Agent Loop Engineering - 讲座总结" (DataApplab / AI聘 webinar
+# summary, emailed 2026-08-20). Sixteen sections describing what a mature agent loop
+# must have. The essay asserts; nothing in it is verified against a running system.
+#
+# THIS FILE IS THE SPEC. `scripts/audit_loop_rubric.py` is the only consumer, so the
+# published score cannot drift from the claims it scores.
+#
+# RULES (docs/skill/playbooks/operationalizing-a-paper-rubric-checklist-standa.md):
+#   * Evidence is OBSERVED (a symbol in shipped code, a passing test), never claimed.
+#   * No evidence => NO. Not "probably".
+#   * A probe that cannot run is `unmeasured` — excluded from the rate, and it BLOCKS
+#     a green gate. An unmeasured item is never a silent pass.
+#   * `expect: absent` items are honest gap declarations: the rubric asserts the engine
+#     does NOT have this, and the probe FAILS if the gap ever silently closes.
+version: 1
+source:
+  title: "Agent Loop Engineering — 讲座总结"
+  publisher: "DataApplab / AI聘 (info@aipin.io)"
+  received: "2026-08-20"
+  nature: "lecture summary; taxonomy, no verification against a running system"
+
+items:
+  - id: L1-loop-not-oneshot
+    section: "2 — why an agent needs a loop"
+    claim: "The system iterates plan→act→observe→evaluate rather than answering once."
+    probe: {type: grep, pattern: "class LoopController", paths: ["src/loopeng/loop/controller.py"]}
+
+  - id: L2-goal
+    section: "3 — Goal"
+    claim: "The loop carries an explicit goal and a definition of done."
+    probe: {type: grep, pattern: "target_grade|target_score", paths: ["src/loopeng/config.py"]}
+
+  - id: L3-state
+    section: "3 — State"
+    claim: "Progress lives outside the model: steps taken, results, environment."
+    probe: {type: grep, pattern: "def record_iteration", paths: ["src/loopeng/memory/store.py"]}
+
+  - id: L4-policy
+    section: "3 — Policy"
+    claim: "Something decides the next action from the current state."
+    probe: {type: grep, pattern: "class RefactorBrief|def build_brief", paths: ["src/loopeng/adapters/base.py", "src/loopeng/loop/refactor_brief.py"]}
+
+  - id: L5-action-space
+    section: "3 — Action space"
+    claim: "The agent's available actions are declared, not open-ended."
+    probe: {type: grep, pattern: "class Factory|class Refiner|class Judge", paths: ["src/loopeng/adapters/base.py"]}
+
+  - id: L6-observation
+    section: "3 — Observation"
+    claim: "Every action returns structured environment feedback."
+    probe: {type: grep, pattern: "class Verdict", paths: ["src/loopeng/adapters/base.py"]}
+
+  - id: L7-evaluation
+    section: "3/10 — Evaluation is the controller"
+    claim: "A verifiable evaluator decides progress, not the maker's self-report."
+    probe: {type: grep, pattern: "def judge", paths: ["src/loopeng/adapters/base.py"]}
+
+  - id: L8-maker-not-checker
+    section: "10 — evaluation must be trustworthy"
+    claim: "The thing that builds is not the thing that grades."
+    probe: {type: pytest, node: "tests/test_maker_checker.py"}
+
+  - id: L9-reflection
+    section: "4/6 — Plan-Execute-Observe-Reflect, Self-Reflection"
+    claim: "Why the last attempt scored what it did is carried into the next attempt."
+    probe: {type: grep, pattern: "class ReflectionContext", paths: ["src/loopeng/adapters/base.py"]}
+
+  - id: L10-replan-on-plateau
+    section: "4 — the plan is not immutable"
+    claim: "Feedback can force a change of strategy, not just another attempt."
+    probe: {type: grep, pattern: "plateau_pivots", paths: ["src/loopeng/config.py"]}
+
+  - id: L11-retry-transient-only
+    section: "8 — Retry vs Recovery"
+    claim: "Only retryable (infrastructure) failures are retried; not every error."
+    probe: {type: grep, pattern: "last_infra_failure", paths: ["src/loopeng/adapters/base.py"]}
+
+  - id: L12-recovery-state
+    section: "8 — Recovery keeps enough state to resume"
+    claim: "A failed change can be rolled back rather than restarting from zero."
+    probe: {type: pytest, node: "tests/test_checkpoint.py"}
+
+  - id: L13-exit-success
+    section: "9 — explicit exits: success"
+    claim: "The loop stops when the goal is verifiably met."
+    probe: {type: grep, pattern: "CONVERGED", paths: ["src/loopeng/loop/convergence.py"]}
+
+  - id: L14-exit-budget
+    section: "9/14 — explicit exits: budget (iterations, tokens, wall clock)"
+    claim: "The loop stops on a spent budget, and the budget has more than one dimension."
+    probe: {type: grep, pattern: "ITERATION_CAP|TOKEN_CAP|WALL_CAP", paths: ["src/loopeng/loop/convergence.py"]}
+
+  - id: L15-exit-giveup
+    section: "9 — explicit exits: give up and report"
+    claim: "Repeated non-progress ends the run and reports failure instead of looping."
+    probe: {type: grep, pattern: "PLATEAU", paths: ["src/loopeng/loop/convergence.py"]}
+
+  - id: L16-safety-terminal
+    section: "13 — permission control"
+    claim: "A safety failure is terminal and unbypassable, whatever the score."
+    probe: {type: grep, pattern: "BLOCKED_SAFETY", paths: ["src/loopeng/loop/convergence.py"]}
+
+  - id: L17-permission-boundary
+    section: "13 — which tools/data the agent may touch is limited"
+    claim: "Execution is jailed and shell metacharacters are refused."
+    probe: {type: grep, pattern: "within_workspace|shell=False", paths: ["src/loopeng/adapters/safety.py"]}
+
+  - id: L18-human-in-the-loop
+    section: "12 — Human-in-the-Loop for high-risk actions"
+    claim: "High-risk completion requires a human, and the caller cannot self-approve."
+    probe: {type: grep, pattern: "class VerificationGate", paths: ["src/loopeng/config.py"]}
+
+  - id: L19-hitl-unbypassable
+    section: "12 — the gate must actually hold"
+    claim: "An unattended run cannot pre-confirm its own result."
+    probe: {type: pytest, node: "tests/test_run_contract.py::test_contract_can_never_disable_the_human_gate"}
+
+  - id: L20-multi-agent-graph
+    section: "11 — Loop becomes Graph with many agents"
+    claim: "Multiple agents are coordinated as a dependency graph, cycles refused."
+    probe: {type: grep, pattern: "Kahn|cycle", paths: ["src/loopeng/orchestration/coordinator.py"]}
+
+  - id: L21-observability
+    section: "13 — every iteration leaves enough log/trace to debug"
+    claim: "A run is reconstructable after the fact from recorded evidence."
+    probe: {type: grep, pattern: "def render_report", paths: ["src/loopeng/autonomous/report.py"]}
+
+  - id: L22-token-accounting
+    section: "14 — Token economics: measure tokens, time, iterations, success"
+    claim: "Token cost, wall time and iteration count are recorded per run."
+    probe: {type: grep, pattern: "token_cost", paths: ["src/loopeng/proof.py"]}
+
+  - id: L23-cost-never-faked
+    section: "14 — measurement must be real to be useful"
+    claim: "An unavailable cost is omitted, never estimated into the record."
+    probe: {type: pytest, node: "tests/test_proof.py"}
+
+  # ---- honest gap declarations: the rubric asserts these are ABSENT ----
+  - id: L24-typed-failure-taxonomy
+    section: "8 — classify the error before choosing a response"
+    claim: "Failures are classified into a named taxonomy (referee-unavailable, adapter-contract, human-gate-timeout)."
+    expect: absent
+    probe: {type: grep, pattern: "class FailureType|REFEREE_UNAVAILABLE", paths: ["src/loopeng"]}
+    gap_note: "Only infra-vs-clean is distinguished. External eval item 3."
+
+  - id: L25-branching-search
+    section: "7 — Tree of Thoughts"
+    claim: "The loop explores multiple candidate paths and prunes them."
+    expect: absent
+    probe: {type: grep, pattern: "tree_of_thought|beam_search", paths: ["src/loopeng"]}
+    gap_note: "Single-path refine with a dimension pivot. Deliberate: branching multiplies cost."
+
+  - id: L26-trace-schema
+    section: "13 — observability as a first-class trace"
+    claim: "Runs emit a structured trace (spans/trace ids), not just a report."
+    expect: absent
+    probe: {type: grep, pattern: "opentelemetry|trace_id|def emit_span", paths: ["src/loopeng"]}
+    gap_note: "Reports and proof packs exist; a span-level trace schema does not."
+
+  # ---- claims the lecture makes that this engine does NOT satisfy ----
+  # Added after the first run scored 23/23. A rubric authored by the same person who
+  # knows the codebase, that then passes everything, has measured nothing. These are
+  # the lecture's claims I had NOT encoded, chosen precisely because I expected them
+  # to fail. A gate that cannot fail is decoration.
+
+  - id: L27-react-interleaving
+    section: "5 — ReAct: reasoning and acting alternate at fine granularity"
+    claim: "The loop interleaves reason->act->observe per tool call, rather than one coarse generate/judge/refactor turn."
+    probe: {type: grep, pattern: "class ReActLoop|def reason_then_act", paths: ["src/loopeng"]}
+    rationale: >-
+      Deliberate divergence, not an oversight: ReAct puts the actor in charge of judging
+      its own next step, and this engine's load-bearing rule is that the maker never
+      grades. Recorded as a MISS rather than reclassified as a pass, because a rubric
+      that lets the author explain failures away scores nothing.
+
+  - id: L28-human-takeover
+    section: "12 — a human may take the task over directly"
+    claim: "A human can seize control of a running loop, not merely approve or reject its result."
+    probe: {type: grep, pattern: "def takeover|def handoff_to_human", paths: ["src/loopeng"]}
+    rationale: >-
+      A real gap. The gate is end-of-run approval; there is no control channel into a
+      loop already in flight. Worth building; not built.
+
+  - id: L29-success-rate-metric
+    section: "14 — measure tokens, time, iteration count AND task success rate"
+    claim: "Task success RATE is computed across runs, not just per-run outcome."
+    probe: {type: pytest, node: "tests/test_success_rate.py"}
+
+  - id: L30-manager-worker
+    section: "11 — Manager-Worker and hierarchical multi-agent structures"
+    claim: "A manager agent decomposes a goal and assigns sub-tasks to worker agents."
+    probe: {type: grep, pattern: "class ManagerAgent|def assign_subtask", paths: ["src/loopeng"]}
+    rationale: >-
+      Divergence: coordination is an explicit dependency DAG with cycle rejection, which
+      is inspectable before anything runs, rather than a manager agent deciding at
+      runtime. Still a miss against the lecture's claim.
+
+  - id: L31-error-memory
+    section: "13 — record errors so the agent does not repeat the same mistake"
+    claim: "Failures that recur across runs are surfaced to the next attempt."
+    probe: {type: grep, pattern: "recurring_failures", paths: ["src/loopeng/memory/store.py"]}
