@@ -676,6 +676,53 @@ class MemoryStore:
             ).fetchall()
         return [(row["run_id"], row["grade"]) for row in rows]
 
+    def success_rate(self, target: str | None = None) -> dict:
+        """Task success RATE across runs -- the cross-run metric the loop lacked.
+
+        Section 14 of the Agent Loop Engineering rubric asks for token cost, wall time,
+        iteration count AND task success rate. The first three were per-run and already
+        recorded; this is the fourth, and it is the only one that cannot be read off a
+        single run.
+
+        Returns counts plus ``rate`` = converged / (converged + stopped + blocked_safety).
+
+        Two deliberate choices, because a success metric is the easiest thing to flatter:
+
+        * ``running`` rows are counted and reported but EXCLUDED from the denominator --
+          an unfinished run is not a failure, and folding it in either way would move the
+          rate without evidence.
+        * ``blocked_safety`` counts as a FAILURE. A run halted by the safety gate did not
+          deliver the artifact, and a rate that quietly forgave safety blocks would reward
+          exactly the outcome the gate exists to prevent.
+
+        ``rate`` is ``None`` when nothing has finished -- never 0.0, which would read as
+        "we tried and failed" rather than "we have not measured".
+        """
+        sql = "SELECT status, COUNT(*) AS n FROM runs"
+        params: tuple = ()
+        if target is not None:
+            sql += " WHERE target = ?"
+            params = (target,)
+        sql += " GROUP BY status"
+        with self._wlock:
+            rows = self._conn.execute(sql, params).fetchall()
+
+        counts = {r["status"]: r["n"] for r in rows}
+        converged = counts.get("converged", 0)
+        stopped = counts.get("stopped", 0)
+        blocked = counts.get("blocked_safety", 0)
+        running = counts.get("running", 0)
+        finished = converged + stopped + blocked
+        return {
+            "target": target,
+            "converged": converged,
+            "stopped": stopped,
+            "blocked_safety": blocked,
+            "running_excluded": running,
+            "finished": finished,
+            "rate": round(converged / finished, 4) if finished else None,
+        }
+
     def record_injected_count(self, run_id: int, count: int) -> None:
         """Record how many reused prior learnings were injected into this run's
         briefs (flywheel U5). Observation-only -- never read into convergence."""
